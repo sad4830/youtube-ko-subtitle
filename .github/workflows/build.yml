@@ -13,9 +13,10 @@ jobs:
         shell: bash
         run: |
           set -e
-          mkdir -p app/src/main/java/com/local/ytaudiooverlay
+          mkdir -p app/src/main/java/com/local/ytaudiointernal
           mkdir -p app/src/main/res/values
-          
+          mkdir -p app/src/main/assets
+
           cat > settings.gradle.kts <<'EOF'
           pluginManagement {
               repositories {
@@ -24,7 +25,7 @@ jobs:
                   gradlePluginPortal()
               }
           }
-          
+
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories {
@@ -32,46 +33,50 @@ jobs:
                   mavenCentral()
               }
           }
-          
-          rootProject.name = "YouTubeAudioOverlay"
+
+          rootProject.name = "YouTubeInternalAudioKoSubtitle"
           include(":app")
           EOF
-          
+
           cat > build.gradle.kts <<'EOF'
           plugins {
               id("com.android.application") version "8.7.3" apply false
           }
           EOF
-          
+
           cat > app/build.gradle.kts <<'EOF'
           plugins {
               id("com.android.application")
           }
-          
+
           android {
-              namespace = "com.local.ytaudiooverlay"
+              namespace = "com.local.ytaudiointernal"
               compileSdk = 35
-          
+
               defaultConfig {
-                  applicationId = "com.local.ytaudiooverlay"
-                  minSdk = 26
+                  applicationId = "com.local.ytaudiointernal"
+                  minSdk = 29
                   targetSdk = 35
-                  versionCode = 2
-                  versionName = "2.0"
+                  versionCode = 3
+                  versionName = "3.0"
               }
           }
+
+          dependencies {
+              implementation("com.alphacephei:vosk-android:0.3.47")
+          }
           EOF
-          
+
           cat > app/src/main/res/values/styles.xml <<'EOF'
           <resources>
               <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
                   <item name="android:fontFamily">sans</item>
                   <item name="android:windowLightStatusBar">false</item>
-                  <item name="android:colorAccent">#ffffff</item>
+                  <item name="android:colorAccent">#111111</item>
               </style>
           </resources>
           EOF
-          
+
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
@@ -79,14 +84,15 @@ jobs:
               <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-          
+
               <application
                   android:allowBackup="true"
-                  android:label="유튜브 한국어 자막"
+                  android:label="유튜브 내부음성 한국어 자막"
                   android:theme="@style/AppTheme"
                   android:usesCleartextTraffic="false">
-          
+
                   <activity
                       android:name=".MainActivity"
                       android:exported="true">
@@ -95,22 +101,24 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-          
+
                   <service
-                      android:name=".SubtitleOverlayService"
+                      android:name=".InternalAudioSubtitleService"
                       android:exported="false"
-                      android:foregroundServiceType="microphone" />
+                      android:foregroundServiceType="mediaProjection|microphone" />
               </application>
           </manifest>
           EOF
-          
-          cat > app/src/main/java/com/local/ytaudiooverlay/MainActivity.java <<'EOF'
-          package com.local.ytaudiooverlay;
-          
+
+          cat > app/src/main/java/com/local/ytaudiointernal/MainActivity.java <<'EOF'
+          package com.local.ytaudiointernal;
+
           import android.Manifest;
           import android.app.Activity;
+          import android.content.Context;
           import android.content.Intent;
           import android.content.pm.PackageManager;
+          import android.media.projection.MediaProjectionManager;
           import android.net.Uri;
           import android.os.Build;
           import android.os.Bundle;
@@ -121,61 +129,61 @@ jobs:
           import android.widget.LinearLayout;
           import android.widget.TextView;
           import android.widget.Toast;
-          
+
           public class MainActivity extends Activity {
-              private static final int REQ_AUDIO = 10;
               private static final int REQ_OVERLAY = 11;
-          
+              private static final int REQ_AUDIO = 12;
+              private static final int REQ_MEDIA_PROJECTION = 13;
               private EditText urlInput;
-          
+
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   buildUi();
               }
-          
+
               private void buildUi() {
                   LinearLayout root = new LinearLayout(this);
                   root.setOrientation(LinearLayout.VERTICAL);
-                  root.setPadding(dp(18), dp(18), dp(18), dp(18));
                   root.setGravity(Gravity.CENTER_HORIZONTAL);
-          
+                  root.setPadding(dp(18), dp(18), dp(18), dp(18));
+
                   TextView title = new TextView(this);
-                  title.setText("유튜브 영어 음성 → 한국어 플로팅 자막");
+                  title.setText("유튜브 내부 음성 → 한국어 실시간 자막");
                   title.setTextSize(20);
                   title.setGravity(Gravity.CENTER);
                   root.addView(title);
-          
+
                   urlInput = new EditText(this);
                   urlInput.setHint("YouTube URL");
                   urlInput.setSingleLine(true);
                   root.addView(urlInput);
-          
-                  Button permissionButton = new Button(this);
-                  permissionButton.setText("권한 허용");
-                  root.addView(permissionButton);
-          
+
+                  Button permButton = new Button(this);
+                  permButton.setText("권한 허용");
+                  root.addView(permButton);
+
                   Button startButton = new Button(this);
-                  startButton.setText("유튜브 열고 자막 시작");
+                  startButton.setText("유튜브 열고 내부음성 자막 시작");
                   root.addView(startButton);
-          
+
                   Button stopButton = new Button(this);
                   stopButton.setText("자막 중지");
                   root.addView(stopButton);
-          
+
                   TextView help = new TextView(this);
-                  help.setText("1. 권한 허용\n2. 유튜브 URL 입력\n3. 유튜브 열고 자막 시작\n\n영상은 유튜브 앱에서 재생되고, 한국어 자막은 화면 위 플로팅 창으로 뜹니다.\n이어폰 말고 스피커로 틀어야 마이크가 영어 음성을 인식합니다.");
+                  help.setText("이번 버전은 마이크 SpeechRecognizer를 쓰지 않습니다.\n화면/오디오 캡처 권한을 받아서 유튜브 앱의 내부 재생 소리를 캡처하고, Vosk로 영어를 인식한 뒤 한국어로 번역해서 플로팅 자막으로 띄웁니다.\n\n일부 기기/영상/유튜브 정책에서 내부 오디오 캡처가 막히면 소리가 안 잡힐 수 있습니다.");
                   help.setTextSize(14);
                   root.addView(help);
-          
-                  permissionButton.setOnClickListener(v -> requestNeededPermissions());
-                  startButton.setOnClickListener(v -> startOverlayAndYoutube());
-                  stopButton.setOnClickListener(v -> stopService(new Intent(this, SubtitleOverlayService.class)));
-          
+
+                  permButton.setOnClickListener(v -> requestBasicPermissions());
+                  startButton.setOnClickListener(v -> startFlow());
+                  stopButton.setOnClickListener(v -> stopService(new Intent(this, InternalAudioSubtitleService.class)));
+
                   setContentView(root);
               }
-          
-              private void requestNeededPermissions() {
+
+              private void requestBasicPermissions() {
                   if (Build.VERSION.SDK_INT >= 23 && !Settings.canDrawOverlays(this)) {
                       Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
                       intent.setData(Uri.parse("package:" + getPackageName()));
@@ -183,169 +191,228 @@ jobs:
                       toast("다른 앱 위에 표시 권한을 허용하세요.");
                       return;
                   }
-          
+
                   if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                       requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_AUDIO);
                       return;
                   }
-          
+
                   if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                       requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 33);
                       return;
                   }
-          
-                  toast("권한 준비 완료");
+
+                  toast("기본 권한 준비 완료");
               }
-          
-              private void startOverlayAndYoutube() {
+
+              private void startFlow() {
                   String url = urlInput.getText().toString().trim();
                   if (url.isEmpty()) {
-                      toast("유튜브 URL을 넣으세요.");
+                      toast("YouTube URL을 넣으세요.");
                       return;
                   }
-          
+
                   if (Build.VERSION.SDK_INT >= 23 && !Settings.canDrawOverlays(this)) {
                       toast("먼저 다른 앱 위에 표시 권한을 허용하세요.");
-                      requestNeededPermissions();
+                      requestBasicPermissions();
                       return;
                   }
-          
+
                   if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                      toast("먼저 마이크 권한을 허용하세요.");
-                      requestNeededPermissions();
+                      toast("먼저 마이크/오디오 권한을 허용하세요.");
+                      requestBasicPermissions();
                       return;
                   }
-          
-                  Intent service = new Intent(this, SubtitleOverlayService.class);
-                  if (Build.VERSION.SDK_INT >= 26) {
-                      startForegroundService(service);
-                  } else {
-                      startService(service);
+
+                  if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                      requestBasicPermissions();
+                      return;
                   }
-          
-                  try {
-                      Intent yt = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                      yt.setPackage("com.google.android.youtube");
-                      startActivity(yt);
-                  } catch (Exception e) {
-                      Intent browser = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                      startActivity(browser);
+
+                  MediaProjectionManager mpm = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+                  Intent captureIntent = mpm.createScreenCaptureIntent();
+                  startActivityForResult(captureIntent, REQ_MEDIA_PROJECTION);
+              }
+
+              @Override
+              protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+                  super.onActivityResult(requestCode, resultCode, data);
+                  if (requestCode == REQ_MEDIA_PROJECTION) {
+                      if (resultCode != RESULT_OK || data == null) {
+                          toast("화면/오디오 캡처 권한이 필요합니다.");
+                          return;
+                      }
+
+                      String url = urlInput.getText().toString().trim();
+
+                      Intent service = new Intent(this, InternalAudioSubtitleService.class);
+                      service.putExtra("projection_result_code", resultCode);
+                      service.putExtra("projection_data", data);
+
+                      if (Build.VERSION.SDK_INT >= 26) {
+                          startForegroundService(service);
+                      } else {
+                          startService(service);
+                      }
+
+                      try {
+                          Intent yt = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                          yt.setPackage("com.google.android.youtube");
+                          startActivity(yt);
+                      } catch (Exception e) {
+                          startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                      }
                   }
               }
-          
+
               @Override
               public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
                   super.onRequestPermissionsResult(requestCode, permissions, grantResults);
                   toast("권한 처리됨");
               }
-          
+
               private int dp(int v) {
                   return Math.round(v * getResources().getDisplayMetrics().density);
               }
-          
+
               private void toast(String text) {
                   Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
               }
           }
           EOF
-          
-          cat > app/src/main/java/com/local/ytaudiooverlay/SubtitleOverlayService.java <<'EOF'
-          package com.local.ytaudiooverlay;
-          
+
+          cat > app/src/main/java/com/local/ytaudiointernal/InternalAudioSubtitleService.java <<'EOF'
+          package com.local.ytaudiointernal;
+
           import android.app.Notification;
           import android.app.NotificationChannel;
           import android.app.NotificationManager;
           import android.app.Service;
+          import android.content.Context;
           import android.content.Intent;
           import android.graphics.Color;
           import android.graphics.PixelFormat;
           import android.graphics.Typeface;
+          import android.media.AudioAttributes;
+          import android.media.AudioFormat;
+          import android.media.AudioPlaybackCaptureConfiguration;
+          import android.media.AudioRecord;
+          import android.media.MediaRecorder;
+          import android.media.projection.MediaProjection;
+          import android.media.projection.MediaProjectionManager;
           import android.os.Build;
-          import android.os.Bundle;
           import android.os.Handler;
           import android.os.IBinder;
           import android.os.Looper;
-          import android.speech.RecognitionListener;
-          import android.speech.RecognizerIntent;
-          import android.speech.SpeechRecognizer;
           import android.view.Gravity;
           import android.view.MotionEvent;
           import android.view.View;
           import android.view.WindowManager;
           import android.widget.TextView;
-          
+
+          import org.vosk.Model;
+          import org.vosk.Recognizer;
+          import org.vosk.android.StorageService;
+
           import java.io.BufferedReader;
           import java.io.InputStream;
           import java.io.InputStreamReader;
           import java.net.HttpURLConnection;
           import java.net.URL;
           import java.net.URLEncoder;
-          import java.util.ArrayList;
-          import java.util.Locale;
           import java.util.concurrent.ExecutorService;
           import java.util.concurrent.Executors;
-          
-          public class SubtitleOverlayService extends Service {
+
+          public class InternalAudioSubtitleService extends Service {
+              private static final int SAMPLE_RATE = 16000;
+
+              private final Handler handler = new Handler(Looper.getMainLooper());
+              private final ExecutorService executor = Executors.newCachedThreadPool();
+
               private WindowManager windowManager;
               private TextView overlayText;
-              private SpeechRecognizer recognizer;
-              private Intent speechIntent;
-              private final Handler handler = new Handler(Looper.getMainLooper());
-              private final ExecutorService executor = Executors.newSingleThreadExecutor();
-              private boolean listening = false;
+
+              private MediaProjection mediaProjection;
+              private AudioRecord audioRecord;
+              private Recognizer recognizer;
+              private Model model;
+
+              private volatile boolean running = false;
+              private volatile boolean translating = false;
+              private String lastPartial = "";
               private String lastFinal = "";
-          
+              private long lastPartialTranslateMs = 0;
+
               @Override
               public void onCreate() {
                   super.onCreate();
-                  createNotification();
+                  startAsForeground();
                   createOverlay();
-                  createRecognizer();
-                  startListening();
+                  setOverlay("내부 오디오 자막 준비 중...");
               }
-          
-              private void createNotification() {
-                  String channelId = "subtitle_overlay";
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  if (intent == null) return START_NOT_STICKY;
+
+                  int resultCode = intent.getIntExtra("projection_result_code", -1);
+                  Intent data = intent.getParcelableExtra("projection_data");
+
+                  if (resultCode == -1 || data == null) {
+                      setOverlay("캡처 권한 정보 없음");
+                      stopSelf();
+                      return START_NOT_STICKY;
+                  }
+
+                  MediaProjectionManager mpm = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+                  mediaProjection = mpm.getMediaProjection(resultCode, data);
+
+                  loadModelAndStart();
+                  return START_STICKY;
+              }
+
+              private void startAsForeground() {
+                  String channelId = "internal_audio_subtitle";
                   if (Build.VERSION.SDK_INT >= 26) {
                       NotificationChannel channel = new NotificationChannel(
                               channelId,
-                              "Subtitle Overlay",
+                              "Internal Audio Subtitle",
                               NotificationManager.IMPORTANCE_LOW
                       );
                       NotificationManager nm = getSystemService(NotificationManager.class);
                       nm.createNotificationChannel(channel);
                   }
-          
+
                   Notification.Builder builder = Build.VERSION.SDK_INT >= 26
                           ? new Notification.Builder(this, channelId)
                           : new Notification.Builder(this);
-          
+
                   Notification notification = builder
-                          .setContentTitle("한국어 자막 실행 중")
-                          .setContentText("유튜브 음성을 듣고 한국어 자막을 표시합니다.")
+                          .setContentTitle("내부음성 한국어 자막 실행 중")
+                          .setContentText("유튜브 소리를 인식하고 한국어 자막을 표시합니다.")
                           .setSmallIcon(android.R.drawable.ic_btn_speak_now)
                           .build();
-          
+
                   startForeground(1, notification);
               }
-          
+
               private void createOverlay() {
                   windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-          
+
                   overlayText = new TextView(this);
-                  overlayText.setText("한국어 자막 대기 중...");
+                  overlayText.setText("한국어 자막 준비 중...");
                   overlayText.setTextColor(Color.WHITE);
-                  overlayText.setTextSize(24);
+                  overlayText.setTextSize(23);
                   overlayText.setTypeface(Typeface.DEFAULT_BOLD);
                   overlayText.setGravity(Gravity.CENTER);
                   overlayText.setShadowLayer(6, 2, 2, Color.BLACK);
-                  overlayText.setBackgroundColor(Color.argb(175, 0, 0, 0));
+                  overlayText.setBackgroundColor(Color.argb(178, 0, 0, 0));
                   overlayText.setPadding(dp(14), dp(10), dp(14), dp(10));
-          
+
                   int type = Build.VERSION.SDK_INT >= 26
                           ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                           : WindowManager.LayoutParams.TYPE_PHONE;
-          
+
                   WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                           WindowManager.LayoutParams.MATCH_PARENT,
                           WindowManager.LayoutParams.WRAP_CONTENT,
@@ -355,14 +422,14 @@ jobs:
                                   | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                           PixelFormat.TRANSLUCENT
                   );
-          
+
                   params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
                   params.y = dp(70);
-          
+
                   overlayText.setOnTouchListener(new View.OnTouchListener() {
                       float startY;
                       int startParamY;
-          
+
                       @Override
                       public boolean onTouch(View v, MotionEvent event) {
                           if (event.getAction() == MotionEvent.ACTION_DOWN) {
@@ -378,113 +445,132 @@ jobs:
                           return true;
                       }
                   });
-          
+
                   windowManager.addView(overlayText, params);
               }
-          
-              private void createRecognizer() {
-                  if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-                      setOverlay("이 폰에서 음성 인식 사용 불가");
+
+              private void loadModelAndStart() {
+                  setOverlay("영어 인식 모델 불러오는 중...");
+                  StorageService.unpack(this, "model-en-us", "model",
+                          loadedModel -> {
+                              model = loadedModel;
+                              setOverlay("모델 준비 완료. 유튜브 소리 캡처 시작...");
+                              startAudioCapture();
+                          },
+                          exception -> {
+                              setOverlay("모델 로드 실패: " + exception.getMessage());
+                              stopSelf();
+                          });
+              }
+
+              private void startAudioCapture() {
+                  if (mediaProjection == null) {
+                      setOverlay("MediaProjection 없음");
                       return;
                   }
-          
-                  recognizer = SpeechRecognizer.createSpeechRecognizer(this);
-                  speechIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-                  speechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-                  speechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag());
-                  speechIntent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-                  speechIntent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
-          
-                  recognizer.setRecognitionListener(new RecognitionListener() {
-                      @Override public void onReadyForSpeech(Bundle params) {
-                          setOverlay("듣는 중...");
-                      }
-          
-                      @Override public void onBeginningOfSpeech() {}
-                      @Override public void onRmsChanged(float rmsdB) {}
-                      @Override public void onBufferReceived(byte[] buffer) {}
-                      @Override public void onEndOfSpeech() { restartListening(); }
-                      @Override public void onError(int error) { if (listening) restartListening(); }
-          
-                      @Override public void onResults(Bundle results) {
-                          handleSpeech(results, true);
-                          if (listening) restartListening();
-                      }
-          
-                      @Override public void onPartialResults(Bundle partialResults) {
-                          handleSpeech(partialResults, false);
-                      }
-          
-                      @Override public void onEvent(int eventType, Bundle params) {}
-                  });
-              }
-          
-              private void startListening() {
-                  listening = true;
-                  if (recognizer == null) return;
+
                   try {
-                      recognizer.cancel();
-                      recognizer.startListening(speechIntent);
+                      AudioFormat audioFormat = new AudioFormat.Builder()
+                              .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                              .setSampleRate(SAMPLE_RATE)
+                              .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                              .build();
+
+                      AudioPlaybackCaptureConfiguration config =
+                              new AudioPlaybackCaptureConfiguration.Builder(mediaProjection)
+                                      .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
+                                      .addMatchingUsage(AudioAttributes.USAGE_GAME)
+                                      .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
+                                      .build();
+
+                      int minBuffer = AudioRecord.getMinBufferSize(
+                              SAMPLE_RATE,
+                              AudioFormat.CHANNEL_IN_MONO,
+                              AudioFormat.ENCODING_PCM_16BIT
+                      );
+                      int bufferSize = Math.max(minBuffer, SAMPLE_RATE * 2);
+
+                      audioRecord = new AudioRecord.Builder()
+                              .setAudioFormat(audioFormat)
+                              .setBufferSizeInBytes(bufferSize)
+                              .setAudioPlaybackCaptureConfig(config)
+                              .build();
+
+                      recognizer = new Recognizer(model, SAMPLE_RATE);
+                      running = true;
+                      executor.execute(this::recordLoop);
                   } catch (Exception e) {
-                      restartListening();
+                      setOverlay("내부 오디오 캡처 시작 실패: " + e.getMessage());
                   }
               }
-          
-              private void restartListening() {
-                  if (!listening) return;
-                  handler.postDelayed(() -> {
-                      if (!listening || recognizer == null) return;
-                      try {
-                          recognizer.cancel();
-                          recognizer.startListening(speechIntent);
-                      } catch (Exception ignored) {}
-                  }, 700);
-              }
-          
-              private void handleSpeech(Bundle bundle, boolean finalResult) {
-                  ArrayList<String> list = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                  if (list == null || list.isEmpty()) return;
-          
-                  String english = list.get(0).trim();
-                  if (english.isEmpty()) return;
-          
-                  if (!finalResult) {
-                      setOverlay("인식 중: " + english);
-                      return;
+
+              private void recordLoop() {
+                  try {
+                      byte[] buffer = new byte[4096];
+                      audioRecord.startRecording();
+                      setOverlay("내부 오디오 듣는 중...");
+
+                      while (running) {
+                          int nread = audioRecord.read(buffer, 0, buffer.length);
+                          if (nread <= 0) continue;
+
+                          boolean finalResult = recognizer.acceptWaveForm(buffer, nread);
+                          if (finalResult) {
+                              String text = extractJsonValue(recognizer.getResult(), "text");
+                              if (text != null && text.trim().length() > 2 && !text.equalsIgnoreCase(lastFinal)) {
+                                  lastFinal = text;
+                                  translateAndShow(text, true);
+                              }
+                          } else {
+                              String partial = extractJsonValue(recognizer.getPartialResult(), "partial");
+                              long now = System.currentTimeMillis();
+                              if (partial != null && partial.trim().length() > 5 && !partial.equalsIgnoreCase(lastPartial)) {
+                                  lastPartial = partial;
+                                  if (now - lastPartialTranslateMs > 1200) {
+                                      lastPartialTranslateMs = now;
+                                      translateAndShow(partial, false);
+                                  }
+                              }
+                          }
+                      }
+                  } catch (Exception e) {
+                      setOverlay("인식 오류: " + e.getMessage());
                   }
-          
-                  if (english.equalsIgnoreCase(lastFinal)) return;
-                  lastFinal = english;
-          
-                  setOverlay("번역 중...");
-                  translate(english);
               }
-          
-              private void translate(String english) {
+
+              private void translateAndShow(String english, boolean finalResult) {
+                  if (translating && !finalResult) return;
+                  translating = true;
+
                   executor.execute(() -> {
                       try {
                           String q = URLEncoder.encode(english, "UTF-8");
                           String url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q=" + q;
-          
+
                           HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                           conn.setRequestMethod("GET");
-                          conn.setConnectTimeout(10000);
-                          conn.setReadTimeout(10000);
-          
+                          conn.setConnectTimeout(8000);
+                          conn.setReadTimeout(8000);
+
                           InputStream is = conn.getInputStream();
                           BufferedReader br = new BufferedReader(new InputStreamReader(is));
                           StringBuilder sb = new StringBuilder();
                           String line;
                           while ((line = br.readLine()) != null) sb.append(line);
-          
+
                           String korean = parseTranslate(sb.toString());
-                          setOverlay(korean);
+                          if (korean == null || korean.trim().isEmpty()) korean = english;
+
+                          final String show = finalResult ? korean : korean + " …";
+                          setOverlay(show);
                       } catch (Exception e) {
-                          setOverlay("번역 실패");
+                          setOverlay("번역 실패: " + english);
+                      } finally {
+                          translating = false;
                       }
                   });
               }
-          
+
               private String parseTranslate(String raw) {
                   try {
                       int a = raw.indexOf("\"");
@@ -492,43 +578,84 @@ jobs:
                       if (a >= 0 && b > a) {
                           return raw.substring(a + 1, b)
                                   .replace("\\n", "\n")
-                                  .replace("\\\"", "\"");
+                                  .replace("\\\"", "\"")
+                                  .replace("\\u003c", "<")
+                                  .replace("\\u003e", ">");
                       }
                   } catch (Exception ignored) {}
                   return raw;
               }
-          
+
+              private String extractJsonValue(String raw, String key) {
+                  try {
+                      String needle = "\"" + key + "\"";
+                      int k = raw.indexOf(needle);
+                      if (k < 0) return "";
+                      int colon = raw.indexOf(":", k);
+                      int first = raw.indexOf("\"", colon + 1);
+                      int second = raw.indexOf("\"", first + 1);
+                      if (first >= 0 && second > first) {
+                          return raw.substring(first + 1, second)
+                                  .replace("\\\"", "\"")
+                                  .replace("\\n", " ");
+                      }
+                  } catch (Exception ignored) {}
+                  return "";
+              }
+
               private void setOverlay(String text) {
                   handler.post(() -> {
                       if (overlayText != null) overlayText.setText(text);
                   });
               }
-          
+
               private int dp(int v) {
                   return Math.round(v * getResources().getDisplayMetrics().density);
               }
-          
-              @Override
-              public int onStartCommand(Intent intent, int flags, int startId) {
-                  if (!listening) startListening();
-                  return START_STICKY;
-              }
-          
+
               @Override
               public void onDestroy() {
-                  listening = false;
-                  if (recognizer != null) recognizer.destroy();
-                  if (overlayText != null && windowManager != null) windowManager.removeView(overlayText);
+                  running = false;
+
+                  try {
+                      if (audioRecord != null) {
+                          audioRecord.stop();
+                          audioRecord.release();
+                      }
+                  } catch (Exception ignored) {}
+
+                  try {
+                      if (recognizer != null) recognizer.close();
+                  } catch (Exception ignored) {}
+
+                  try {
+                      if (model != null) model.close();
+                  } catch (Exception ignored) {}
+
+                  try {
+                      if (mediaProjection != null) mediaProjection.stop();
+                  } catch (Exception ignored) {}
+
+                  try {
+                      if (overlayText != null && windowManager != null) windowManager.removeView(overlayText);
+                  } catch (Exception ignored) {}
+
                   executor.shutdownNow();
                   super.onDestroy();
               }
-          
+
               @Override
               public IBinder onBind(Intent intent) {
                   return null;
               }
           }
           EOF
+
+          echo "Downloading Vosk English model..."
+          curl -L -o model.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+          unzip -q model.zip
+          mv vosk-model-small-en-us-0.15 app/src/main/assets/model-en-us
+          rm model.zip
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -553,5 +680,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: youtube-audio-overlay-apk
+          name: youtube-internal-audio-ko-subtitle-apk
           path: app/build/outputs/apk/debug/app-debug.apk
