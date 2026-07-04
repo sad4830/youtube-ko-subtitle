@@ -60,10 +60,6 @@ jobs:
                   versionName = "1.0"
               }
           }
-
-          dependencies {
-              implementation("com.google.mlkit:translate:17.0.3")
-          }
           EOF
 
           cat > app/src/main/res/values/styles.xml <<'EOF'
@@ -127,14 +123,16 @@ jobs:
           import android.widget.TextView;
           import android.widget.Toast;
 
-          import com.google.mlkit.common.model.DownloadConditions;
-          import com.google.mlkit.nl.translate.TranslateLanguage;
-          import com.google.mlkit.nl.translate.Translation;
-          import com.google.mlkit.nl.translate.Translator;
-          import com.google.mlkit.nl.translate.TranslatorOptions;
-
+          import java.io.BufferedReader;
+          import java.io.InputStream;
+          import java.io.InputStreamReader;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.net.URLEncoder;
           import java.util.ArrayList;
           import java.util.Locale;
+          import java.util.concurrent.ExecutorService;
+          import java.util.concurrent.Executors;
 
           public class MainActivity extends Activity {
               private static final int REQ_AUDIO = 100;
@@ -149,17 +147,15 @@ jobs:
 
               private SpeechRecognizer recognizer;
               private Intent speechIntent;
-              private Translator translator;
               private boolean listening = false;
-              private boolean translatorReady = false;
               private final Handler handler = new Handler(Looper.getMainLooper());
+              private final ExecutorService executor = Executors.newSingleThreadExecutor();
               private String lastFinalText = "";
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   buildUi();
-                  prepareTranslator();
                   prepareRecognizer();
               }
 
@@ -197,13 +193,12 @@ jobs:
 
                   listenButton = new Button(this);
                   listenButton.setText("음성 인식 시작");
-                  listenButton.setEnabled(false);
                   row.addView(listenButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
                   top.addView(row);
 
                   progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
                   progressBar.setMax(100);
-                  progressBar.setProgress(0);
+                  progressBar.setProgress(100);
                   top.addView(progressBar);
 
                   statusText = new TextView(this);
@@ -225,6 +220,7 @@ jobs:
                   ws.setUseWideViewPort(true);
                   ws.setLoadWithOverviewMode(true);
                   webView.setWebChromeClient(new WebChromeClient());
+
                   box.addView(webView, new FrameLayout.LayoutParams(
                           FrameLayout.LayoutParams.MATCH_PARENT,
                           FrameLayout.LayoutParams.MATCH_PARENT
@@ -237,7 +233,7 @@ jobs:
                   subtitleText.setTypeface(Typeface.DEFAULT_BOLD);
                   subtitleText.setGravity(Gravity.CENTER);
                   subtitleText.setShadowLayer(6, 2, 2, Color.BLACK);
-                  subtitleText.setBackgroundColor(Color.argb(165, 0, 0, 0));
+                  subtitleText.setBackgroundColor(Color.argb(170, 0, 0, 0));
                   subtitleText.setPadding(dp(12), dp(8), dp(12), dp(8));
 
                   FrameLayout.LayoutParams sub = new FrameLayout.LayoutParams(
@@ -260,25 +256,6 @@ jobs:
                   setContentView(root);
               }
 
-              private void prepareTranslator() {
-                  TranslatorOptions options = new TranslatorOptions.Builder()
-                          .setSourceLanguage(TranslateLanguage.ENGLISH)
-                          .setTargetLanguage(TranslateLanguage.KOREAN)
-                          .build();
-
-                  translator = Translation.getClient(options);
-                  status("번역 모델 준비 중...");
-
-                  translator.downloadModelIfNeeded(new DownloadConditions.Builder().build())
-                          .addOnSuccessListener(unused -> {
-                              translatorReady = true;
-                              progressBar.setProgress(100);
-                              listenButton.setEnabled(true);
-                              status("번역 준비 완료. 영상을 열고 재생하세요.");
-                          })
-                          .addOnFailureListener(e -> status("번역 모델 다운로드 실패: " + e.getMessage()));
-              }
-
               private void prepareRecognizer() {
                   if (!SpeechRecognizer.isRecognitionAvailable(this)) {
                       status("이 폰에서 음성 인식 서비스를 사용할 수 없습니다.");
@@ -294,7 +271,7 @@ jobs:
 
                   recognizer.setRecognitionListener(new RecognitionListener() {
                       @Override public void onReadyForSpeech(Bundle params) {
-                          status("듣는 중... 영상 소리를 스피커로 틀어주세요.");
+                          status("듣는 중... 영상 영어 소리를 스피커로 틀어주세요.");
                       }
 
                       @Override public void onBeginningOfSpeech() {}
@@ -302,13 +279,16 @@ jobs:
                       @Override public void onBufferReceived(byte[] buffer) {}
                       @Override public void onEndOfSpeech() { restart(); }
                       @Override public void onError(int error) { if (listening) restart(); }
+
                       @Override public void onResults(Bundle results) {
                           handleResults(results, true);
                           if (listening) restart();
                       }
+
                       @Override public void onPartialResults(Bundle partialResults) {
                           handleResults(partialResults, false);
                       }
+
                       @Override public void onEvent(int eventType, Bundle params) {}
                   });
               }
@@ -327,15 +307,10 @@ jobs:
 
                   webView.loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "utf-8", null);
                   subtitleText.setText("");
-                  status("영상 열림. 영상 재생 후 음성 인식 시작을 누르세요.");
+                  status("영상 열림. 재생 후 음성 인식 시작을 누르세요.");
               }
 
               private void toggleListening() {
-                  if (!translatorReady) {
-                      toast("번역 모델 준비 중입니다.");
-                      return;
-                  }
-
                   if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                       requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_AUDIO);
                       return;
@@ -371,7 +346,7 @@ jobs:
               }
 
               private void restart() {
-                  if (listening) handler.postDelayed(this::startListen, 500);
+                  if (listening) handler.postDelayed(this::startListen, 600);
               }
 
               private void handleResults(Bundle bundle, boolean finalResult) {
@@ -390,13 +365,48 @@ jobs:
                   lastFinalText = english;
 
                   status("영어 인식: " + english + "\n한국어 번역 중...");
+                  translateOnline(english);
+              }
 
-                  translator.translate(english)
-                          .addOnSuccessListener(korean -> {
+              private void translateOnline(String english) {
+                  executor.execute(() -> {
+                      try {
+                          String q = URLEncoder.encode(english, "UTF-8");
+                          String url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q=" + q;
+
+                          HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                          conn.setRequestMethod("GET");
+                          conn.setConnectTimeout(10000);
+                          conn.setReadTimeout(10000);
+
+                          InputStream is = conn.getInputStream();
+                          BufferedReader br = new BufferedReader(new InputStreamReader(is));
+                          StringBuilder sb = new StringBuilder();
+                          String line;
+                          while ((line = br.readLine()) != null) sb.append(line);
+
+                          String korean = parseGoogleTranslate(sb.toString());
+                          runOnUiThread(() -> {
                               subtitleText.setText(korean);
                               status("영어: " + english + "\n한국어: " + korean);
-                          })
-                          .addOnFailureListener(e -> status("번역 실패: " + e.getMessage()));
+                          });
+                      } catch (Exception e) {
+                          runOnUiThread(() -> status("번역 실패: " + e.getMessage()));
+                      }
+                  });
+              }
+
+              private String parseGoogleTranslate(String raw) {
+                  try {
+                      int firstQuote = raw.indexOf("\"");
+                      int secondQuote = raw.indexOf("\"", firstQuote + 1);
+                      if (firstQuote >= 0 && secondQuote > firstQuote) {
+                          return raw.substring(firstQuote + 1, secondQuote)
+                                  .replace("\\n", "\n")
+                                  .replace("\\\"", "\"");
+                      }
+                  } catch (Exception ignored) {}
+                  return raw;
               }
 
               private String extractVideoId(String input) {
@@ -443,7 +453,7 @@ jobs:
               protected void onDestroy() {
                   listening = false;
                   if (recognizer != null) recognizer.destroy();
-                  if (translator != null) translator.close();
+                  executor.shutdownNow();
                   super.onDestroy();
               }
           }
