@@ -2,129 +2,452 @@ name: Build APK
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Restore project
+      - name: Create Android project
         shell: bash
         run: |
-          cat > project.tgz.b64 <<'B64EOF'
-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
-h2SQ+AB4AAA=
-B64EOF
-          base64 -d project.tgz.b64 > project.tgz
-          tar -xzf project.tgz
+          set -e
+          mkdir -p app/src/main/java/com/local/ytaudioko
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle.kts <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "YouTubeAudioKoLive"
+          include(":app")
+          EOF
+
+          cat > build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application") version "8.7.3" apply false
+          }
+          EOF
+
+          cat > app/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application")
+          }
+
+          android {
+              namespace = "com.local.ytaudioko"
+              compileSdk = 35
+
+              defaultConfig {
+                  applicationId = "com.local.ytaudioko"
+                  minSdk = 26
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+          }
+
+          dependencies {
+              implementation("com.google.mlkit:translate:17.0.3")
+          }
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:colorAccent">#ffffff</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+              <application
+                  android:allowBackup="true"
+                  android:label="유튜브 한국어 자막"
+                  android:theme="@style/AppTheme"
+                  android:usesCleartextTraffic="false">
+                  <activity
+                      android:name=".MainActivity"
+                      android:configChanges="orientation|screenSize|keyboardHidden"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/java/com/local/ytaudioko/MainActivity.java <<'EOF'
+          package com.local.ytaudioko;
+
+          import android.Manifest;
+          import android.annotation.SuppressLint;
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.speech.RecognitionListener;
+          import android.speech.RecognizerIntent;
+          import android.speech.SpeechRecognizer;
+          import android.view.Gravity;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.FrameLayout;
+          import android.widget.LinearLayout;
+          import android.widget.ProgressBar;
+          import android.widget.TextView;
+          import android.widget.Toast;
+
+          import com.google.mlkit.common.model.DownloadConditions;
+          import com.google.mlkit.nl.translate.TranslateLanguage;
+          import com.google.mlkit.nl.translate.Translation;
+          import com.google.mlkit.nl.translate.Translator;
+          import com.google.mlkit.nl.translate.TranslatorOptions;
+
+          import java.util.ArrayList;
+          import java.util.Locale;
+
+          public class MainActivity extends Activity {
+              private static final int REQ_AUDIO = 100;
+
+              private EditText urlInput;
+              private Button openButton;
+              private Button listenButton;
+              private TextView statusText;
+              private TextView subtitleText;
+              private WebView webView;
+              private ProgressBar progressBar;
+
+              private SpeechRecognizer recognizer;
+              private Intent speechIntent;
+              private Translator translator;
+              private boolean listening = false;
+              private boolean translatorReady = false;
+              private final Handler handler = new Handler(Looper.getMainLooper());
+              private String lastFinalText = "";
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  buildUi();
+                  prepareTranslator();
+                  prepareRecognizer();
+              }
+
+              @SuppressLint("SetJavaScriptEnabled")
+              private void buildUi() {
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setBackgroundColor(Color.BLACK);
+
+                  LinearLayout top = new LinearLayout(this);
+                  top.setOrientation(LinearLayout.VERTICAL);
+                  top.setPadding(dp(10), dp(10), dp(10), dp(8));
+                  top.setBackgroundColor(Color.rgb(18, 18, 18));
+
+                  TextView title = new TextView(this);
+                  title.setText("유튜브 영어 음성 → 한국어 자막");
+                  title.setTextColor(Color.WHITE);
+                  title.setTextSize(19);
+                  title.setGravity(Gravity.CENTER);
+                  top.addView(title);
+
+                  urlInput = new EditText(this);
+                  urlInput.setHint("YouTube URL");
+                  urlInput.setHintTextColor(Color.GRAY);
+                  urlInput.setTextColor(Color.WHITE);
+                  urlInput.setSingleLine(true);
+                  top.addView(urlInput);
+
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+
+                  openButton = new Button(this);
+                  openButton.setText("영상 열기");
+                  row.addView(openButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+                  listenButton = new Button(this);
+                  listenButton.setText("음성 인식 시작");
+                  listenButton.setEnabled(false);
+                  row.addView(listenButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+                  top.addView(row);
+
+                  progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+                  progressBar.setMax(100);
+                  progressBar.setProgress(0);
+                  top.addView(progressBar);
+
+                  statusText = new TextView(this);
+                  statusText.setText("URL 입력 → 영상 열기 → 재생 → 음성 인식 시작");
+                  statusText.setTextColor(Color.LTGRAY);
+                  statusText.setTextSize(12);
+                  top.addView(statusText);
+
+                  root.addView(top);
+
+                  FrameLayout box = new FrameLayout(this);
+                  box.setBackgroundColor(Color.BLACK);
+
+                  webView = new WebView(this);
+                  WebSettings ws = webView.getSettings();
+                  ws.setJavaScriptEnabled(true);
+                  ws.setDomStorageEnabled(true);
+                  ws.setMediaPlaybackRequiresUserGesture(false);
+                  ws.setUseWideViewPort(true);
+                  ws.setLoadWithOverviewMode(true);
+                  webView.setWebChromeClient(new WebChromeClient());
+                  box.addView(webView, new FrameLayout.LayoutParams(
+                          FrameLayout.LayoutParams.MATCH_PARENT,
+                          FrameLayout.LayoutParams.MATCH_PARENT
+                  ));
+
+                  subtitleText = new TextView(this);
+                  subtitleText.setText("");
+                  subtitleText.setTextColor(Color.WHITE);
+                  subtitleText.setTextSize(24);
+                  subtitleText.setTypeface(Typeface.DEFAULT_BOLD);
+                  subtitleText.setGravity(Gravity.CENTER);
+                  subtitleText.setShadowLayer(6, 2, 2, Color.BLACK);
+                  subtitleText.setBackgroundColor(Color.argb(165, 0, 0, 0));
+                  subtitleText.setPadding(dp(12), dp(8), dp(12), dp(8));
+
+                  FrameLayout.LayoutParams sub = new FrameLayout.LayoutParams(
+                          FrameLayout.LayoutParams.MATCH_PARENT,
+                          FrameLayout.LayoutParams.WRAP_CONTENT
+                  );
+                  sub.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+                  sub.setMargins(dp(8), dp(8), dp(8), dp(24));
+                  box.addView(subtitleText, sub);
+
+                  root.addView(box, new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          0,
+                          1
+                  ));
+
+                  openButton.setOnClickListener(v -> openYoutube());
+                  listenButton.setOnClickListener(v -> toggleListening());
+
+                  setContentView(root);
+              }
+
+              private void prepareTranslator() {
+                  TranslatorOptions options = new TranslatorOptions.Builder()
+                          .setSourceLanguage(TranslateLanguage.ENGLISH)
+                          .setTargetLanguage(TranslateLanguage.KOREAN)
+                          .build();
+
+                  translator = Translation.getClient(options);
+                  status("번역 모델 준비 중...");
+
+                  translator.downloadModelIfNeeded(new DownloadConditions.Builder().build())
+                          .addOnSuccessListener(unused -> {
+                              translatorReady = true;
+                              progressBar.setProgress(100);
+                              listenButton.setEnabled(true);
+                              status("번역 준비 완료. 영상을 열고 재생하세요.");
+                          })
+                          .addOnFailureListener(e -> status("번역 모델 다운로드 실패: " + e.getMessage()));
+              }
+
+              private void prepareRecognizer() {
+                  if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+                      status("이 폰에서 음성 인식 서비스를 사용할 수 없습니다.");
+                      return;
+                  }
+
+                  recognizer = SpeechRecognizer.createSpeechRecognizer(this);
+                  speechIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                  speechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                  speechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.US.toLanguageTag());
+                  speechIntent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+                  speechIntent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+
+                  recognizer.setRecognitionListener(new RecognitionListener() {
+                      @Override public void onReadyForSpeech(Bundle params) {
+                          status("듣는 중... 영상 소리를 스피커로 틀어주세요.");
+                      }
+
+                      @Override public void onBeginningOfSpeech() {}
+                      @Override public void onRmsChanged(float rmsdB) {}
+                      @Override public void onBufferReceived(byte[] buffer) {}
+                      @Override public void onEndOfSpeech() { restart(); }
+                      @Override public void onError(int error) { if (listening) restart(); }
+                      @Override public void onResults(Bundle results) {
+                          handleResults(results, true);
+                          if (listening) restart();
+                      }
+                      @Override public void onPartialResults(Bundle partialResults) {
+                          handleResults(partialResults, false);
+                      }
+                      @Override public void onEvent(int eventType, Bundle params) {}
+                  });
+              }
+
+              private void openYoutube() {
+                  String videoId = extractVideoId(urlInput.getText().toString().trim());
+                  if (videoId == null) {
+                      toast("유튜브 URL을 제대로 넣어주세요.");
+                      return;
+                  }
+
+                  String html = "<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
+                          "<style>html,body{margin:0;background:#000;height:100%;overflow:hidden;}iframe{width:100%;height:100%;border:0;}</style>" +
+                          "</head><body><iframe src='https://www.youtube.com/embed/" + videoId +
+                          "?playsinline=1&autoplay=0&cc_load_policy=0' allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share' allowfullscreen></iframe></body></html>";
+
+                  webView.loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "utf-8", null);
+                  subtitleText.setText("");
+                  status("영상 열림. 영상 재생 후 음성 인식 시작을 누르세요.");
+              }
+
+              private void toggleListening() {
+                  if (!translatorReady) {
+                      toast("번역 모델 준비 중입니다.");
+                      return;
+                  }
+
+                  if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                      requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_AUDIO);
+                      return;
+                  }
+
+                  if (recognizer == null) {
+                      toast("음성 인식기를 사용할 수 없습니다.");
+                      return;
+                  }
+
+                  if (listening) {
+                      listening = false;
+                      listenButton.setText("음성 인식 시작");
+                      try { recognizer.stopListening(); } catch (Exception ignored) {}
+                      subtitleText.setText("");
+                      status("음성 인식 중지됨.");
+                  } else {
+                      listening = true;
+                      lastFinalText = "";
+                      listenButton.setText("음성 인식 중지");
+                      startListen();
+                  }
+              }
+
+              private void startListen() {
+                  if (!listening || recognizer == null) return;
+                  try {
+                      recognizer.cancel();
+                      recognizer.startListening(speechIntent);
+                  } catch (Exception ignored) {
+                      restart();
+                  }
+              }
+
+              private void restart() {
+                  if (listening) handler.postDelayed(this::startListen, 500);
+              }
+
+              private void handleResults(Bundle bundle, boolean finalResult) {
+                  ArrayList<String> list = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                  if (list == null || list.isEmpty()) return;
+
+                  String english = list.get(0).trim();
+                  if (english.isEmpty()) return;
+
+                  if (!finalResult) {
+                      status("인식 중: " + english);
+                      return;
+                  }
+
+                  if (english.equalsIgnoreCase(lastFinalText)) return;
+                  lastFinalText = english;
+
+                  status("영어 인식: " + english + "\n한국어 번역 중...");
+
+                  translator.translate(english)
+                          .addOnSuccessListener(korean -> {
+                              subtitleText.setText(korean);
+                              status("영어: " + english + "\n한국어: " + korean);
+                          })
+                          .addOnFailureListener(e -> status("번역 실패: " + e.getMessage()));
+              }
+
+              private String extractVideoId(String input) {
+                  if (input == null) return null;
+                  String[] patterns = new String[]{
+                          "v=([A-Za-z0-9_-]{11})",
+                          "youtu\\.be/([A-Za-z0-9_-]{11})",
+                          "shorts/([A-Za-z0-9_-]{11})",
+                          "embed/([A-Za-z0-9_-]{11})"
+                  };
+                  for (String p : patterns) {
+                      java.util.regex.Matcher m = java.util.regex.Pattern.compile(p).matcher(input);
+                      if (m.find()) return m.group(1);
+                  }
+                  if (input.matches("[A-Za-z0-9_-]{11}")) return input;
+                  return null;
+              }
+
+              @Override
+              public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+                  super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+                  if (requestCode == REQ_AUDIO) {
+                      if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                          toggleListening();
+                      } else {
+                          toast("마이크 권한이 필요합니다.");
+                      }
+                  }
+              }
+
+              private void status(String text) {
+                  runOnUiThread(() -> statusText.setText(text));
+              }
+
+              private void toast(String text) {
+                  Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
+              }
+
+              private int dp(int value) {
+                  return Math.round(value * getResources().getDisplayMetrics().density);
+              }
+
+              @Override
+              protected void onDestroy() {
+                  listening = false;
+                  if (recognizer != null) recognizer.destroy();
+                  if (translator != null) translator.close();
+                  super.onDestroy();
+              }
+          }
+          EOF
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -134,6 +457,9 @@ B64EOF
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
