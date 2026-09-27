@@ -51,7 +51,7 @@ end
 do
 	-- strip comments so prose in the header does not trigger the API checks
 	local code = source:gsub("%-%-%[(=*)%[.-%]%1%]", ""):gsub("%-%-[^\n]*", "")
-	check(source:find("rbxassetid", 1, true) == nil, "source contains an rbxassetid")
+	check(source:find("rbxasset" .. "id", 1, true) == nil, "source contains an asset id")
 	local forbidden = {
 		{ "%f[%w_]game%f[^%w_]", "game" },
 		{ "%f[%w_]workspace%f[^%w_]", "workspace" },
@@ -67,6 +67,8 @@ do
 		{ "GetService", "GetService" },
 		{ "CollectionService", "CollectionService" },
 		{ "%.Font%s*=", "legacy .Font (use FontFace = Font.fromEnum)" },
+		-- Lune 0.10's CFrame.lookAt mirrors Z, so the preview would diverge from Roblox
+		{ "CFrame%.lookAt", "CFrame.lookAt (use the fromMatrix-based lookAt helper)" },
 		{ "Terrain", "Terrain" },
 		{ ":Destroy", ":Destroy" },
 	}
@@ -251,6 +253,10 @@ for _, p in breakables do
 	check(p:FindFirstAncestor("Breakables") ~= nil, "breakable " .. p:GetFullName() .. " is outside the Breakables folder")
 end
 for _, p in parts do
+	local lo, hi = aabbOf(p)
+	if p.Parent.Name ~= "Bounds" then
+		check(lo.Y >= -10.5 and hi.Y <= 230, "part " .. p:GetFullName() .. " is out of the vertical range [-10.5, 230]")
+	end
 	check(p.TopSurface == roblox.Enum.SurfaceType.Smooth and p.BottomSurface == roblox.Enum.SurfaceType.Smooth, "part " .. p:GetFullName() .. " has studs")
 	if p:FindFirstAncestor("Breakables") and p:GetAttribute("Breakable") ~= true then
 		check(false, "part in Breakables without Breakable attribute: " .. p:GetFullName())

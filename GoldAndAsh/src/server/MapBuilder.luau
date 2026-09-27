@@ -913,7 +913,7 @@ local function buildPlaza(root: Instance, brk: Instance)
 			else
 				col = jitter(C.scaleB, 6)
 			end
-			cyl(scales, "Scale", 5.6, 0.1, V3(math.cos(a) * r, top - 0.05, math.sin(a) * r), col, MAT.Slate, "tiny")
+			cyl(scales, "Scale", 4.9, 0.1, V3(math.cos(a) * r, top - 0.05, math.sin(a) * r), col, MAT.Slate, "tiny")
 		end
 	end
 
@@ -1654,8 +1654,6 @@ local function buildCanal(root: Instance, brk: Instance)
 	aabb(f, "CanalBed", CANAL_X0, -10, -188, CANAL_X1, CANAL_FLOOR, 188, rgb(70, 72, 64), MAT.Slate, "solid")
 	aabb(f, "CanalWallWest", -112, -10, -188, CANAL_X0, 0, 188, stoneCol, MAT.Cobblestone, "solid")
 	aabb(f, "CanalWallEast", CANAL_X1, -10, -188, -96, 0, 188, stoneCol, MAT.Cobblestone, "solid")
-	aabb(f, "CanalEndNorth", CANAL_X0, -10, -190, CANAL_X1, 0, -188, stoneCol, MAT.Cobblestone, "solid")
-	aabb(f, "CanalEndSouth", CANAL_X0, -10, 188, CANAL_X1, 0, 190, stoneCol, MAT.Cobblestone, "solid")
 	aabb(f, "CulvertNorth", CANAL_X0 + 2, CANAL_FLOOR, -188.05, CANAL_X1 - 2, -2.5, -187.95, rgb(12, 12, 14), MAT.SmoothPlastic, "tiny")
 	aabb(f, "CulvertSouth", CANAL_X0 + 2, CANAL_FLOOR, 187.95, CANAL_X1 - 2, -2.5, 188.05, rgb(12, 12, 14), MAT.SmoothPlastic, "tiny")
 	local water = aabb(f, "CanalWater", CANAL_X0, CANAL_FLOOR + 0.1, -188, CANAL_X1, -5.5, 188, C.water, MAT.Glass, "deco")
@@ -1683,7 +1681,7 @@ local function buildCanal(root: Instance, brk: Instance)
 	end
 
 	-- stairs down into the channel
-	for i = 1, 8 do
+	for i = 1, 7 do
 		aabb(f, "CanalStepEast", CANAL_X1 - 3, CANAL_FLOOR, 26 + 2 * i, CANAL_X1, -i, 28 + 2 * i, C.stone, MAT.Granite, "solid")
 		aabb(f, "CanalStepWest", CANAL_X0, CANAL_FLOOR, -28 - 2 * i, CANAL_X0 + 3, -i, -26 - 2 * i, C.stone, MAT.Granite, "solid")
 	end
@@ -1836,9 +1834,9 @@ local function buildWest(root: Instance, brk: Instance)
 	local dump = box(f, "WACAContainer", V3(6.5, 6.8, 14), CF(-168, 3.45, 168) * ANG(0, rad(80), 0), rgb(24, 24, 28), MAT.CorrodedMetal, "solid")
 	surfaceText(dump, Enum.NormalId.Right, 16, nil, oneLine("WACA", C.wacaRed, Enum.Font.GothamBlack), 0.6)
 	local garden = folder(f, "Garden")
-	bambooCluster(garden, -177, -28, 0.05, 7)
-	bambooCluster(garden, -177, 28, 0.05, 7)
-	bambooCluster(garden, -130, -168, 0.05, 6)
+	bambooCluster(garden, -177, 0.05, -28, 7)
+	bambooCluster(garden, -177, 0.05, 28, 7)
+	bambooCluster(garden, -130, 0.05, -168, 6)
 	for _, p in { { -140, -14 }, { -162, 13 }, { -135, 15 }, { -165, -16 }, { -158, 40 } } do
 		rock(garden, p[1], 0.05, p[2], rr(0.9, 1.4))
 	end
@@ -1892,9 +1890,9 @@ end
 
 local function wacaTruck(f: Instance, o: CFrame)
 	local m = model(f, "WACATruck")
-	local chassis = box(m, "Chassis", V3(7.6, 1.2, 22), o * CF(0, 1.9, 0), C.black, MAT.Metal, "solid")
+	local chassis = box(m, "Chassis", V3(7.3, 1.2, 21.6), o * CF(0, 1.9, 0.1), C.black, MAT.Metal, "solid")
 	m.PrimaryPart = chassis
-	box(m, "Cab", V3(7.6, 6, 6), o * CF(0, 4.3, -8), C.black, MAT.SmoothPlastic, "solid")
+	box(m, "Cab", V3(7.6, 5.8, 6), o * CF(0, 4.4, -8), C.black, MAT.SmoothPlastic, "solid")
 	box(m, "Windshield", V3(6.8, 2.6, 0.2), o * CF(0, 5.6, -11.05), C.glassDark, MAT.Glass, "tiny")
 	for _, sx in { -1, 1 } do
 		box(m, "SideWindow", V3(0.2, 2.2, 3.0), o * CF(sx * 3.85, 5.6, -8.6), C.glassDark, MAT.Glass, "tiny")
@@ -2025,7 +2023,7 @@ local function buildSouth(root: Instance, brk: Instance)
 			brokenPillar(cb, p[1], 0.8, p[2], p[3], 1.8)
 		end
 	end
-	aabb(cb, "UpperSlab", -82, 15, 156, -56, 16.2, 186, C.concrete, MAT.Concrete, "solid")
+	aabb(cb, "UpperSlab", -80, 15, 156, -56, 16.2, 184, C.concrete, MAT.Concrete, "solid")
 	rebarCluster(cb, V3(-57, 15.6, 170), 3)
 	-- fallen floor section = ramp up to the upper slab
 	local rampRun, rampRise = 21, 14.4
@@ -2189,11 +2187,11 @@ local function skylineBuilding(f: Instance, frame: CFrame, cu: number, w: number
 			end
 		end
 		local nLit = ri(2, 5)
-		for _ = 1, nLit do
+		for li = 1, nLit do
 			local fl = ri(0, nF - 1)
 			local lw = rr(3, math.min(12, gw * 0.4))
 			local lx = rr(cu - gw / 2 + lw / 2, cu + gw / 2 - lw / 2)
-			box(m, "LitWindow", V3(lw, floorH - spand - 0.2, 0.1), frame * CF(lx, baseH + fl * floorH + floorH / 2, zf - (if glassTower then 0.05 else 0.35)), pick(WINDOW_LIT), MAT.Neon, "tiny")
+			box(m, "LitWindow", V3(lw, floorH - spand - 0.2, 0.1), frame * CF(lx, baseH + fl * floorH + floorH / 2, zf - (if glassTower then 0.05 else 0.33) - li * 0.012), pick(WINDOW_LIT), MAT.Neon, "tiny")
 		end
 	end
 	-- street level: dark shopfront + a glowing sign strip
@@ -2207,7 +2205,7 @@ local function skylineBuilding(f: Instance, frame: CFrame, cu: number, w: number
 		surfaceText(vs, Enum.NormalId.Front, 12, rgb(20, 18, 22), { { text = pick(SKY_SIGNS), color = pick(SKY_SIGN_COLORS), y = 0.03, h = 0.94, font = Enum.Font.GothamBlack } }, 0, 2.5)
 	end
 	-- roof: cornice + one or two details
-	box(m, "Cornice", V3(w + 0.6, 1.2, 1.2), frame * CF(cu, h - 0.6, zf - 0.3), jitter(bodyCol, 12), bodyMat, "tiny")
+	box(m, "Cornice", V3(w + 0.6, 1.2, 1.2), frame * CF(cu, h - 0.3, zf - 0.3), jitter(bodyCol, 12), bodyMat, "tiny")
 	local r = rnd()
 	if r < 0.35 then
 		local tx = cu + rr(-w / 4, w / 4)
@@ -2240,11 +2238,11 @@ local function skylineTower(f: Instance, frame: CFrame, cu: number, w: number, h
 	local body = box(m, "Body", V3(w, h, depth), frame * CF(cu, h / 2, zf + depth / 2), col, if glass then MAT.Glass else MAT.Concrete, "tiny")
 	body.Reflectance = if glass then 0.2 else 0
 	m.PrimaryPart = body
-	for _ = 1, ri(2, 4) do
+	for li = 1, ri(2, 4) do
 		local lw = rr(4, w * 0.5)
-		box(m, "LitStrip", V3(lw, rr(1.5, 3.5), 0.2), frame * CF(cu + rr(-(w - lw) / 2, (w - lw) / 2), rr(12, h - 6), zf - 0.1), pick(WINDOW_LIT), MAT.Neon, "tiny")
+		box(m, "LitStrip", V3(lw, rr(1.5, 3.5), 0.2), frame * CF(cu + rr(-(w - lw) / 2, (w - lw) / 2), rr(12, h - 6), zf - 0.1 - li * 0.03), pick(WINDOW_LIT), MAT.Neon, "tiny")
 	end
-	box(m, "Crown", V3(w + 0.6, 2.4, depth + 0.6), frame * CF(cu, h - 1.2, zf + depth / 2), jitter(col, 16), MAT.Concrete, "tiny")
+	box(m, "Crown", V3(w + 0.6, 2.4, depth + 0.6), frame * CF(cu, h - 0.9, zf + depth / 2), jitter(col, 16), MAT.Concrete, "tiny")
 	if rnd() < 0.5 then
 		local basePos = (frame * CF(cu, h, zf + depth / 2)).Position
 		local ah = rr(14, 30)
