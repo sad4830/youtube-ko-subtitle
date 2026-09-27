@@ -679,6 +679,69 @@ local function bambooCluster(parent: Instance, x: number, y: number, z: number, 
 	end
 end
 
+-- raised stone planter with a golden ginkgo (cover + a ledge to hop on)
+local function ginkgoPlanter(parent: Instance, x: number, z: number)
+	local m = folder(parent, "GinkgoPlanter")
+	cyl(m, "PlanterRim", 10, 1.8, V3(x, 0.9, z), C.stoneLight, MAT.Granite, "solid")
+	cyl(m, "PlanterSoil", 8.8, 0.2, V3(x, 1.85, z), rgb(70, 52, 38), MAT.Ground, "tiny")
+	local top = V3(x + rr(-0.6, 0.6), 11, z + rr(-0.6, 0.6))
+	rod(m, "GinkgoTrunk", V3(x, 1.5, z), top, 1.3, C.trunk, MAT.Wood, "solid")
+	rod(m, "GinkgoBranch", top - V3(0, 3, 0), top + V3(rr(-3, 3), 1, rr(-3, 3)), 0.6, C.trunk, MAT.Wood, "tiny")
+	for i = 1, 5 do
+		local a = i / 5 * 2 * math.pi + rr(-0.4, 0.4)
+		local off = V3(math.cos(a) * rr(1.5, 3.2), rr(-1.5, 2.5), math.sin(a) * rr(1.5, 3.2))
+		local gold = if i % 2 == 0 then rgb(236, 186, 52) else rgb(222, 164, 40)
+		ball(m, "GinkgoCrown", rr(5, 7), top + off, jitter(gold, 10), MAT.Grass, "deco")
+	end
+end
+
+-- autumn maple (red/orange crown)
+local function maple(parent: Instance, x: number, y: number, z: number, s: number)
+	local top = V3(x + rr(-0.8, 0.8), y + 7.5 * s, z + rr(-0.8, 0.8))
+	rod(parent, "MapleTrunk", V3(x, y - 0.4, z), top, 1.1 * s, C.trunk, MAT.Wood, "solid")
+	local cols = { rgb(196, 64, 36), rgb(220, 104, 40), rgb(172, 44, 34), rgb(230, 140, 50) }
+	for i = 1, 4 do
+		local a = i / 4 * 2 * math.pi + rr(-0.5, 0.5)
+		local off = V3(math.cos(a) * rr(1.2, 2.6), rr(-0.8, 2.2), math.sin(a) * rr(1.2, 2.6)) * s
+		ball(parent, "MapleCrown", rr(4.5, 6) * s, top + off, jitter(cols[i], 10), MAT.Grass, "deco")
+	end
+end
+
+-- newspaper kiosk; o = ground centre, LookVector = service window
+local function kiosk(parent: Instance, o: CFrame)
+	local m = model(parent, "NewsKiosk")
+	local body = box(m, "KioskBody", V3(6, 6.5, 4.5), o * CF(0, 3.25, 0), rgb(40, 90, 70), MAT.Metal, "solid")
+	m.PrimaryPart = body
+	box(m, "KioskRoof", V3(7.4, 0.4, 6.4), o * CF(0, 6.8, -0.6), rgb(30, 60, 50), MAT.Metal, "solid")
+	box(m, "KioskWindow", V3(4.6, 2.6, 0.1), o * CF(0, 4.2, -2.27), C.windowWarm, MAT.Neon, "tiny")
+	box(m, "KioskCounter", V3(5.6, 0.3, 1.0), o * CF(0, 2.7, -2.7), C.woodLight, MAT.Wood, "tiny")
+	local cols = { rgb(220, 60, 60), rgb(240, 200, 60), rgb(60, 140, 220), C.white, rgb(90, 190, 110) }
+	for i = 1, 5 do
+		box(m, "Magazine", V3(0.9, 1.2, 0.1), o * CF(-2.6 + i * 0.87, 1.6, -2.3) * ANG(rad(-12), 0, 0), cols[i], MAT.SmoothPlastic, "tiny")
+	end
+	local sign = box(m, "KioskSign", V3(6, 1.2, 0.2), o * CF(0, 6.2, -2.4), C.black, MAT.SmoothPlastic, "tiny")
+	surfaceText(sign, Enum.NormalId.Front, 30, C.black, oneLine("報攤 · 新聞", C.goldPale, Enum.Font.Antique), 0.5)
+end
+
+-- noodle-delivery scooter; o = ground centre, LookVector = front
+local function scooter(parent: Instance, o: CFrame)
+	local m = model(parent, "DeliveryScooter")
+	local body = box(m, "ScooterBody", V3(1.2, 1.4, 4.2), o * CF(0, 1.6, 0), rgb(200, 190, 170), MAT.SmoothPlastic, "solid")
+	m.PrimaryPart = body
+	for _, sz in { -1.6, 1.6 } do
+		local w = Instance.new("Part")
+		w.Shape = Enum.PartType.Cylinder
+		setup(w, m, "ScooterWheel", V3(0.5, 1.6, 1.6), o * CF(0, 0.8, sz), C.black, MAT.SmoothPlastic, "tiny")
+	end
+	box(m, "ScooterSeat", V3(1.1, 0.4, 1.8), o * CF(0, 2.5, 0.4), C.black, MAT.Fabric, "tiny")
+	rod(m, "ScooterStem", (o * CF(0, 1.6, -1.8)).Position, (o * CF(0, 3.6, -2.0)).Position, 0.25, C.metal, MAT.Metal, "tiny")
+	box(m, "ScooterBars", V3(2.0, 0.2, 0.2), o * CF(0, 3.6, -2.0), C.metal, MAT.Metal, "tiny")
+	local crateBox = box(m, "DeliveryBox", V3(1.8, 1.6, 1.8), o * CF(0, 3.5, 1.4), C.lacquer, MAT.SmoothPlastic, "solid")
+	for _, face in { Enum.NormalId.Left, Enum.NormalId.Back } do
+		surfaceText(crateBox, face, 40, C.lacquer, oneLine("林記", C.gold), 0.5)
+	end
+end
+
 -- a rock (rotated block) sitting on the ground
 local function rock(parent: Instance, x: number, y: number, z: number, s: number)
 	local size = V3(rr(1.6, 3.2), rr(1.0, 2.2), rr(1.6, 3.2)) * s
@@ -808,8 +871,8 @@ local function stoneLantern(f: Instance, brk: Instance, a: number, state: string
 		local p = V3(x, y0, z) + tangent * 3.4 + outward * 0.6
 		local yaw = math.atan2(-tangent.Z, tangent.X)
 		lanternUpper(f, CF(p.X, y0 + 1.9, p.Z) * ANG(0, yaw, 0) * ANG(rad(12), 0, rad(-90)), false, false)
-		local q = V3(x, y0, z) - tangent * 2.8 - outward * 1.5
-		rubbleChunk(brk, q.X, y0, q.Z, V3(1.8, 1.0, 1.5), C.stone)
+		local q = V3(x, y0, z) - tangent * 3.4 - outward * 2.6
+		rubbleChunk(brk, q.X, PLAZA_INNER_TOP, q.Z, V3(1.8, 1.0, 1.5), C.stone)
 	else -- snapped: the whole column lies on the plaza
 		local s = Instance.new("Part")
 		s.Shape = Enum.PartType.Cylinder
@@ -818,8 +881,8 @@ local function stoneLantern(f: Instance, brk: Instance, a: number, state: string
 		local dir = -tangent
 		local yaw = math.atan2(-dir.Z, dir.X)
 		lanternUpper(f, CF(p.X, y0 + 1.9, p.Z) * ANG(0, yaw, 0) * ANG(rad(-8), 0, rad(-90)), true, false)
-		local q = V3(x, y0, z) + tangent * 2.6 - outward * 1.8
-		rubbleChunk(brk, q.X, y0, q.Z, V3(2.2, 1.1, 1.6), C.stone)
+		local q = V3(x, y0, z) + tangent * 3.2 - outward * 3.2
+		rubbleChunk(brk, q.X, PLAZA_INNER_TOP, q.Z, V3(2.2, 1.1, 1.6), C.stone)
 	end
 end
 
@@ -889,13 +952,19 @@ local function buildPlaza(root: Instance, brk: Instance)
 	stoneLantern(f, brk, rad(225), "intact") -- NW
 	stoneLantern(f, brk, rad(315), "snapped") -- NE
 
+	-- golden ginkgo planters on the east / west flanks
+	ginkgoPlanter(f, -70, -26)
+	ginkgoPlanter(f, -70, 28)
+	ginkgoPlanter(f, 63, -34)
+	ginkgoPlanter(f, 63, 36)
+
 	-- hairline cracks spilling from the incident side onto the plaza steps
 	for i = 1, 5 do
 		local a = rad(70 + i * 9 + rr(-3, 3))
 		local r0 = 46.5
 		local p0 = V3(math.cos(a) * r0, 0.83, math.sin(a) * r0)
 		local p1 = V3(math.cos(a + rr(-0.04, 0.04)) * 48.8, 0.83, math.sin(a + rr(-0.04, 0.04)) * 48.8)
-		rod(f, "Crack", p0, p1, 0.18, rgb(40, 36, 34), MAT.Slate, "tiny", true)
+		box(f, "Crack", V3(0.2, 0.04, (p1 - p0).Magnitude), lookAt((p0 + p1) / 2, p1), rgb(40, 36, 34), MAT.Slate, "tiny")
 	end
 end
 
@@ -1031,7 +1100,7 @@ local function buildNoodleShop(root: Instance, brk: Instance)
 
 	-- A-frame menu board on the street
 	for _, s in { -1, 1 } do
-		local p = box(f, "MenuBoard", V3(1.8, 3.2, 0.12), CF(-13, 1.6, -109.6 + s * 0.45) * ANG(rad(s * 14), rad(20), 0), C.woodDark, MAT.Wood, "tiny")
+		local p = box(f, "MenuBoard", V3(1.8, 3.2, 0.12), CF(-13, 1.6, -109.6 + s * 0.45) * ANG(rad(-s * 14), rad(20), 0), C.woodDark, MAT.Wood, "tiny")
 		if s == 1 then
 			surfaceText(p, Enum.NormalId.Back, 40, rgb(30, 30, 30), {
 				{ text = "今日", color = C.goldPale, y = 0.05, h = 0.25 },
@@ -1056,9 +1125,9 @@ local function buildNorthRow(root: Instance, brk: Instance)
 	local f = folder(root, "NorthShopRow")
 
 	-- W1: 茶館 teahouse (2 storeys + balcony)
-	aabb(f, "TeahouseBody", -58, 0, -186, -20, 24, -114, C.plaster, MAT.Concrete, "solid")
+	aabb(f, "TeahouseBody", -60, 0, -186, -20, 24, -114, C.plaster, MAT.Concrete, "solid")
 	aabb(f, "TeahouseKick", -56, 0, -114.2, -22, 1.2, -113.8, C.woodDark, MAT.Wood, "tiny")
-	aabb(f, "TeahouseDoors", -56, 1.2, -114.2, -22, 9.2, -114, rgb(180, 110, 58), MAT.Neon, "deco")
+	aabb(f, "TeahouseDoors", -56, 1.2, -114, -22, 9.2, -113.85, rgb(180, 110, 58), MAT.Neon, "deco")
 	for i = 0, 6 do
 		local x = -56 + i * (34 / 6)
 		aabb(f, "DoorFrame", x - 0.25, 1.2, -114.1, x + 0.25, 9.6, -113.7, C.woodDark, MAT.Wood, "tiny")
@@ -1071,10 +1140,10 @@ local function buildNorthRow(root: Instance, brk: Instance)
 		aabb(f, "BalconyBaluster", x - 0.12, 13.3, -109.85, x + 0.12, 15.4, -109.65, C.lacquer, MAT.Wood, "tiny")
 	end
 	for _, x in { -50, -39, -28 } do
-		aabb(f, "TeahouseWindow", x - 3, 15, -114.15, x + 3, 21, -114, C.windowWarm, MAT.Neon, "deco")
-		aabb(f, "WindowLattice", x - 0.15, 15, -114.25, x + 0.15, 21, -114.1, C.woodDark, MAT.Wood, "tiny")
+		aabb(f, "TeahouseWindow", x - 3, 15, -114, x + 3, 21, -113.85, C.windowWarm, MAT.Neon, "deco")
+		aabb(f, "WindowLattice", x - 0.15, 15, -113.85, x + 0.15, 21, -113.7, C.woodDark, MAT.Wood, "tiny")
 	end
-	aabb(f, "TeahouseCornice", -58.5, 23.2, -115, -20, 24.6, -113.4, C.jade, MAT.SmoothPlastic, "solid")
+	aabb(f, "TeahouseCornice", -60, 23.2, -115, -20, 24.6, -113.4, C.jade, MAT.SmoothPlastic, "solid")
 	local blade = aabb(f, "TeaBladeSign", -21.4, 14.5, -113.6, -21.0, 22.0, -110.6, C.lacquerDark, MAT.SmoothPlastic, "deco")
 	for _, face in { Enum.NormalId.Right, Enum.NormalId.Left } do
 		surfaceText(blade, face, 40, C.lacquerDark, { { text = "茶\n館", color = C.gold, y = 0.05, h = 0.9 } }, 0.3, 1.5)
@@ -1084,9 +1153,9 @@ local function buildNorthRow(root: Instance, brk: Instance)
 
 	-- W2: 雜貨 sundries (1 storey, flat roof reachable by an external steel stair)
 	aabb(f, "SundriesBody", -95, 0, -186, -60, 13, -114, rgb(150, 138, 122), MAT.Concrete, "solid")
-	aabb(f, "SundriesShutter", -92, 5, -114.15, -72, 10.8, -114, rgb(128, 130, 132), MAT.CorrodedMetal, "deco")
-	aabb(f, "SundriesInterior", -92, 0, -114.1, -72, 5, -114, rgb(28, 26, 26), MAT.SmoothPlastic, "tiny")
-	local band = aabb(f, "SundriesSign", -94, 10.9, -114.5, -62, 12.7, -114, rgb(28, 40, 90), MAT.SmoothPlastic, "deco")
+	aabb(f, "SundriesShutter", -92, 5, -114, -72, 10.8, -113.8, rgb(128, 130, 132), MAT.CorrodedMetal, "deco")
+	aabb(f, "SundriesInterior", -92, 0, -114, -72, 5, -113.9, rgb(28, 26, 26), MAT.SmoothPlastic, "tiny")
+	local band = aabb(f, "SundriesSign", -94, 10.9, -114, -62, 12.7, -113.5, rgb(28, 40, 90), MAT.SmoothPlastic, "deco")
 	surfaceText(band, Enum.NormalId.Back, 30, rgb(28, 40, 90), oneLine("雜貨  ·  잡화점", C.white, Enum.Font.Antique), 0.3)
 	-- roof parapet with a gap where the stair arrives
 	aabb(f, "Parapet", -95, 13, -115, -88, 14.2, -114, rgb(140, 128, 112), MAT.Concrete, "solid")
@@ -1119,18 +1188,18 @@ local function buildNorthRow(root: Instance, brk: Instance)
 
 	-- E1: 百草堂 herbal medicine shop
 	aabb(f, "HerbalBody", 25, 0, -186, 56, 22, -114, rgb(186, 158, 118), MAT.Concrete, "solid")
-	aabb(f, "HerbalWindow", 27, 1, -114.2, 54, 9, -114, rgb(200, 150, 80), MAT.Neon, "deco")
+	aabb(f, "HerbalWindow", 27, 1, -114, 54, 9, -113.85, rgb(200, 150, 80), MAT.Neon, "deco")
 	for i = 0, 4 do
 		local x = 27 + i * 6.75
-		aabb(f, "HerbalMullion", x - 0.3, 1, -114.3, x + 0.3, 9, -113.9, C.woodDark, MAT.Wood, "tiny")
+		aabb(f, "HerbalMullion", x - 0.3, 1, -114, x + 0.3, 9, -113.7, C.woodDark, MAT.Wood, "tiny")
 	end
-	local hs = aabb(f, "HerbalSign", 28, 9.8, -114.6, 53, 12.6, -114, C.jade, MAT.SmoothPlastic, "deco")
+	local hs = aabb(f, "HerbalSign", 28, 9.8, -114, 53, 12.6, -113.4, C.jade, MAT.SmoothPlastic, "deco")
 	surfaceText(hs, Enum.NormalId.Back, 30, C.jade, {
 		{ text = "百草堂", color = C.gold, y = 0.03, h = 0.62 },
 		{ text = "한약방", color = C.goldPale, y = 0.66, h = 0.3 },
 	}, 0.3, 1.4)
 	for _, x in { 31, 40.5, 50 } do
-		aabb(f, "HerbalUpperWindow", x - 2.8, 14, -114.15, x + 2.8, 19, -114, rgb(60, 70, 72), MAT.Glass, "deco")
+		aabb(f, "HerbalUpperWindow", x - 2.8, 14, -114, x + 2.8, 19, -113.85, rgb(60, 70, 72), MAT.Glass, "deco")
 	end
 	aabb(f, "HerbalEave", 24.5, 22, -140, 56.5, 22.6, -112.5, C.tile, MAT.Slate, "solid")
 	wedge(f, "HerbalRoofFront", V3(32, 5, 13.75), CF(40.5, 25.1, -119.375) * ANG(0, math.pi, 0), C.tile, MAT.Slate, "solid")
@@ -1143,9 +1212,9 @@ local function buildNorthRow(root: Instance, brk: Instance)
 
 	-- E2: 居酒屋 izakaya (1 storey, truss ladder on its street side)
 	aabb(f, "IzakayaBody", 56, 0, -186, 74, 12, -114, C.woodDark, MAT.WoodPlanks, "solid")
-	aabb(f, "IzakayaDoor", 60, 0.2, -114.2, 70, 8.8, -114, rgb(200, 132, 70), MAT.Neon, "deco")
+	aabb(f, "IzakayaDoor", 60, 0.2, -114, 70, 8.8, -113.88, rgb(200, 132, 70), MAT.Neon, "deco")
 	for i, x in { 62, 65, 68 } do
-		local n = box(f, "IzakayaNoren", V3(2.8, 3.4, 0.08), CF(x, 7.1, -113.9), rgb(150, 24, 24), MAT.Fabric, "tiny")
+		local n = box(f, "IzakayaNoren", V3(2.8, 3.4, 0.08), CF(x, 7.1, -113.75), rgb(150, 24, 24), MAT.Fabric, "tiny")
 		local chars = { "焼", "鳥", "酒" }
 		surfaceText(n, Enum.NormalId.Back, 30, nil, { { text = chars[i], color = C.white, y = 0.15, h = 0.6 } }, 0.8)
 	end
@@ -1319,6 +1388,8 @@ local function buildNorthYards(root: Instance, brk: Instance)
 	barrel(brk, -46, 0, -104, C.wood)
 	barrel(brk, -43.5, 0, -102, rgb(120, 60, 40))
 	lanternPost(brk, -80, 0, -70, 45, true)
+	kiosk(f, lookAt(V3(-74, 0, -90), V3(0, 0, -90)))
+	scooter(f, lookAt(V3(-24.5, 0.05, -108.5), V3(-24.5, 0.05, 0)))
 	-- a parasol over the first table (decor pole + canopy; nothing rests on breakables)
 	cyl(f, "ParasolPole", 0.3, 8.5, V3(-58.2, 4.25, -77.8), C.woodDark, MAT.Wood, "tiny")
 	cyl(f, "ParasolCanopy", 8.5, 0.3, V3(-58.2, 8.4, -77.8), rgb(170, 40, 36), MAT.Fabric, "deco")
@@ -1505,11 +1576,13 @@ local function buildEast(root: Instance, brk: Instance)
 	local roofGlow = aabb(bus, "ShelterLight", 75.5, 8.9, 24, 80, 9.0, 32, C.lampWhite, MAT.Neon, "tiny")
 	pointLight(roofGlow, 12, 0.9, rgb(255, 230, 190))
 	local ad = aabb(bus, "ShelterAd", 74.6, 1.5, 33.6, 79.8, 8.2, 33.9, rgb(40, 20, 16), MAT.SmoothPlastic, "deco")
-	surfaceText(ad, Enum.NormalId.Front, 30, C.lacquerDark, {
-		{ text = "林記麵館", color = C.gold, y = 0.08, h = 0.3 },
-		{ text = "→ 夜市", color = C.goldPale, y = 0.42, h = 0.2 },
-		{ text = "since 1987", color = C.goldPale, y = 0.72, h = 0.12, font = Enum.Font.Garamond },
-	}, 0.2, 1.5)
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		surfaceText(ad, face, 30, C.lacquerDark, {
+			{ text = "林記麵館", color = C.gold, y = 0.08, h = 0.3 },
+			{ text = "→ 夜市", color = C.goldPale, y = 0.42, h = 0.2 },
+			{ text = "since 1987", color = C.goldPale, y = 0.72, h = 0.12, font = Enum.Font.Garamond },
+		}, 0.2, 1.5)
+	end
 	aabb(bus, "BenchSeat", 75.3, 2.0, 24, 76.9, 2.4, 32, C.woodLight, MAT.WoodPlanks, "solid")
 	aabb(bus, "BenchLegs", 75.6, 0.5, 24.5, 76.6, 2.0, 31.5, C.charcoal, MAT.Metal, "solid")
 	rod(bus, "StopSignPole", V3(82.8, 0.5, 20.5), V3(82.8, 8.5, 20.5), 0.25, C.steel, MAT.Metal, "tiny")
@@ -1585,7 +1658,7 @@ local function buildCanal(root: Instance, brk: Instance)
 	aabb(f, "CanalEndSouth", CANAL_X0, -10, 188, CANAL_X1, 0, 190, stoneCol, MAT.Cobblestone, "solid")
 	aabb(f, "CulvertNorth", CANAL_X0 + 2, CANAL_FLOOR, -188.05, CANAL_X1 - 2, -2.5, -187.95, rgb(12, 12, 14), MAT.SmoothPlastic, "tiny")
 	aabb(f, "CulvertSouth", CANAL_X0 + 2, CANAL_FLOOR, 187.95, CANAL_X1 - 2, -2.5, 188.05, rgb(12, 12, 14), MAT.SmoothPlastic, "tiny")
-	local water = aabb(f, "CanalWater", CANAL_X0, CANAL_FLOOR, -188, CANAL_X1, -5.5, 188, C.water, MAT.Glass, "deco")
+	local water = aabb(f, "CanalWater", CANAL_X0, CANAL_FLOOR + 0.1, -188, CANAL_X1, -5.5, 188, C.water, MAT.Glass, "deco")
 	water.Transparency = 0.35
 	water.Reflectance = 0.25
 	water.CastShadow = false
@@ -1741,6 +1814,27 @@ local function buildWest(root: Instance, brk: Instance)
 	bench(brk, lookAt(V3(-120, 0.05, 20), V3(200, 0.05, 20)), true)
 
 	pavilion(f, -150, 0)
+	local maples = folder(f, "Maples")
+	for _, p in { { -168, -95 }, { -138, -72 }, { -138, 72 }, { -168, 100 }, { -176, -40 } } do
+		maple(maples, p[1], 0.05, p[2], rr(0.9, 1.15))
+	end
+	-- stepping stones from the pavilion up to the shrine
+	for i = 1, 9 do
+		local z = -14 - i * 11.5
+		cyl(f, "SteppingStone", rr(2.4, 3.0), 0.2, V3(-150 + math.sin(i * 0.9) * 3, 0.1, z), jitter(C.stoneLight, 10), MAT.Slate, "tiny")
+	end
+	-- path lanterns
+	for _, pz in { -6, 6 } do
+		local base = CF(-134, 0.05, pz)
+		box(f, "PathLanternBase", V3(1.4, 1.2, 1.4), base * CF(0, 0.6, 0), C.stone, MAT.Granite, "solid")
+		box(f, "PathLanternBox", V3(1.1, 1.3, 1.1), base * CF(0, 1.85, 0), C.stoneLight, MAT.Granite, "solid")
+		box(f, "PathLanternGlow", V3(1.15, 0.6, 0.6), base * CF(0, 1.9, 0), C.neonWarm, MAT.Neon, "tiny")
+		box(f, "PathLanternRoof", V3(1.8, 0.4, 1.8), base * CF(0, 2.7, 0), C.stoneDark, MAT.Granite, "tiny")
+	end
+	-- WACA debris dump in the south-west corner
+	rubblePile(f, -152, 0.05, 150, 6, 8)
+	local dump = box(f, "WACAContainer", V3(6.5, 6.8, 14), CF(-168, 3.45, 168) * ANG(0, rad(80), 0), rgb(24, 24, 28), MAT.CorrodedMetal, "solid")
+	surfaceText(dump, Enum.NormalId.Right, 16, nil, oneLine("WACA", C.wacaRed, Enum.Font.GothamBlack), 0.6)
 	local garden = folder(f, "Garden")
 	bambooCluster(garden, -177, -28, 0.05, 7)
 	bambooCluster(garden, -177, 28, 0.05, 7)
@@ -1842,14 +1936,14 @@ local function buildSouth(root: Instance, brk: Instance)
 	local crater = folder(f, "Epicentre")
 	local ecx, ecz = 0, 110
 	cyl(crater, "Scorch", 30, 0.1, V3(ecx, 0.08, ecz), rgb(34, 30, 32), MAT.Slate, "tiny")
-	cyl(crater, "ScorchCore", 14, 0.1, V3(ecx, 0.1, ecz), rgb(22, 20, 22), MAT.Slate, "tiny")
+	cyl(crater, "ScorchCore", 14, 0.1, V3(ecx, 0.13, ecz), rgb(22, 20, 22), MAT.Slate, "tiny")
 	for i = 1, 12 do
 		local a = i / 12 * 2 * math.pi + rr(-0.15, 0.15)
 		local r0, r1 = rr(3, 6), rr(16, 30)
-		local p0 = V3(ecx + math.cos(a) * r0, 0.14, ecz + math.sin(a) * r0)
-		local p1 = V3(ecx + math.cos(a) * r1, 0.14, ecz + math.sin(a) * r1)
+		local p0 = V3(ecx + math.cos(a) * r0, 0.2, ecz + math.sin(a) * r0)
+		local p1 = V3(ecx + math.cos(a) * r1, 0.2, ecz + math.sin(a) * r1)
 		local glowing = i % 4 == 0
-		rod(crater, "Fissure", p0, p1, rr(0.35, 0.6), if glowing then rgb(120, 60, 160) else rgb(18, 16, 18), if glowing then MAT.Neon else MAT.Slate, "tiny", true)
+		box(crater, "Fissure", V3(rr(0.35, 0.6), 0.06, (p1 - p0).Magnitude), lookAt((p0 + p1) / 2, p1), if glowing then rgb(120, 60, 160) else rgb(18, 16, 18), if glowing then MAT.Neon else MAT.Slate, "tiny")
 	end
 	for i = 1, 11 do
 		local a = i / 11 * 2 * math.pi + rr(-0.12, 0.12)
@@ -1898,10 +1992,12 @@ local function buildSouth(root: Instance, brk: Instance)
 	local sx, sz = -34, 96
 	box(cut, "PillarLower", V3(4, 6, 4), CF(sx, 3.05, sz), C.concrete, MAT.Concrete, "solid")
 	wedge(cut, "PillarCutLower", V3(4, 4, 4), CF(sx, 8.05, sz) * ANG(0, math.pi, 0), C.concrete, MAT.Concrete, "solid")
-	local upper = CF(sx + 1.6, 8.05 - 1.3, sz - 1.6) * ANG(0, 0, rad(-4))
-	wedge(cut, "PillarCutUpper", V3(4, 4, 4), upper * ANG(math.pi, 0, 0), C.concrete, MAT.Concrete, "solid")
+	-- the lower wedge keeps the solid below the plane y = -(z - sz); the upper piece is its
+	-- complement, slid 1.3 studs down the cut plane (towards +Z) and nudged sideways
+	local upper = CF(sx + 0.8, 8.05 - 1.3, sz + 1.3) * ANG(0, 0, rad(-3))
+	wedge(cut, "PillarCutUpper", V3(4, 4, 4), upper * ANG(0, 0, math.pi), C.concrete, MAT.Concrete, "solid")
 	box(cut, "PillarUpper", V3(4, 4.5, 4), upper * CF(0, 4.25, 0), C.concrete, MAT.Concrete, "solid")
-	box(cut, "CutAshLine", V3(4.1, 0.06, 5.7), CF(sx, 8.05, sz) * ANG(rad(-45), 0, 0), C.ash, MAT.Sand, "tiny")
+	box(cut, "CutAshLine", V3(4.1, 0.06, 5.7), CF(sx, 8.05, sz) * ANG(rad(45), 0, 0), C.ash, MAT.Sand, "tiny")
 	ashPile(cut, sx - 3.5, 0.05, sz + 2, 1.0)
 	ashPile(cut, sx + 2.5, 0.05, sz + 4, 0.7)
 
@@ -1986,7 +2082,7 @@ local function buildSouth(root: Instance, brk: Instance)
 		end
 	end
 	box(tent, "TentRoof", V3(9.2, 0.3, 9.2), CF(28, 8.1, 80), C.black, MAT.Fabric, "deco")
-	local valance = box(tent, "TentValance", V3(9.2, 1.0, 0.1), CF(28, 7.5, 75.4) * ANG(0, math.pi, 0), C.black, MAT.Fabric, "tiny")
+	local valance = box(tent, "TentValance", V3(9.2, 1.0, 0.1), CF(28, 7.5, 75.4), C.black, MAT.Fabric, "tiny")
 	surfaceText(valance, Enum.NormalId.Front, 30, nil, oneLine("WACA  現場本部", C.wacaRed, Enum.Font.GothamBlack), 0.4, 1.5)
 	aabb(tent, "TentTable", 25, 2.8, 79, 31, 3.1, 81, rgb(200, 200, 196), MAT.SmoothPlastic, "solid")
 	aabb(tent, "TentTableLegs", 25.5, 0.05, 79.5, 30.5, 2.8, 80.5, C.charcoal, MAT.Metal, "solid")
@@ -2021,7 +2117,7 @@ local function buildSouth(root: Instance, brk: Instance)
 	end
 	local rubbleSpots = {
 		{ -12, 90, 2.4 },
-		{ 14, 96, 2.0 },
+		{ 9, 90, 2.0 },
 		{ -26, 118, 2.6 },
 		{ 18, 128, 2.2 },
 		{ -44, 124, 3.0 },
@@ -2230,7 +2326,7 @@ local function buildMarkers(map: Instance)
 	aabb(bounds, "Ceiling", -B - T, 220, -B - T, B + T, 222, B + T, C.white, MAT.SmoothPlastic, "bound")
 
 	-- character-select camera: 3/4 view of the noodle shop front with the lane and dummies
-	box(map, "SelectCamera", V3(1, 1, 1), lookAt(V3(24, 9.5, -74), V3(-3, 11, -110)), rgb(255, 255, 255), MAT.SmoothPlastic, "ghost")
+	box(map, "SelectCamera", V3(1, 1, 1), lookAt(V3(-10, 11, -76), V3(1, 12.5, -112)), rgb(255, 255, 255), MAT.SmoothPlastic, "ghost")
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
