@@ -153,136 +153,147 @@
     return [qx + dx * Math.cos(r) - dy * Math.sin(r), qy + dx * Math.sin(r) + dy * Math.cos(r)];
   };
 
-  GA.el = (tag, attrs, inner = '') =>
-    `<${tag} ${Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(' ')}>${inner}</${tag}>`;
-
   /* ------------------------------------------------------------------ *
-   * Golden dragon head (Chinese long), profile facing +x, made of light.
-   * Local frame roughly x -90..370, y -80..260. Mouth centre ~ (300,150).
-   * ids: suffix for gradient ids so several dragons can coexist.
+   * Golden dragon head (Chinese long), mascot-style cel shading, profile
+   * facing +x, jaws open. Local frame ~ x -90..380, y -90..265;
+   * jaw front ~ (335,150). id: suffix for gradient ids.
    * ------------------------------------------------------------------ */
   GA.dragonHead = (id, opt = {}) => {
     const R = GA.rng(opt.seed ?? 7);
-    const line = opt.line ?? GA.C.brown;
-    let s = '';
-    s += `<defs>
-      <linearGradient id="dhSkull${id}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#FFF6D2"/><stop offset=".35" stop-color="${GA.C.goldLight}"/>
-        <stop offset=".75" stop-color="${GA.C.gold}"/><stop offset="1" stop-color="${GA.C.goldDeep}"/></linearGradient>
-      <linearGradient id="dhJaw${id}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="${GA.C.gold}"/><stop offset="1" stop-color="${GA.C.amber}"/></linearGradient>
-      <linearGradient id="dhMane${id}" x1="1" y1="0" x2="0" y2="0">
-        <stop offset="0" stop-color="${GA.C.goldDeep}"/><stop offset=".6" stop-color="${GA.C.gold}"/><stop offset="1" stop-color="${GA.C.goldLight}" stop-opacity=".2"/></linearGradient>
-      <linearGradient id="dhHorn${id}" x1="1" y1="1" x2="0" y2="0">
-        <stop offset="0" stop-color="${GA.C.goldLight}"/><stop offset="1" stop-color="#FFF8E6"/></linearGradient>
-      <radialGradient id="dhMouth${id}" cx=".85" cy=".5" r=".8">
-        <stop offset="0" stop-color="#FFFFFF"/><stop offset=".4" stop-color="#FFF1B8"/><stop offset="1" stop-color="#FF9A2A"/></radialGradient>
+    const L = opt.line ?? '#2A0E02';
+    const hi = '#FFF4C8', base = '#FFC44A', mid = '#F29A22', shade = '#C4600E';
+    const sw = opt.sw ?? 3.2;
+    const stroke = `stroke="${L}" stroke-width="${sw}" stroke-linejoin="round"`;
+    let s = `<defs>
+      <linearGradient id="dhMouth${id}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#3A0A04"/><stop offset=".55" stop-color="#8A240A"/><stop offset="1" stop-color="#FF9A3A"/></linearGradient>
+      <radialGradient id="dhEye${id}" cx=".6" cy=".5" r=".7">
+        <stop offset="0" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#FFF6C8"/><stop offset="1" stop-color="#FFD24A"/></radialGradient>
     </defs>`;
 
-    // mane: flame spikes flowing back from skull, cheek and jaw
-    const maneBases = [[150, 26, -150, 1.1], [128, 34, -160, 1.25], [104, 50, -168, 1.35], [86, 72, -176, 1.35], [72, 98, 176, 1.3], [66, 124, 168, 1.2], [80, 146, 158, 1.1], [104, 160, 148, 1.0], [132, 170, 138, 0.9], [160, 182, 128, 0.8]];
-    let mane = '', maneBack = '';
-    maneBases.forEach(([x, y, deg, k], i) => {
-      const a = (deg * Math.PI) / 180, L = 120 * k * R.range(0.85, 1.1);
-      const c = Math.cos(a), sn = Math.sin(a), curl = (i % 2 ? 1 : -1) * 18;
-      const pts = [[x, y], [x + c * L * 0.35 - sn * curl * 0.3, y + sn * L * 0.35 + c * curl * 0.3], [x + c * L * 0.7 + sn * curl, y + sn * L * 0.7 - c * curl - 10], [x + c * L, y + sn * L - 26 + curl * 0.4]];
-      const d = GA.ribbon(pts, GA.prof.horn(46 * k, 1.1), 10);
-      if (i % 2) maneBack += `<path d="${d}"/>`; else mane += `<path d="${d}"/>`;
+    // --- mane: wind-blown flame spikes from the back of the skull/jaw
+    const maneBases = [[158, 34, -158, 1.0], [132, 40, -166, 1.2], [108, 50, -172, 1.3], [88, 66, -178, 1.35], [72, 88, 176, 1.35], [62, 112, 170, 1.3], [66, 136, 162, 1.2], [84, 154, 154, 1.05], [110, 164, 146, 0.95], [140, 170, 138, 0.85]];
+    const spikes = maneBases.map(([x, y, deg, k], i) => {
+      const a = (deg * Math.PI) / 180, len = 130 * k * R.range(0.88, 1.08);
+      const c = Math.cos(a), sn = Math.sin(a), px = -sn, py = c;
+      const wave = (i % 2 ? 1 : -1) * 14;
+      const pts = [[x, y], [x + c * len * 0.3 + px * wave, y + sn * len * 0.3 + py * wave],
+        [x + c * len * 0.66 - px * wave, y + sn * len * 0.66 - py * wave - 8], [x + c * len, y + sn * len - 30]];
+      return GA.ribbon(pts, GA.prof.horn(50 * k, 1.15), 10);
     });
-    s += `<g fill="${GA.C.goldDeep}" opacity=".95">${maneBack}</g>`;
-    s += `<g fill="url(#dhMane${id})">${mane}</g>`;
+    s += `<g fill="${shade}" ${stroke}>${spikes.filter((_, i) => i % 2).map((d) => `<path d="${d}"/>`).join('')}</g>`;
+    s += `<g fill="${mid}" ${stroke}>${spikes.filter((_, i) => !(i % 2)).map((d) => `<path d="${d}"/>`).join('')}</g>`;
 
-    // antlers
-    const hornA = [[164, 30], [128, -2], [82, -28], [26, -44], [-34, -40], [-70, -24]];
-    const tineA = [[74, -30], [60, -62], [64, -92]];
-    const tineA2 = [[16, -44], [-4, -70], [-2, -98]];
-    const hornB = [[140, 42], [100, 22], [52, 10], [-4, 10], [-46, 24]];
-    const tineB = [[40, 10], [20, -14], [18, -40]];
-    s += `<g fill="${GA.C.goldDeep}">
-      <path d="${GA.ribbon(hornB, GA.prof.horn(24, 0.9))}"/><path d="${GA.ribbon(tineB, GA.prof.horn(13, 0.9))}"/></g>`;
-    s += `<g fill="url(#dhHorn${id})" stroke="${line}" stroke-width="2.2" stroke-linejoin="round">
-      <path d="${GA.ribbon(tineA, GA.prof.horn(16, 0.9))}"/><path d="${GA.ribbon(tineA2, GA.prof.horn(14, 0.9))}"/>
-      <path d="${GA.ribbon(hornA, GA.prof.horn(30, 0.9))}"/></g>`;
+    // --- horns (back one darker)
+    const hornB = [[150, 44], [110, 22], [60, 10], [6, 12], [-44, 26]];
+    const hornA = [[178, 36], [140, 8], [90, -16], [30, -30], [-30, -26], [-66, -12]];
+    const tineA = [[80, -18], [64, -52], [70, -86]];
+    s += `<g fill="${shade}" ${stroke}><path d="${GA.ribbon(hornB, GA.prof.horn(30, 0.9))}"/></g>`;
+    s += `<g fill="#FFE6A0" ${stroke}><path d="${GA.ribbon(tineA, GA.prof.horn(20, 0.9))}"/><path d="${GA.ribbon(hornA, GA.prof.horn(38, 0.9))}"/></g>`;
+    s += `<path d="${GA.ribbon(hornA.map(([x, y]) => [x, y - 5]), GA.prof.horn(12, 0.9))}" fill="${hi}"/>`;
 
-    // lower jaw
-    s += `<path d="M178 136 C205 148 240 162 280 172 C298 177 314 182 322 192 C328 202 318 214 304 212 C270 210 230 202 194 190 C168 181 148 172 128 158 Z" fill="url(#dhJaw${id})" stroke="${line}" stroke-width="3" stroke-linejoin="round"/>`;
-    // beard / chin spikes
-    s += `<g fill="${GA.C.goldDeep}" stroke="${line}" stroke-width="2">
-      <path d="${GA.ribbon([[290, 206], [276, 236], [250, 262]], GA.prof.horn(22))}"/>
-      <path d="${GA.ribbon([[252, 202], [236, 228], [206, 246]], GA.prof.horn(20))}"/>
-      <path d="${GA.ribbon([[212, 192], [192, 214], [160, 226]], GA.prof.horn(18))}"/></g>`;
-    // mouth interior (white-hot, charging)
-    s += `<path d="M330 108 L318 114 C290 116 250 118 215 124 C200 127 190 132 180 138 C205 149 240 162 280 172 C298 177 312 181 322 190 C316 162 318 132 330 108 Z" fill="url(#dhMouth${id})"/>`;
-    // teeth
-    let teeth = '';
-    for (let x = 292; x > 222; x -= 13) teeth += `M${x} ${117 + (300 - x) * 0.05}l-5 0l2.5 ${10 + (x - 220) * 0.05}z`;
-    for (let x = 262; x > 200; x -= 13) teeth += `M${x} ${166 - (270 - x) * 0.33}l6 0l-3 -10z`;
-    s += `<path d="${teeth}" fill="#FFFDF2"/>`;
-    s += `<path d="M298 114 L312 114 L302 152 Z M284 176 L298 180 L294 142 Z" fill="#FFFDF2" stroke="${line}" stroke-width="2" stroke-linejoin="round"/>`;
+    // --- cheek frill + beard
+    s += `<g fill="${mid}" ${stroke}>
+      <path d="${GA.ribbon([[186, 150], [154, 184], [112, 202]], GA.prof.horn(30, 1))}"/>
+      <path d="${GA.ribbon([[156, 162], [126, 198], [86, 214]], GA.prof.horn(26, 1))}"/></g>`;
+    s += `<g fill="${shade}" ${stroke}>
+      <path d="${GA.ribbon([[304, 208], [292, 238], [264, 262]], GA.prof.horn(26))}"/>
+      <path d="${GA.ribbon([[266, 206], [248, 234], [218, 250]], GA.prof.horn(22))}"/>
+      <path d="${GA.ribbon([[226, 196], [204, 222], [172, 234]], GA.prof.horn(20))}"/></g>`;
 
-    // skull + upper jaw
-    s += `<path d="M58 104 C60 72 84 50 118 40 C140 22 172 16 198 32 C208 40 212 52 224 58 C252 62 276 60 296 52 C306 36 328 32 338 48 C348 64 342 82 330 88 C336 96 338 106 330 110 L318 114 C290 116 250 118 215 124 C200 127 190 132 180 138 C168 150 150 156 128 156 C104 156 80 150 60 140 Z" fill="url(#dhSkull${id})" stroke="${line}" stroke-width="3" stroke-linejoin="round"/>`;
+    // --- mouth interior + tongue
+    s += `<path d="M334 106 L246 116 L192 130 L186 140 L246 160 L304 182 L328 186 C334 160 336 130 334 106 Z" fill="url(#dhMouth${id})" ${stroke}/>`;
+    s += `<path d="M206 146 C246 152 286 166 322 160 C306 174 256 174 210 158 Z" fill="#E0561C"/>`;
+
+    // --- lower jaw
+    s += `<path d="M186 140 L246 160 L304 182 L328 186 L336 200 L320 214 L252 210 L196 190 L138 164 Z" fill="${base}" ${stroke}/>`;
+    s += `<path d="M146 170 L198 180 L254 196 L330 204 L320 214 L252 210 L196 190 Z" fill="${shade}"/>`;
+    // --- teeth
+    let tu = '', tl = '';
+    for (let i = 0; i < 6; i++) { const x = 312 - i * 14, y = 108 + i * 1.6 + (i > 3 ? (i - 3) * 3 : 0); tu += `M${x} ${y}L${x - 9} ${y + 1}L${x - 5} ${y + 13 - i}Z`; }
+    for (let i = 0; i < 6; i++) { const x = 300 - i * 16, y = 180 - i * 6.4; tl += `M${x} ${y}L${x - 9} ${y - 3}L${x - 6} ${y - 13 + i}Z`; }
+    s += `<path d="${tu}${tl}" fill="#FFFBEA" stroke="${L}" stroke-width="1.6" stroke-linejoin="round"/>`;
+    s += `<path d="M324 107 L336 106 L326 142 Z M314 184 L326 186 L318 150 Z" fill="#FFFBEA" ${stroke}/>`;
+
+    // --- skull + upper jaw
+    const skull = 'M58 112 C58 84 80 58 112 46 L150 34 L206 12 L216 40 L236 52 C262 58 290 58 306 50 L322 30 C338 24 354 36 352 56 C351 68 344 76 336 78 L346 94 L334 108 L246 116 L192 130 L176 152 L128 164 L74 150 Z';
+    s += `<path d="${skull}" fill="${base}" ${stroke}/>`;
+    // cel shade (lower band) + highlight (upper planes)
+    s += `<path d="M60 124 C96 132 140 128 176 116 L246 100 L336 94 L346 94 L334 108 L246 116 L192 130 L176 152 L128 164 L74 150 Z" fill="${mid}"/>`;
+    s += `<path d="M74 150 L128 164 L176 152 L192 130 L150 142 L100 144 Z" fill="${shade}"/>`;
+    s += `<path d="M84 86 C94 66 106 54 124 46 L150 36 L204 16 L200 32 L156 50 C130 58 104 72 84 86 Z" fill="${hi}"/>`;
+    s += `<path d="M236 58 C262 64 292 64 308 56 L324 36 C334 32 344 34 348 42 L326 52 C302 70 262 70 236 64 Z" fill="${hi}"/>`;
+    s += `<path d="${skull}" fill="none" ${stroke}/>`;
     // feature lines
-    s += `<g fill="none" stroke="${line}" stroke-width="3" stroke-linecap="round">
-      <path d="M232 72 C258 76 282 72 300 64"/>
-      <path d="M318 72 C322 62 332 62 334 72"/>
-      <path d="M214 60 C206 84 196 104 186 130"/>
-      <path d="M244 96 C262 98 284 96 304 92" stroke-width="2.2" opacity=".7"/></g>`;
-    // cheek curl (classic long cheek spiral) + brow ridge + fierce eye
-    s += `<path d="M168 118 C150 128 124 122 120 100 C116 80 138 70 152 82 C162 92 152 106 142 100" fill="none" stroke="${line}" stroke-width="3" stroke-linecap="round"/>`;
-    s += `<path d="M150 44 C176 22 214 28 234 58 L222 60 C204 44 180 42 158 56 Z" fill="${line}"/>`;
-    s += `<path d="M166 62 L186 50 L218 56 L206 66 C194 70 178 69 166 62 Z" fill="#FFFBEA" stroke="${line}" stroke-width="2.5" stroke-linejoin="round"/>`;
-    s += `<path d="M193 52 L199 52 L197 68 L192 67 Z" fill="#9E1016"/>`;
-    // snout ridge bumps
-    s += `<path d="M236 58 l6 -10 l6 10 M258 60 l6 -9 l6 9 M280 57 l5 -8 l5 7" fill="${GA.C.goldLight}" stroke="${line}" stroke-width="2" stroke-linejoin="round"/>`;
-    // whiskers (barbels)
-    s += `<g fill="${GA.C.goldLight}" stroke="${line}" stroke-width="1.6">
-      <path d="${GA.ribbon([[334, 100], [364, 116], [372, 150], [352, 196], [308, 232], [240, 250], [170, 246]], GA.prof.horn(12, 0.7), 14)}"/>
-      <path d="${GA.ribbon([[334, 62], [352, 40], [340, 18], [296, 8], [240, 12], [180, 2], [120, -14]], GA.prof.horn(10, 0.7), 14)}"/></g>`;
-    // top highlight
-    s += `<path d="M84 60 C108 42 132 30 150 26 M234 60 C258 62 278 58 296 50" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity=".85"/>`;
+    s += `<g fill="none" stroke="${L}" stroke-width="${sw * 0.85}" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M332 42 C340 40 344 48 339 55"/>
+      <path d="M224 76 L202 104 L196 128"/>
+      <path d="M152 92 C140 84 124 88 124 104 C124 116 138 120 146 112"/>
+      <path d="M250 84 L292 80"/>
+      <path d="M100 128 L120 114 M84 118 L100 102"/></g>`;
+    // brow + glowing eye
+    s += `<ellipse cx="192" cy="70" rx="40" ry="18" transform="rotate(-12 192 70)" fill="#FFFFFF" opacity=".85" filter="url(#dhBlur${id})"/>`;
+    s += `<path d="M146 56 L206 24 L230 58 L214 60 L198 48 L160 66 Z" fill="${L}"/>`;
+    s += `<path d="M162 72 L198 58 L222 62 L208 74 C194 80 176 80 162 72 Z" fill="url(#dhEye${id})" stroke="${L}" stroke-width="${sw * 0.8}" stroke-linejoin="round"/>`;
+    s += `<defs><filter id="dhBlur${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"/></filter></defs>`;
+    // snout ridge spikes
+    s += `<path d="M244 56 l7 -13 l8 14 M266 59 l7 -12 l7 12 M288 58 l6 -10 l6 9" fill="${hi}" stroke="${L}" stroke-width="${sw * 0.7}" stroke-linejoin="round"/>`;
+
+    // --- whiskers
+    s += `<g fill="${hi}" ${stroke}>
+      <path d="${GA.ribbon([[346, 90], [374, 104], [384, 140], [366, 186], [324, 220], [262, 236], [198, 232]], GA.prof.horn(15, 0.75), 14)}"/>
+      <path d="${GA.ribbon([[340, 34], [362, 14], [358, -8], [330, -20], [292, -16], [262, -30]], GA.prof.horn(14, 0.75), 14)}"/></g>`;
     return s;
   };
 
-  /* dragon body: serpentine tube with scale bands and dorsal fins.
-   * ctrl: control points from neck -> tail. returns svg markup */
+  /* dragon body: cel-shaded serpentine tube with belly plates, scale
+   * chevrons and dorsal fins. ctrl: control points neck -> tail.
+   * finSide: +1/-1 which side of the path carries the fins (belly is the other). */
   GA.dragonBody = (id, ctrl, w0, w1, opt = {}) => {
-    const R = GA.rng(opt.seed ?? 11);
-    const line = opt.line ?? GA.C.brown;
+    const L = opt.line ?? '#2A0E02', sw = opt.sw ?? 3.2;
+    const stroke = `stroke="${L}" stroke-width="${sw}" stroke-linejoin="round"`;
     const fr = GA.frames(GA.spline(ctrl, 18));
-    const wf = GA.prof.body(w0, w1);
-    const finSide = opt.finSide ?? 1;
-    let fins = '', bands = '';
+    const wf = opt.width ?? GA.prof.body(w0, w1);
+    const fs = opt.finSide ?? 1;
     const total = fr[fr.length - 1].total;
-    // dorsal fins
-    for (let L = 30; L < total * 0.93; L += opt.finStep ?? 34) {
-      const q = fr.find((p) => p.len >= L);
-      if (!q) break;
-      const w = wf(q.t), h = w * 0.75 + 6;
-      const bx = q.x + q.nx * finSide * w * 0.42, by = q.y + q.ny * finSide * w * 0.42;
-      const back = -(opt.finStep ?? 34) * 0.9;
-      fins += `M${f(bx + q.tx * w * 0.35)} ${f(by + q.ty * w * 0.35)}` +
-        `Q${f(bx + q.nx * finSide * h * 0.9)} ${f(by + q.ny * finSide * h * 0.9)} ${f(bx + q.nx * finSide * h + q.tx * back)} ${f(by + q.ny * finSide * h + q.ty * back)}` +
-        `Q${f(bx + q.nx * finSide * h * 0.3 + q.tx * back * 0.3)} ${f(by + q.ny * finSide * h * 0.3 + q.ty * back * 0.3)} ${f(bx - q.tx * w * 0.35)} ${f(by - q.ty * w * 0.35)}Z`;
+    const at = (len) => fr.find((p) => p.len >= len) || fr[fr.length - 1];
+    let fins = '', chev = '', plates = '';
+    const fstep = opt.finStep ?? 40;
+    for (let len = 24; len < total * 0.95; len += fstep) {
+      const q = at(len), w = wf(q.t), h = w * 0.62 + 8;
+      const bx = q.x + q.nx * fs * w * 0.4, by = q.y + q.ny * fs * w * 0.4;
+      const back = -fstep * 1.05;
+      fins += `M${(bx + q.tx * w * 0.3).toFixed(1)} ${(by + q.ty * w * 0.3).toFixed(1)}` +
+        `Q${(bx + q.nx * fs * h * 0.8).toFixed(1)} ${(by + q.ny * fs * h * 0.8).toFixed(1)} ${(bx + q.nx * fs * h + q.tx * back).toFixed(1)} ${(by + q.ny * fs * h + q.ty * back).toFixed(1)}` +
+        `Q${(bx + q.nx * fs * h * 0.25 + q.tx * back * 0.3).toFixed(1)} ${(by + q.ny * fs * h * 0.25 + q.ty * back * 0.3).toFixed(1)} ${(bx - q.tx * w * 0.35).toFixed(1)} ${(by - q.ty * w * 0.35).toFixed(1)}Z`;
     }
-    // scale bands (chevrons across the body)
-    for (let L = 16; L < total * 0.97; L += opt.bandStep ?? 15) {
-      const q = fr.find((p) => p.len >= L);
-      if (!q) break;
-      const w = wf(q.t) / 2 * 0.92;
-      const k = w * 0.45;
-      bands += `M${f(q.x + q.nx * w)} ${f(q.y + q.ny * w)}Q${f(q.x - q.tx * k)} ${f(q.y - q.ty * k)} ${f(q.x - q.nx * w)} ${f(q.y - q.ny * w)}`;
+    const cstep = opt.chevStep ?? 22;
+    for (let len = 14; len < total * 0.96; len += cstep) {
+      const q = at(len), w = wf(q.t) / 2;
+      // chevron on the back half (fin side), belly plate line on the belly half
+      const k = w * 0.5;
+      chev += `M${(q.x + q.nx * fs * w * 0.85).toFixed(1)} ${(q.y + q.ny * fs * w * 0.85).toFixed(1)}Q${(q.x - q.tx * k + q.nx * fs * w * 0.3).toFixed(1)} ${(q.y - q.ty * k + q.ny * fs * w * 0.3).toFixed(1)} ${(q.x - q.nx * fs * w * 0.2).toFixed(1)} ${(q.y - q.ny * fs * w * 0.2).toFixed(1)}`;
+      plates += `M${(q.x - q.nx * fs * w * 0.3).toFixed(1)} ${(q.y - q.ny * fs * w * 0.3).toFixed(1)}L${(q.x - q.nx * fs * w * 0.98).toFixed(1)} ${(q.y - q.ny * fs * w * 0.98).toFixed(1)}`;
     }
     const body = GA.ribbon(ctrl, wf, 18);
-    // belly strip on the non-fin side
-    const belly = GA.ribbon(ctrl, (t) => wf(t) * 0.42, 18);
-    const bellyOffset = opt.bellyShift ?? 0;
-    return `<defs><linearGradient id="dbFill${id}" gradientUnits="userSpaceOnUse" ${opt.grad ?? 'x1="0" y1="0" x2="0" y2="400"'}>
-        ${opt.stops ?? `<stop offset="0" stop-color="${GA.C.goldLight}"/><stop offset=".55" stop-color="${GA.C.gold}"/><stop offset="1" stop-color="${GA.C.goldDeep}"/>`}</linearGradient></defs>
-      <path d="${fins}" fill="${GA.C.goldDeep}" stroke="${line}" stroke-width="2" stroke-linejoin="round"/>
-      <path d="${body}" fill="url(#dbFill${id})" stroke="${line}" stroke-width="3" stroke-linejoin="round"/>
-      <path d="${bands}" fill="none" stroke="${line}" stroke-width="2.2" opacity=".55"/>
-      <path d="${belly}" transform="translate(${bellyOffset})" fill="#FFF3C8" opacity="0"/>`;
+    // strip between two fractions of the half-width on one side of the centre line
+    const offStrip = (ratioIn, ratioOut, side) => {
+      const left = [], right = [];
+      for (const q of fr) {
+        const w = wf(q.t) / 2;
+        left.push([q.x + q.nx * side * w * ratioIn, q.y + q.ny * side * w * ratioIn]);
+        right.push([q.x + q.nx * side * w * ratioOut, q.y + q.ny * side * w * ratioOut]);
+      }
+      return GA.poly(left.concat(right.reverse()));
+    };
+    return `<path d="${fins}" fill="${opt.finFill ?? '#E0741A'}" ${stroke}/>
+      <path d="${body}" fill="${opt.fill ?? '#FFC44A'}"/>
+      <path d="${offStrip(0.05, 1, -fs)}" fill="${opt.shade ?? '#F29A22'}"/>
+      <path d="${offStrip(0.5, 1, -fs)}" fill="${opt.belly ?? '#FFD76A'}"/>
+      <path d="${plates}" fill="none" stroke="${L}" stroke-width="${sw * 0.6}" opacity=".7"/>
+      <path d="${offStrip(0.4, 0.68, fs)}" fill="${opt.hi ?? '#FFF4C8'}" opacity=".85"/>
+      <path d="${chev}" fill="none" stroke="#B8560E" stroke-width="${sw * 0.7}" stroke-linecap="round" opacity=".8"/>
+      <path d="${body}" fill="none" ${stroke}/>`;
   };
 
   /* wait for injected fonts (render_art.py) then call draw() and flag ready */

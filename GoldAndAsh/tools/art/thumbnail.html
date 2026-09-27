@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>GOLD &amp; ASH thumbnail</title>
+<!-- 1920x1080 Roblox thumbnail. Rendered by render_art.py (fonts injected there). -->
+<style>
+  html, body { margin: 0; padding: 0; background: #0B0A0E; }
+  svg { display: block; }
+  text { font-family: 'Black Han Sans', 'Do Hyeon', sans-serif; }
+  .en { font-family: 'Anton', 'Black Han Sans', sans-serif; }
+</style>
+<script src="common.js"></script>
+</head>
+<body>
+<svg id="art" xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080"></svg>
+<script>
+function draw() {
+  const W = 1920, H = 1080;
+  const P = { x: 962, y: 468 };              // clash point
+  const A = [1122, -20], B = [786, 1100];     // split line (gold left / ash right)
+  const GROUND = 792;
+  const onAsh = (x, y) => (x - B[0]) * (A[1] - B[1]) - (y - B[1]) * (A[0] - B[0]) < 0;
+  const f1 = (v) => v.toFixed(1);
+  const rot = (x, y, deg) => { const r = deg * Math.PI / 180; return [x * Math.cos(r) - y * Math.sin(r), x * Math.sin(r) + y * Math.cos(r)]; };
+
+  let s = `<defs>
+    <clipPath id="clipGold"><path d="${GA.poly([[-10, -10], A, B, [-10, 1100]])}"/></clipPath>
+    <clipPath id="clipAsh"><path d="${GA.poly([A, [1940, -10], [1940, 1100], B])}"/></clipPath>
+    <linearGradient id="skyGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5A1E08"/><stop offset=".35" stop-color="#B8480E"/>
+      <stop offset=".58" stop-color="#F29A22"/><stop offset=".72" stop-color="#FFD76A"/><stop offset="1" stop-color="#FFE8A0"/></linearGradient>
+    <radialGradient id="sun" gradientUnits="userSpaceOnUse" cx="600" cy="500" r="600">
+      <stop offset="0" stop-color="#FFFBE6"/><stop offset=".12" stop-color="#FFF1B8" stop-opacity=".95"/>
+      <stop offset=".35" stop-color="#FFC44A" stop-opacity=".55"/><stop offset="1" stop-color="#FF9A2A" stop-opacity="0"/></radialGradient>
+    <linearGradient id="skyAsh" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0B0A0E"/><stop offset=".45" stop-color="#1E1418"/>
+      <stop offset=".75" stop-color="#4A1418"/><stop offset="1" stop-color="#7A1C20"/></linearGradient>
+    <radialGradient id="flash" gradientUnits="userSpaceOnUse" cx="${P.x}" cy="${P.y}" r="190">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset=".2" stop-color="#FFFBE6"/>
+      <stop offset=".5" stop-color="#FFD76A" stop-opacity=".65"/><stop offset="1" stop-color="#FF9A2A" stop-opacity="0"/></radialGradient>
+    <radialGradient id="flashWide" gradientUnits="userSpaceOnUse" cx="${P.x}" cy="${P.y}" r="520">
+      <stop offset="0" stop-color="#FFE9B0" stop-opacity=".75"/><stop offset=".4" stop-color="#FF7A3A" stop-opacity=".25"/><stop offset="1" stop-color="#FF5A2A" stop-opacity="0"/></radialGradient>
+    <linearGradient id="groundGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7A3410"/><stop offset=".3" stop-color="#4A1C08"/><stop offset="1" stop-color="#1E0A04"/></linearGradient>
+    <linearGradient id="groundAsh" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3A1418"/><stop offset=".3" stop-color="#1A1216"/><stop offset="1" stop-color="#0A090C"/></linearGradient>
+    <linearGradient id="txtGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset=".3" stop-color="#FFF0B0"/><stop offset=".62" stop-color="#FFC44A"/><stop offset="1" stop-color="#E07A12"/></linearGradient>
+    <linearGradient id="txtAsh" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset=".45" stop-color="#D9D4DC"/><stop offset="1" stop-color="#7E7884"/></linearGradient>
+    <filter id="blur2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2"/></filter>
+    <filter id="blur4" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
+    <filter id="blur10" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10"/></filter>
+    <filter id="blur24" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="24"/></filter>
+    <filter id="bloom" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="1.1 0 0 0 .12  0 1 0 0 .06  0 0 .6 0 0  0 0 0 1.3 0" result="b2"/>
+      <feMerge><feMergeNode in="b2"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="smoke" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".004 .009" numOctaves="5" seed="4"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 .5  0 0 0 0 .47  0 0 0 0 .5  0 0 0 2.6 -1.1"/></filter>
+    <filter id="haze" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".003 .012" numOctaves="4" seed="12"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 .85  0 0 0 0 .55  0 0 0 1.6 -.75"/></filter>
+    <filter id="glowGold" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="16" result="b"/>
+      <feFlood flood-color="#FFD24A"/><feComposite in2="b" operator="in"/></filter>
+    <filter id="dropDark" x="-30%" y="-30%" width="160%" height="160%">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="5" result="d"/>
+      <feGaussianBlur in="d" stdDeviation="10" result="b"/>
+      <feFlood flood-color="#1A0602" flood-opacity=".7"/><feComposite in2="b" operator="in"/><feOffset dx="4" dy="8"/></filter>
+    <filter id="sticker" x="-20%" y="-20%" width="140%" height="140%">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="3" result="d"/>
+      <feFlood flood-color="#2A0E02"/><feComposite in2="d" operator="in" result="o"/>
+      <feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="rimGold" x="-20%" y="-20%" width="140%" height="140%">
+      <feOffset in="SourceAlpha" dx="-7" dy="4" result="off"/>
+      <feComposite in="SourceAlpha" in2="off" operator="out" result="rim"/>
+      <feGaussianBlur in="rim" stdDeviation="1.2" result="rb"/>
+      <feFlood flood-color="#FFF1B8"/><feComposite in2="rb" operator="in" result="rc"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14" result="ab"/>
+      <feFlood flood-color="#FFB02A" flood-opacity=".75"/><feComposite in2="ab" operator="in" result="aura"/>
+      <feMerge><feMergeNode in="aura"/><feMergeNode in="SourceGraphic"/><feMergeNode in="rc"/></feMerge></filter>
+    <filter id="rimRed" x="-20%" y="-20%" width="140%" height="140%">
+      <feOffset in="SourceAlpha" dx="7" dy="4" result="off"/>
+      <feComposite in="SourceAlpha" in2="off" operator="out" result="rim"/>
+      <feGaussianBlur in="rim" stdDeviation="1.2" result="rb"/>
+      <feFlood flood-color="#FF8A7A"/><feComposite in2="rb" operator="in" result="rc"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14" result="ab"/>
+      <feFlood flood-color="#D62C34" flood-opacity=".8"/><feComposite in2="ab" operator="in" result="aura"/>
+      <feMerge><feMergeNode in="aura"/><feMergeNode in="SourceGraphic"/><feMergeNode in="rc"/></feMerge></filter>
+    <filter id="rimUpGold" x="-5%" y="-5%" width="110%" height="110%">
+      <feOffset in="SourceAlpha" dx="-2" dy="5" result="off"/><feComposite in="SourceAlpha" in2="off" operator="out" result="rim"/>
+      <feFlood flood-color="#FFB347"/><feComposite in2="rim" operator="in" result="rc"/>
+      <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="rc"/></feMerge></filter>
+    <filter id="rimUpRed" x="-5%" y="-5%" width="110%" height="110%">
+      <feOffset in="SourceAlpha" dx="2" dy="5" result="off"/><feComposite in="SourceAlpha" in2="off" operator="out" result="rim"/>
+      <feFlood flood-color="#C8303A"/><feComposite in2="rim" operator="in" result="rc"/>
+      <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="rc"/></feMerge></filter>
+    <linearGradient id="smokeFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff"/><stop offset=".42" stop-color="#fff"/><stop offset=".62" stop-color="#fff" stop-opacity=".25"/><stop offset=".75" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <mask id="smokeMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080"><rect width="1920" height="1080" fill="url(#smokeFade)"/></mask>
+    <filter id="textShadow" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="8"/></filter>
+    <radialGradient id="vig" cx=".5" cy=".5" r=".75">
+      <stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></radialGradient>
+  </defs>`;
+
+  /* =================== 1. SKY =================== */
+  s += `<g clip-path="url(#clipGold)"><rect width="${W}" height="${H}" fill="url(#skyGold)"/>
+    <rect width="${W}" height="${H}" fill="url(#sun)"/>
+    <circle cx="600" cy="500" r="182" fill="#FFE9A8" opacity=".7"/><circle cx="600" cy="500" r="160" fill="#FFF3CC"/>
+    <rect width="${W}" height="720" filter="url(#haze)" opacity=".35"/></g>`;
+  s += `<g clip-path="url(#clipAsh)"><rect width="${W}" height="${H}" fill="url(#skyAsh)"/>
+    <rect width="${W}" height="${H}" filter="url(#smoke)" opacity=".7" mask="url(#smokeMask)"/></g>`;
+  s += `<g clip-path="url(#clipGold)"><path d="${GA.rays(P.x, P.y, 90, 330, 1500, 9, GA.rng(3), { inward: true, even: true })}" fill="#FFF3C0" opacity=".22"/></g>`;
+  s += `<g clip-path="url(#clipAsh)"><path d="${GA.rays(P.x, P.y, 80, 330, 1500, 8, GA.rng(4), { inward: true, even: true })}" fill="#000" opacity=".35"/></g>`;
+  s += `<rect width="${W}" height="${H}" fill="url(#flashWide)"/>`;
+
+  /* =================== 2. TOWN (far + mid silhouettes) =================== */
+  // pagoda-style roof with upturned eaves
+  const roof = (xl, xr, ye, rh, c) => {
+    const w = xr - xl;
+    return `M${f1(xl - c)} ${f1(ye - c * 0.75)}Q${f1(xl + c * 0.2)} ${f1(ye + 3)} ${f1(xl + c * 1.4)} ${f1(ye + 3)}L${f1(xr - c * 1.4)} ${f1(ye + 3)}` +
+      `Q${f1(xr - c * 0.2)} ${f1(ye + 3)} ${f1(xr + c)} ${f1(ye - c * 0.75)}Q${f1(xr - w * 0.12)} ${f1(ye - rh * 0.3)} ${f1(xr - w * 0.28)} ${f1(ye - rh)}` +
+      `L${f1(xl + w * 0.28)} ${f1(ye - rh)}Q${f1(xl + w * 0.12)} ${f1(ye - rh * 0.3)} ${f1(xl - c)} ${f1(ye - c * 0.75)}Z` +
+      // ridge end ornaments
+      `M${f1(xl + w * 0.28 - 4)} ${f1(ye - rh + 1)}l-10 -12l16 6zM${f1(xr - w * 0.28 + 4)} ${f1(ye - rh + 1)}l10 -12l-16 6z`;
+  };
+  // (each part is its own <path>: mixed winding inside one path would punch holes)
+  const house = (x, base, w, h, floors, tilt = 0) => {
+    const parts = [`M${f1(x - w / 2)} ${base}L${f1(x - w / 2)} ${f1(base - h)}L${f1(x + w / 2)} ${f1(base - h)}L${f1(x + w / 2)} ${base}Z`];
+    const fh = h / floors;
+    for (let i = 1; i <= floors; i++) {
+      const ye = base - fh * i + (i === floors ? 0 : fh * 0.12);
+      const ww = i === floors ? w * 1.02 : w * 1.12;
+      parts.push(roof(x - ww / 2, x + ww / 2, ye, i === floors ? fh * 0.55 : fh * 0.22, Math.min(26, w * 0.12)));
+      // eave soffit under the overhang
+      parts.push(`M${f1(x - ww * 0.47)} ${f1(ye)}L${f1(x + ww * 0.47)} ${f1(ye)}L${f1(x + w / 2)} ${f1(ye + fh * 0.16)}L${f1(x - w / 2)} ${f1(ye + fh * 0.16)}Z`);
+    }
+    const inner = parts.map((d) => `<path d="${d}"/>`).join('');
+    return tilt ? `<g transform="rotate(${tilt} ${f1(x + (tilt > 0 ? w / 2 : -w / 2))} ${base})">${inner}</g>` : inner;
+  };
+  const pagoda = (x, base, w, tiers, th) => {
+    const parts = [];
+    for (let i = 0; i < tiers; i++) {
+      const ww = w * (1 - i * 0.13), yb = base - i * th, ye = yb - th * 0.62;
+      parts.push(`M${f1(x - ww * 0.36)} ${f1(yb)}L${f1(x - ww * 0.36)} ${f1(ye)}L${f1(x + ww * 0.36)} ${f1(ye)}L${f1(x + ww * 0.36)} ${f1(yb)}Z`);
+      parts.push(roof(x - ww / 2, x + ww / 2, ye, th * 0.4, ww * 0.1));
+    }
+    const top = base - tiers * th - th * 0.1;
+    parts.push(`M${x - 3} ${f1(top + th * 0.3)}L${x - 2} ${f1(top - th * 0.9)}L${x + 2} ${f1(top - th * 0.9)}L${x + 3} ${f1(top + th * 0.3)}Z`);
+    return parts.map((d) => `<path d="${d}"/>`).join('');
+  };
+
+  // far layer
+  const tr = GA.rng(5);
+  let far = pagoda(250, 700, 190, 5, 72) + pagoda(1690, 690, 170, 4, 70);
+  for (let x = -40; x < 2000; x += tr.range(110, 170)) {
+    if (Math.abs(x - 250) < 110 || Math.abs(x - 1690) < 100 || (x > 700 && x < 1260)) continue;
+    far += house(x, 740, tr.range(90, 140), tr.range(120, 230), tr() < 0.4 ? 2 : 1, 0);
+  }
+  s += `<g clip-path="url(#clipGold)" fill="#B4521A" opacity=".55" filter="url(#rimUpGold)">${far}</g>`;
+  s += `<g clip-path="url(#clipAsh)" fill="#2A1216" opacity=".9">${far}</g>`;
+
+  // mid layer: shophouses, some collapsed, with signboards
+  const mr = GA.rng(21);
+  let mid = '', signs = '', windows = '';
+  const mids = [[-20, 190, 330, 2, 0], [170, 170, 250, 2, -4], [330, 150, 300, 3, 0], [520, 210, 220, 2, 0],
+    [1400, 200, 260, 2, 0], [1590, 170, 320, 3, 5], [1780, 200, 240, 2, 0], [1950, 190, 300, 2, 0]];
+  for (const [x, w, h, fl, tilt] of mids) {
+    mid += house(x, GROUND + 6, w, h, fl, tilt);
+    // lit windows
+    for (let i = 0; i < fl; i++) {
+      const wy = GROUND - (h / fl) * (i + 0.62);
+      for (let k = -1; k <= 1; k += 2) if (mr() < 0.55) windows += `<rect x="${f1(x + k * w * 0.22 - 14)}" y="${f1(wy)}" width="28" height="${f1(h / fl * 0.3)}" rx="2" transform="rotate(${tilt} ${f1(x + (tilt > 0 ? w / 2 : -w / 2))} ${GROUND})"/>`;
+    }
+  }
+  // collapsed beams / broken walls
+  mid += `<path d="M600 ${GROUND}L640 ${GROUND - 150}L668 ${GROUND - 140}L700 ${GROUND - 60}L735 ${GROUND - 90}L760 ${GROUND}Z"/>`;
+  mid += `<path d="M1180 ${GROUND}L1210 ${GROUND - 110}L1250 ${GROUND - 170}L1275 ${GROUND - 120}L1320 ${GROUND - 140}L1350 ${GROUND}Z"/>`;
+  mid += `<rect x="560" y="${GROUND - 230}" width="22" height="260" transform="rotate(-24 571 ${GROUND})"/>`;
+  mid += `<rect x="1340" y="${GROUND - 250}" width="22" height="280" transform="rotate(28 1351 ${GROUND})"/>`;
+  // snapped torii gate (ash side) and a fallen paifang beam (gold side)
+  mid += `<g transform="rotate(9 1640 ${GROUND})"><path d="M1540 ${GROUND - 300}Q1640 ${GROUND - 318} 1760 ${GROUND - 312}L1768 ${GROUND - 290}Q1640 ${GROUND - 292} 1532 ${GROUND - 280}Z"/>
+    <rect x="1548" y="${GROUND - 262}" width="200" height="20"/><rect x="1570" y="${GROUND - 290}" width="26" height="290"/><rect x="1690" y="${GROUND - 290}" width="26" height="120"/></g>
+    <path d="M1690 ${GROUND}L1704 ${GROUND - 70}L1716 ${GROUND - 58}L1722 ${GROUND}Z"/>`;
+  const rr = GA.rng(61);
+  for (let i = 0; i < 40; i++) {
+    const x = rr.range(-20, 1940), sz = rr.range(10, 34);
+    if (x > 760 && x < 1180) continue;
+    mid += `<path d="${GA.flake(x, GROUND - sz * 0.25, sz, rr() * 6.28, rr)}"/>`;
+  }
+  s += `<g clip-path="url(#clipGold)"><g fill="#3A1406" filter="url(#rimUpGold)">${mid}</g><g fill="#FFB347" opacity=".55">${windows}</g></g>`;
+  s += `<g clip-path="url(#clipAsh)"><g fill="#0D0B0F" filter="url(#rimUpRed)">${mid}</g><g fill="#FF5A2A" opacity=".35">${windows}</g></g>`;
+  // embers of the burning market along the ash-side street
+  const fr2 = GA.rng(90);
+  let fires = '';
+  for (let i = 0; i < 9; i++) fires += `<ellipse cx="${f1(fr2.range(1220, 1920))}" cy="${f1(GROUND - fr2.range(0, 20))}" rx="${f1(fr2.range(40, 110))}" ry="${f1(fr2.range(14, 34))}" fill="${fr2() < 0.5 ? '#FF4A20' : '#D62C34'}"/>`;
+  s += `<g clip-path="url(#clipAsh)" filter="url(#blur24)" opacity=".75">${fires}</g>`;
+
+  // hanging signboards with Hangul (generic market words)
+  const sign = (x, y, w, h, txt, gold) => {
+    const col = gold ? '#FFD76A' : '#FF5A4E';
+    return `<g transform="translate(${x} ${y})"><rect x="${-w / 2}" y="0" width="${w}" height="${h}" rx="4" fill="${gold ? '#5A1A06' : '#1A0A0C'}" stroke="${col}" stroke-width="3"/>
+      <text x="0" y="${h * 0.5}" text-anchor="middle" dominant-baseline="central" font-size="${w * 0.62}" fill="${col}" style="writing-mode: vertical-rl; text-orientation: upright;">${txt}</text></g>`;
+  };
+  s += `<g filter="url(#bloom)" opacity=".9">${sign(250, 500, 44, 140, '금룡반점', true)}${sign(420, 560, 40, 100, '만두', true)}${sign(1560, 520, 44, 120, '찻집', false)}${sign(1790, 560, 40, 100, '라멘', false)}</g>`;
+
+  // lantern strings (catenaries) — some snapped
+  const cat = (x1, y1, x2, y2, sag, n = 28) => {
+    const pts = [];
+    for (let i = 0; i <= n; i++) { const t = i / n; pts.push([x1 + (x2 - x1) * t, y1 + (y2 - y1) * t + sag * 4 * t * (1 - t)]); }
+    return pts;
+  };
+  let wires = '', lanterns = '';
+  const strings = [[-20, 300, 560, 330, 90, 0.95], [60, 420, 640, 380, 70, 1], [1280, 360, 1940, 300, 90, 1], [1330, 250, 1900, 200, 70, 0.6]];
+  const lr = GA.rng(9);
+  for (const [x1, y1, x2, y2, sag, frac] of strings) {
+    const pts = cat(x1, y1, x2, y2, sag).slice(0, Math.round(29 * frac));
+    wires += `<path d="${GA.poly(pts, false)}"/>`;
+    for (let i = 2; i < pts.length - 1; i += 3) {
+      const [x, y] = pts[i], ash = onAsh(x, y);
+      const lit = !ash || lr() < 0.5;
+      lanterns += `<g transform="translate(${f1(x)} ${f1(y + 22)})">
+        <line x1="0" y1="-22" x2="0" y2="-14" stroke="#1A0A06" stroke-width="2"/>
+        <ellipse rx="15" ry="18" fill="${lit ? (ash ? '#D62C34' : '#FF7A2A') : '#2A1216'}"/>
+        <ellipse rx="7" ry="15" fill="${lit ? (ash ? '#FF6A5A' : '#FFD76A') : '#3A1A1E'}" opacity=".8"/>
+        <rect x="-8" y="-21" width="16" height="5" fill="#1A0A06"/><rect x="-8" y="16" width="16" height="5" fill="#1A0A06"/></g>`;
+    }
+  }
+  s += `<g fill="none" stroke="#1A0A06" stroke-width="2.5">${wires}</g><g filter="url(#bloom)">${lanterns}</g>`;
+
+  /* =================== 3. GROUND =================== */
+  s += `<g clip-path="url(#clipGold)"><rect y="${GROUND}" width="${W}" height="${H - GROUND}" fill="url(#groundGold)"/></g>`;
+  s += `<g clip-path="url(#clipAsh)"><rect y="${GROUND}" width="${W}" height="${H - GROUND}" fill="url(#groundAsh)"/></g>`;
+  // perspective tile lines
+  let tiles = '';
+  for (let i = -14; i <= 14; i++) tiles += `M${f1(P.x + i * 40)} ${GROUND}L${f1(P.x + i * 260)} ${H}`;
+  for (let k = 1; k < 7; k++) { const y = GROUND + Math.pow(k / 7, 1.7) * (H - GROUND); tiles += `M0 ${f1(y)}L${W} ${f1(y)}`; }
+  s += `<path d="${tiles}" stroke="#000" stroke-width="2" opacity=".25" fill="none"/>`;
+  // impact cracks radiating from under the clash
+  const cr = GA.rng(44);
+  let cracks = '';
+  for (let i = 0; i < 16; i++) {
+    let x = P.x + cr.range(-40, 40), y = GROUND + 30, a = cr.range(0.1, Math.PI - 0.1), pts = [[x, y]];
+    const len = cr.range(160, 520);
+    for (let k = 0; k < 7; k++) { a += cr.range(-0.35, 0.35); x += Math.cos(a) * len / 7; y += Math.sin(a) * len / 7 * 0.28; pts.push([x, y]); }
+    cracks += `<path d="${GA.ribbon(pts, GA.prof.horn(7, 1))}"/>`;
+  }
+  s += `<g fill="#FFE27A" filter="url(#bloom)" opacity=".85" clip-path="url(#clipGold)">${cracks}</g><g fill="#FF4A48" filter="url(#bloom)" opacity=".85" clip-path="url(#clipAsh)">${cracks}</g>`;
+
+  /* =================== 4. DRAGON (behind the fighters) =================== */
+  const HP = [335, 150, 800, 318, 0.9, 20];
+  const N = GA.map(...HP, 64, 112);
+  const body = GA.dragonBody('t', [[N[0] + 20, N[1] + 16], [N[0] - 60, N[1] - 30], [N[0] - 190, N[1] - 30], [N[0] - 320, N[1] + 60], [N[0] - 360, N[1] + 220], [N[0] - 280, N[1] + 360], [N[0] - 400, N[1] + 520], [N[0] - 560, N[1] + 560]], 120, 30, { finSide: 1, finStep: 46, chevStep: 26 });
+  const dragon = `${body}<g transform="${GA.place(...HP)}">${GA.dragonHead('t')}</g>`;
+  const ghost = dragon.replace(/id="(dh\w+)"/g, 'id="ghost_$1"');
+  s += `<g filter="url(#glowGold)" opacity=".7">${ghost}</g><g filter="url(#dropDark)">${ghost}</g>`;
+  s += `<g filter="url(#sticker)">${dragon}</g>`;
+  const M = GA.map(...HP, 300, 150);
+  s += `<path d="${GA.sliver(M[0], M[1], P.x, P.y, 60, { peak: 0.2, pa: 0.4, pb: 1.2 })}" fill="#FFF6D6" filter="url(#blur10)" opacity=".9"/>`;
+
+  /* =================== 5. CRIMSON ASH SLASHES (right sky) =================== */
+  const slash = (ax, ay, bx, by, w) => `
+    <path d="${GA.sliver(ax, ay, bx, by, w * 1.8, { peak: 0.35 })}" fill="#D62C34" filter="url(#blur10)" opacity=".85"/>
+    <path d="${GA.sliver(ax, ay, bx, by, w, { peak: 0.35 })}" fill="#FF4A48"/>
+    <path d="${GA.sliver(ax, ay, bx, by, w * 0.66, { peak: 0.35, skew: 0.4 })}" fill="#0E0B0E"/>
+    <path d="${GA.sliver(ax, ay, bx, by, w * 0.14, { peak: 0.35, skew: 0.05 })}" fill="#FFE2DA"/>`;
+  s += slash(1960, 120, 1180, 330, 46) + slash(1960, 300, 1300, 420, 30) + slash(1860, -20, 1350, 170, 26);
+
+  /* =================== 6. FIGHTERS (blocky R6 avatars) =================== */
+  // Players fight as their own avatar, so the fighters are generic R6 blocks,
+  // back-lit by the clash: shaded toward the light + coloured rim (filter).
+  const u = 98;
+  let gdefs = '';
+  // cel-shaded block: base + hard lit band toward the light + shade band away from it
+  const block = (x, y, w, h, tone, deg, light, rx = 0.1) => {
+    const d = rot(light[0], light[1], -deg);
+    const r = f1(u * rx), o = 2;
+    let bands;
+    if (Math.abs(d[0]) >= Math.abs(d[1])) {
+      const litX = d[0] > 0 ? x + w * 0.64 : x, shX = d[0] > 0 ? x : x + w * 0.74;
+      bands = `<rect x="${f1(litX + o)}" y="${f1(y + o)}" width="${f1(w * 0.36 - 2 * o)}" height="${f1(h - 2 * o)}" rx="${r}" fill="${tone[1]}"/>` +
+        `<rect x="${f1(shX + o)}" y="${f1(y + o)}" width="${f1(w * 0.26 - 2 * o)}" height="${f1(h - 2 * o)}" rx="${r}" fill="${tone[2]}"/>`;
+    } else {
+      const litY = d[1] > 0 ? y + h * 0.66 : y, shY = d[1] > 0 ? y : y + h * 0.76;
+      bands = `<rect x="${f1(x + o)}" y="${f1(litY + o)}" width="${f1(w - 2 * o)}" height="${f1(h * 0.34 - 2 * o)}" rx="${r}" fill="${tone[1]}"/>` +
+        `<rect x="${f1(x + o)}" y="${f1(shY + o)}" width="${f1(w - 2 * o)}" height="${f1(h * 0.24 - 2 * o)}" rx="${r}" fill="${tone[2]}"/>`;
+    }
+    return `<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" rx="${r}" fill="${tone[0]}"/>${bands}` +
+      `<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" rx="${r}" fill="none" stroke="#0A0406" stroke-width="4"/>`;
+  };
+  // angles in degrees; 0 = limb hanging straight down. returns svg + hand positions
+  function fighter(c) {
+    const { hip, facing: fc, torso, head, armN, armF, legN, legF, light } = c;
+    const shN = [fc * 0.05 * u, -1.72 * u], shF = [-fc * 0.3 * u, -1.78 * u];
+    const tl = (v) => { const r = rot(v[0], v[1], torso); return [hip[0] + r[0], hip[1] + r[1]]; };
+    const hand = (sh, a) => { const r = rot(0, 1.7 * u, a); return tl([sh[0] + r[0], sh[1] + r[1]]); };
+    const T = (x, y, deg, inner) => `<g transform="translate(${f1(x)} ${f1(y)}) rotate(${deg})">${inner}</g>`;
+    let g = '';
+    g += T(hip[0] - fc * 0.28 * u, hip[1], legF, block(-0.48 * u, -0.1 * u, 0.96 * u, 2.05 * u, [c.leg[2], c.leg[0], c.leg[2]], legF, light));
+    g += T(hip[0], hip[1], torso, T(shF[0], shF[1], armF, block(-0.44 * u, -0.25 * u, 0.88 * u, 2.05 * u, [c.arm[2], c.arm[0], c.arm[2]], torso + armF, light)));
+    if (c.back) g += T(hip[0], hip[1], torso, c.back);
+    g += T(hip[0] + fc * 0.18 * u, hip[1], legN, block(-0.48 * u, -0.1 * u, 0.96 * u, 2.05 * u, c.leg, legN, light));
+    g += T(hip[0], hip[1], torso,
+      `<path d="M${f1(-fc * 0.78 * u)} ${f1(-1.98 * u)}l${f1(-fc * 0.34 * u)} ${f1(0.14 * u)}l0 ${f1(1.8 * u)}l${f1(fc * 0.34 * u)} ${f1(0.08 * u)}z" fill="${c.body[2]}" stroke="#0A0406" stroke-width="4" stroke-linejoin="round"/>` +
+      block(-0.78 * u, -2 * u, 1.56 * u, 2.05 * u, c.body, torso, light) +
+      (c.belt ?? '') +
+      T(fc * 0.06 * u, -2.66 * u, head, block(-0.56 * u, -0.56 * u, 1.12 * u, 1.12 * u, c.skin, torso + head, light, 0.26) + (c.face ?? '') + (c.headwear ?? '')) +
+      (c.waist ?? '') +
+      T(shN[0], shN[1], armN, block(-0.44 * u, -0.25 * u, 0.88 * u, 2.05 * u, c.arm, torso + armN, light) +
+        block(-0.44 * u, 1.45 * u, 0.88 * u, 0.6 * u, c.skin, torso + armN, light)));
+    return { svg: g, handN: hand(shN, armN), handF: hand(shF, armF), headC: tl([fc * 0.06 * u, -2.66 * u]) };
+  }
+  // simple fierce face drawn on the head block (facing fc)
+  const face = (fc) => `<g fill="#140806">
+      <rect x="${f1(fc > 0 ? 0.02 * u : -0.3 * u)}" y="${f1(-0.16 * u)}" width="${f1(0.1 * u)}" height="${f1(0.2 * u)}" rx="2"/>
+      <rect x="${f1(fc > 0 ? 0.3 * u : -0.02 * u - 0.1 * u)}" y="${f1(-0.16 * u)}" width="${f1(0.1 * u)}" height="${f1(0.2 * u)}" rx="2"/>
+      <path d="M${f1(fc > 0 ? -0.04 * u : 0.04 * u)} ${f1(-0.3 * u)}L${f1(fc * 0.2 * u)} ${f1(-0.2 * u)}L${f1(fc * 0.46 * u)} ${f1(-0.3 * u)}" fill="none" stroke="#140806" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M${f1(fc * 0.06 * u)} ${f1(0.24 * u)}L${f1(fc * 0.38 * u)} ${f1(0.2 * u)}" stroke="#140806" stroke-width="5" stroke-linecap="round"/></g>`;
+
+  // --- Lin Yuan moveset user (left): bo staff thrust, straw hat on the back, gold chi
+  const hat = `<g transform="translate(${f1(-1.05 * u)} ${f1(-1.3 * u)}) rotate(-80)">
+      <path d="M${f1(-1.55 * u)} ${f1(0.05 * u)} L0 ${f1(-0.64 * u)} L${f1(1.55 * u)} ${f1(0.05 * u)} Q0 ${f1(0.22 * u)} ${f1(-1.55 * u)} ${f1(0.05 * u)}Z" fill="#D8A850" stroke="#0A0406" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M0 ${f1(-0.62 * u)}L${f1(-0.9 * u)} ${f1(0.1 * u)}M0 ${f1(-0.62 * u)}L${f1(-0.3 * u)} ${f1(0.14 * u)}M0 ${f1(-0.62 * u)}L${f1(0.3 * u)} ${f1(0.14 * u)}M0 ${f1(-0.62 * u)}L${f1(0.9 * u)} ${f1(0.1 * u)}" stroke="#8A6424" stroke-width="3"/>
+      <path d="M0 ${f1(-0.64 * u)}L${f1(1.55 * u)} ${f1(0.05 * u)}Q${f1(0.8 * u)} ${f1(0.16 * u)} 0 ${f1(0.18 * u)}Z" fill="#8A6424" opacity=".45"/></g>`;
+  const linBelt = `<rect x="${f1(-0.78 * u)}" y="${f1(-0.44 * u)}" width="${f1(1.56 * u)}" height="${f1(0.22 * u)}" fill="#FFC44A" stroke="#0A0406" stroke-width="3"/>
+    <path d="M${f1(0.1 * u)} ${f1(-2 * u)}L${f1(0.1 * u)} ${f1(-0.44 * u)}" stroke="#FFC44A" stroke-width="6"/>`;
+  const U = (v) => f1(v * u);
+  const linBand = `<path d="${GA.ribbon([[-0.5 * u, -0.34 * u], [-0.95 * u, -0.26 * u], [-1.35 * u, -0.46 * u], [-1.8 * u, -0.3 * u]], GA.prof.lin(0.2 * u, 0.05 * u))}" fill="#FFC44A" stroke="#0A0406" stroke-width="3"/>
+    <path d="${GA.ribbon([[-0.5 * u, -0.3 * u], [-0.85 * u, -0.1 * u], [-1.2 * u, -0.2 * u], [-1.55 * u, 0]], GA.prof.lin(0.16 * u, 0.04 * u))}" fill="#E0901E" stroke="#0A0406" stroke-width="3"/>
+    <rect x="${U(-0.58)}" y="${U(-0.46)}" width="${U(1.16)}" height="${U(0.18)}" fill="#FFC44A" stroke="#0A0406" stroke-width="3"/>`;
+  const renHair = `<path d="${GA.ribbon([[0.5 * u, -0.5 * u], [0.95 * u, -0.66 * u], [1.45 * u, -0.46 * u], [1.95 * u, -0.6 * u]], GA.prof.lin(0.36 * u, 0.06 * u))}" fill="#141218" stroke="#0A0406" stroke-width="3"/>
+    <path d="M${U(-0.62)} ${U(-0.3)}L${U(-0.62)} ${U(-0.6)}Q${U(-0.6)} ${U(-0.66)} ${U(-0.5)} ${U(-0.66)}L${U(0.54)} ${U(-0.66)}Q${U(0.64)} ${U(-0.66)} ${U(0.64)} ${U(-0.54)}L${U(0.64)} ${U(0.34)}L${U(0.3)} ${U(0.12)}L${U(0.16)} ${U(-0.28)}L${U(-0.12)} ${U(-0.34)}L${U(-0.26)} ${U(-0.22)}L${U(-0.38)} ${U(-0.36)}L${U(-0.5)} ${U(-0.2)}Z" fill="#1A171E" stroke="#0A0406" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M${U(-0.4)} ${U(-0.6)}L${U(0.5)} ${U(-0.6)}" stroke="#3A3444" stroke-width="4" stroke-linecap="round"/>
+    <rect x="${U(0.5)}" y="${U(-0.66)}" width="${U(0.14)}" height="${U(0.26)}" fill="#D62C34" stroke="#0A0406" stroke-width="2"/>`;
+  const lin = fighter({ hip: [592, 664], facing: 1, torso: 18, head: -8, armN: -98, armF: 62, legN: -40, legF: 44, light: [1, -0.35],
+    body: ['#8A2C12', '#D0562A', '#4A1408'], arm: ['#8A2C12', '#D0562A', '#4A1408'], leg: ['#3A2414', '#6A4428', '#1E120A'],
+    skin: ['#D89A60', '#F6C890', '#9A6034'], back: hat, belt: linBelt, face: face(1), headwear: linBand });
+  // staff through the hands to the clash
+  const sd = [P.x - lin.handN[0], P.y - lin.handN[1]], sL = Math.hypot(...sd), su = [sd[0] / sL, sd[1] / sL];
+  const st0 = [lin.handN[0] - su[0] * 330, lin.handN[1] - su[1] * 330], st1 = [P.x + su[0] * 6, P.y + su[1] * 6];
+  const pill = (a, b, w) => GA.sliver(a[0], a[1], b[0], b[1], w, { peak: 0.5, pa: 0.01, pb: 0.01 });
+  const staff = `<path d="${pill(st0, st1, 40)}" fill="#FFD24A" filter="url(#blur10)" opacity=".85"/>
+    <path d="${pill(st0, st1, 18)}" fill="#7A4318" stroke="#1A0A04" stroke-width="3"/>
+    <path d="${GA.sliver(st0[0], st0[1] - 4, st1[0], st1[1] - 4, 5, { peak: 0.5, pa: 0.01, pb: 0.01 })}" fill="#F0B870"/>
+    <circle cx="${f1(st0[0])}" cy="${f1(st0[1])}" r="11" fill="#FFC44A" stroke="#1A0A04" stroke-width="3"/>`;
+
+  // --- Kanzaki Ren moveset user (right): katana slash, sealed scabbard (10 red lines), ash
+  let seals = '';
+  for (let i = 0; i < 10; i++) seals += `<rect x="${f1(-1.25 * u + i * 0.25 * u)}" y="${f1(-0.14 * u)}" width="${f1(0.07 * u)}" height="${f1(0.28 * u)}" fill="#FF3A3A"/>`;
+  const scabbard = `<g transform="translate(${f1(-0.1 * u)} ${f1(-0.2 * u)}) rotate(22)">
+    <rect x="${f1(-1.45 * u)}" y="${f1(-0.15 * u)}" width="${f1(3.1 * u)}" height="${f1(0.3 * u)}" rx="${f1(0.15 * u)}" fill="#141218" stroke="#050305" stroke-width="3"/>
+    <g filter="url(#bloom)">${seals}</g></g>`;
+  const renBelt = `<rect x="${f1(-0.78 * u)}" y="${f1(-0.44 * u)}" width="${f1(1.56 * u)}" height="${f1(0.22 * u)}" fill="#D62C34" stroke="#0A0406" stroke-width="3"/>
+    <path d="M${f1(-0.1 * u)} ${f1(-2 * u)}L${f1(-0.3 * u)} ${f1(-0.44 * u)}" stroke="#D62C34" stroke-width="6"/>`;
+  const ren = fighter({ hip: [1336, 664], facing: -1, torso: -16, head: 8, armN: 102, armF: -34, legN: 40, legF: -42, light: [-1, -0.35],
+    body: ['#26222C', '#5A5266', '#121016'], arm: ['#26222C', '#5A5266', '#121016'], leg: ['#1A181E', '#3A3642', '#0C0B0E'],
+    skin: ['#E0AC88', '#FAD2B4', '#A06A4E'], waist: scabbard, belt: renBelt, face: face(-1), headwear: renHair });
+  const kd = [P.x - ren.handN[0], P.y - ren.handN[1]], kL = Math.hypot(...kd), ku = [kd[0] / kL, kd[1] / kL];
+  const kt0 = [ren.handN[0] - ku[0] * 76, ren.handN[1] - ku[1] * 76], kg = [ren.handN[0] + ku[0] * 22, ren.handN[1] + ku[1] * 22];
+  const ktip = [P.x + ku[0] * 150, P.y + ku[1] * 150];
+  const kb = (w, extra = {}) => GA.sliver(kg[0], kg[1], ktip[0], ktip[1], w, Object.assign({ peak: 0.02, pa: 1, pb: 0.22, bow: 14 }, extra));
+  const kat = `<path d="${pill(kt0, kg, 16)}" fill="#2A1A20" stroke="#050305" stroke-width="3"/>
+    <path d="${kb(54)}" fill="#D62C34" filter="url(#blur10)"/>
+    <path d="${kb(22)}" fill="#E4E0E8" stroke="#050305" stroke-width="3"/>
+    <path d="${kb(6, { skew: 0 })}" fill="#FF3A3A"/>
+    <path d="${kb(4, { skew: 1 })}" fill="#FFFFFF"/>
+    <ellipse cx="${f1(kg[0])}" cy="${f1(kg[1])}" rx="9" ry="24" transform="rotate(${f1(Math.atan2(ku[1], ku[0]) * 180 / Math.PI)} ${f1(kg[0])} ${f1(kg[1])})" fill="#2A2228" stroke="#050305" stroke-width="3"/>`;
+
+  s += `<defs>${gdefs}</defs>`;
+  // kicked-up dust behind the feet
+  const dr = GA.rng(55);
+  let dust = '';
+  for (let i = 0; i < 14; i++) {
+    const side = i % 2 ? 1 : -1, x = side < 0 ? dr.range(300, 780) : dr.range(1150, 1640), y = GROUND + dr.range(-30, 10);
+    dust += `<ellipse cx="${f1(x)}" cy="${f1(y)}" rx="${f1(dr.range(60, 130))}" ry="${f1(dr.range(18, 40))}" fill="${side < 0 ? '#E09A4A' : '#5A4450'}" opacity="${dr.range(0.35, 0.6).toFixed(2)}"/>`;
+  }
+  s += `<g filter="url(#blur10)">${dust}</g>`;
+  s += `<g filter="url(#rimGold)">${lin.svg}</g>`;
+  s += `<g filter="url(#rimRed)">${ren.svg}</g>`;
+
+  /* =================== 7. ASH PARTICLES + CLASH =================== */
+  let flakes = '', hot = '', embers = '', gsp = '';
+  const ar = GA.rng(77);
+  for (let i = 0; i < 520; i++) {
+    const x = ar.range(900, 1940), y = ar.range(0, 1000);
+    if (!onAsh(x, y) || Math.hypot(x - ren.headC[0], y - ren.headC[1]) < 95 || Math.hypot(x - lin.headC[0], y - lin.headC[1]) < 95) continue;
+    const dClash = Math.hypot(x - P.x, y - P.y);
+    const big = dClash < 520 && ar() < 0.3;
+    const sz = big ? ar.range(8, 20) : ar.range(2.5, 8);
+    const fl = GA.flake(x, y, sz, ar() * 6.28, ar);
+    if (big) hot += `<path d="${fl}" fill="#0E0C10" stroke="#E0343C" stroke-width="1.6"/>`;
+    else flakes += `<path d="${fl}" fill="${ar.pick(['#0E0C10', '#1A171C', '#2B272E', '#3B363F', '#58535C', '#8C8790'])}" opacity="${ar.range(0.5, 1).toFixed(2)}"/>`;
+    if (ar() < 0.12) embers += `<path d="${GA.streak(x, y, -0.4 + ar.range(-0.3, 0.3), ar.range(8, 22), ar.range(1.6, 3))}" fill="${ar() < 0.6 ? '#FF5A4E' : '#FFB08A'}"/>`;
+  }
+  const gr = GA.rng(78);
+  for (let i = 0; i < 200; i++) {
+    const x = gr.range(0, 1100), y = gr.range(0, 1000);
+    if (onAsh(x, y)) continue;
+    gsp += `<circle cx="${f1(x)}" cy="${f1(y)}" r="${gr.range(1.2, 3.6).toFixed(1)}" fill="${gr() < 0.5 ? '#FFF3C0' : '#FFD24A'}" opacity="${gr.range(0.4, 1).toFixed(2)}"/>`;
+  }
+  s += `<g>${flakes}</g><g filter="url(#bloom)">${hot}${embers}${gsp}</g>`;
+  const kr = GA.rng(66);
+  let rocks = '';
+  for (let i = 0; i < 26; i++) {
+    const side = i % 2 ? 1 : -1;
+    const x = side < 0 ? kr.range(240, 760) : kr.range(1160, 1700), y = GROUND - Math.pow(kr(), 1.5) * 220 - 10;
+    if (x > 600 && x < 1320 && y > 780) continue;
+    const gold = !onAsh(x, y), sz = kr.range(6, 18);
+    rocks += `<path d="${GA.flake(x, y, sz, kr() * 6.28, kr)}" fill="${gold ? '#3A1C0A' : '#121014'}" stroke="${gold ? '#FFC44A' : '#E0343C'}" stroke-width="2"/>`;
+  }
+  s += `<g>${rocks}</g>`;
+
+  // clash burst
+  s += `<g clip-path="url(#clipGold)"><path d="${GA.rays(P.x, P.y, 34, 14, 330, 12, GA.rng(12), { even: true })}" fill="#FFE27A" filter="url(#blur2)"/></g>
+    <g clip-path="url(#clipAsh)"><path d="${GA.rays(P.x, P.y, 30, 14, 310, 11, GA.rng(15), { even: true })}" fill="#FF4A48" filter="url(#blur2)"/></g>
+    <path d="${GA.rays(P.x, P.y, 16, 10, 210, 7, GA.rng(13), { even: true })}" fill="#FFFFFF"/>
+    <circle cx="${P.x}" cy="${P.y}" r="190" fill="url(#flash)"/>
+    ${staff}${kat}
+    <circle cx="${P.x}" cy="${P.y}" r="70" fill="url(#core)"/>
+    <defs><radialGradient id="core" gradientUnits="userSpaceOnUse" cx="${P.x}" cy="${P.y}" r="70">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset=".35" stop-color="#FFFFFF" stop-opacity=".95"/><stop offset="1" stop-color="#FFF1C0" stop-opacity="0"/></radialGradient></defs>
+    <ellipse cx="${P.x}" cy="${P.y}" rx="170" ry="46" transform="rotate(-72 ${P.x} ${P.y})" fill="none" stroke="#FFF6DA" stroke-width="4" opacity=".55" filter="url(#blur2)"/>`;
+  let sp = '';
+  const sr = GA.rng(31);
+  for (let i = 0; i < 90; i++) {
+    const a = sr() * 6.28, r = sr.range(70, 420), x = P.x + Math.cos(a) * r, y = P.y + Math.sin(a) * r * 0.8;
+    const col = onAsh(x, y) ? (sr() < 0.6 ? '#FF6A5A' : '#FFFFFF') : (sr() < 0.6 ? '#FFE27A' : '#FFFFFF');
+    sp += `<path d="${GA.streak(x, y, a, sr.range(12, 44), sr.range(2, 4.5))}" fill="${col}"/>`;
+  }
+  s += `<g filter="url(#bloom)">${sp}</g>`;
+
+  /* =================== 8. VIGNETTE + TITLE =================== */
+  s += `<rect width="${W}" height="${H}" fill="url(#vig)"/>`;
+  s += `<rect y="780" width="${W}" height="300" fill="url(#titleFade)"/>
+    <defs><linearGradient id="titleFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".7"/></linearGradient></defs>`;
+  const ty = 968;
+  const main = (attrs, inner) => `<text x="${W / 2}" y="${ty}" text-anchor="middle" font-size="200" letter-spacing="-4" ${attrs}>${inner}</text>`;
+  const words = (a, b) => `<tspan ${a}>금빛과</tspan><tspan dx="28" ${b}>재</tspan>`;
+  s += main('fill="#000" stroke="#000" stroke-width="48" stroke-linejoin="round" filter="url(#textShadow)" opacity=".8" transform="translate(0 12)"', words('', ''));
+  s += main('fill="#1A0B04" stroke="#1A0B04" stroke-width="38" stroke-linejoin="round" transform="translate(0 11)"', words('', ''));
+  s += main('stroke-width="38" stroke-linejoin="round"', words('fill="#1A0B04" stroke="#1A0B04"', 'fill="#1A0B04" stroke="#1A0B04"'));
+  s += main('stroke-width="17" stroke-linejoin="round"', words('fill="#9A4A0C" stroke="#9A4A0C"', 'fill="#A0161E" stroke="#A0161E"'));
+  s += main('', words('fill="url(#txtGold)"', 'fill="url(#txtAsh)"'));
+  // subtitle bar
+  s += `<text x="${W / 2}" y="1042" text-anchor="middle" font-size="48" letter-spacing="10" fill="#FFE8A0" stroke="#1A0B04" stroke-width="10" paint-order="stroke" stroke-linejoin="round">WACA 배틀그라운드</text>`;
+  // tagline (top centre)
+  s += `<g font-size="46" stroke="#1A0B04" stroke-width="10" paint-order="stroke" stroke-linejoin="round">
+    <text x="${W / 2 - 70}" y="92" text-anchor="end" fill="#FFE27A">린 위안</text>
+    <text class="en" x="${W / 2}" y="94" text-anchor="middle" font-size="58" fill="#FFFFFF">VS</text>
+    <text x="${W / 2 + 70}" y="92" text-anchor="start" fill="#FF6A5A">칸자키 렌</text></g>`;
+
+  document.getElementById('art').innerHTML = s;
+}
+GA.boot(draw);
+</script>
+</body>
+</html>

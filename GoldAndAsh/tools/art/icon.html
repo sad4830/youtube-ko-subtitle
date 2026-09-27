@@ -30,9 +30,9 @@ function draw() {
   let s = `<defs>
     <clipPath id="clipGold"><path d="${goldPoly}"/></clipPath>
     <clipPath id="clipAsh"><path d="${ashPoly}"/></clipPath>
-    <radialGradient id="bgGold" gradientUnits="userSpaceOnUse" cx="${P.x}" cy="${P.y}" r="420">
-      <stop offset="0" stop-color="#FFF1BE"/><stop offset=".14" stop-color="#FFC44A"/>
-      <stop offset=".38" stop-color="#E0741A"/><stop offset=".66" stop-color="#8E2E08"/><stop offset="1" stop-color="#2E0B03"/></radialGradient>
+    <radialGradient id="bgGold" gradientUnits="userSpaceOnUse" cx="${P.x}" cy="${P.y}" r="360">
+      <stop offset="0" stop-color="#FFF1BE"/><stop offset=".13" stop-color="#FFC44A"/>
+      <stop offset=".34" stop-color="#E0741A"/><stop offset=".62" stop-color="#8A2A08"/><stop offset="1" stop-color="#2A0A03"/></radialGradient>
     <radialGradient id="bgAsh" gradientUnits="userSpaceOnUse" cx="${P.x}" cy="${P.y}" r="400">
       <stop offset="0" stop-color="#7A1820"/><stop offset=".25" stop-color="#3A1216"/>
       <stop offset=".6" stop-color="#1B1519"/><stop offset="1" stop-color="#0A090C"/></radialGradient>
@@ -54,8 +54,12 @@ function draw() {
     <filter id="glowOnly" x="-40%" y="-40%" width="180%" height="180%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="12" result="b"/>
       <feFlood flood-color="#FFD24A"/><feComposite in2="b" operator="in"/></filter>
+    <filter id="dropDark" x="-30%" y="-30%" width="160%" height="160%">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="4" result="d"/>
+      <feGaussianBlur in="d" stdDeviation="7" result="b"/>
+      <feFlood flood-color="#1A0602" flood-opacity=".75"/><feComposite in2="b" operator="in"/><feOffset dx="3" dy="6"/></filter>
     <filter id="sticker" x="-20%" y="-20%" width="140%" height="140%">
-      <feMorphology in="SourceAlpha" operator="dilate" radius="3.2" result="d"/>
+      <feMorphology in="SourceAlpha" operator="dilate" radius="3.6" result="d"/>
       <feFlood flood-color="#2A0E02"/><feComposite in2="d" operator="in" result="o"/>
       <feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     <filter id="blur6" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
@@ -66,7 +70,7 @@ function draw() {
       <feColorMatrix in="n" type="matrix" values="0 0 0 0 .55  0 0 0 0 .52  0 0 0 0 .56  0 0 0 2.4 -1.05"/></filter>
     <filter id="textShadow" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="5"/></filter>
     <radialGradient id="vig" cx=".5" cy=".5" r=".72">
-      <stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></radialGradient>
+      <stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></radialGradient>
   </defs>`;
 
   /* ---------- 1. backgrounds ---------- */
@@ -76,62 +80,84 @@ function draw() {
     <rect width="${W}" height="${H}" filter="url(#smoke)" opacity=".55"/>
     <path d="${GA.rays(P.x, P.y, 40, 120, 560, 6, GA.rng(4), { inward: true, even: true })}" fill="#000" opacity=".4"/></g>`;
 
-  /* ---------- 2. dragon (body + head) ---------- */
-  const HP = [330, 150, P.x - 40, P.y - 20, 0.76, 18];   // head placement (local pt -> global)
-  const headT = GA.place(...HP);
-  const N = GA.map(...HP, 64, 112);                       // neck
-  const body = GA.dragonBody('i', [[N[0] + 16, N[1] + 12], [N[0] - 30, N[1] - 34], [N[0] - 44, N[1] - 110], [N[0] + 6, N[1] - 176], [N[0] + 90, N[1] - 210], [N[0] + 190, N[1] - 236]], 80, 44,
-    { finSide: -1, seed: 3, bandStep: 18, grad: 'x1="0" y1="-60" x2="0" y2="160"',
-      stops: '<stop offset="0" stop-color="#FFD76A"/><stop offset=".6" stop-color="#F0A030"/><stop offset="1" stop-color="#C0620E"/>' });
-  // light beam from the jaws into the impact
+  // which side of the split a point is on (true = ash side)
+  const onAsh = (x, y) => (x - B[0]) * (A[1] - B[1]) - (y - B[1]) * (A[0] - B[0]) < 0;
+  const U = [(A[0] - B[0]) / Math.hypot(A[0] - B[0], A[1] - B[1]), (A[1] - B[1]) / Math.hypot(A[0] - B[0], A[1] - B[1])]; // along split, upward
+
+  /* ---------- 2. golden chi trails + dragon head ---------- */
+  const chi = [
+    [[[-30, 318], [70, 312], [160, 290], [232, 266], [P.x - 6, P.y + 4]], 16],
+    [[[-30, 214], [30, 250], [110, 262], [200, 256], [P.x - 10, P.y - 2]], 9],
+  ];
+  s += `<g filter="url(#bloom)">${chi.map(([c, w]) => `<path d="${GA.ribbon(c, GA.prof.spike(w, 0.5))}" fill="#FFF3C0" opacity=".9"/>`).join('')}</g>`;
+  const HP = [330, 150, P.x - 38, P.y - 24, 0.8, 16];   // head placement (local pt -> global)
   const M = GA.map(...HP, 300, 150);
-  const dragon = `${body}<g transform="${headT}">${GA.dragonHead('i')}</g>`;
-  s += `<g filter="url(#glowOnly)" opacity=".9">${dragon.replace(/id="d[hb]/g, 'id="x$&').replace(/id="xid="/g, 'id="x')}</g>`;
+  const dragon = `<g transform="${GA.place(...HP)}">${GA.dragonHead('i')}</g>`;
+  const ghost = dragon.replace(/id="(dh\w+)"/g, 'id="ghost_$1"');
+  s += `<g filter="url(#glowOnly)" opacity=".6">${ghost}</g>`;
+  s += `<g filter="url(#dropDark)">${ghost}</g>`;
   s += `<g filter="url(#sticker)">${dragon}</g>`;
-  s += `<path d="${GA.sliver(M[0], M[1], P.x + 10, P.y + 2, 40, { peak: 0.2, pa: 0.4, pb: 1.2 })}" fill="#FFF6D6" filter="url(#blur6)"/>`;
+  // breath of light from the jaws into the impact
+  s += `<path d="${GA.sliver(M[0], M[1], P.x + 10, P.y + 2, 46, { peak: 0.25, pa: 0.4, pb: 1.2 })}" fill="#FFF6D6" filter="url(#blur6)"/>`;
 
   /* ---------- 3. katana (right side, tip into the impact) ---------- */
-  const kA = [P.x + 20, P.y + 10], kB = [548, 330];
+  const kA = [P.x + 20, P.y + 10], kB = [474, 318];           // tip, guard
+  const kdir = [(kB[0] - kA[0]), (kB[1] - kA[1])], kl = Math.hypot(...kdir), ku = [kdir[0] / kl, kdir[1] / kl];
+  const kH = [kB[0] + ku[0] * 70, kB[1] + ku[1] * 70];          // end of the grip (off-canvas)
   const kopt = (extra) => Object.assign({ peak: 0.02, pa: 1, pb: 0.22, bow: -8 }, extra);
+  const kang = Math.atan2(ku[1], ku[0]) * 180 / Math.PI;
   s += `<g>
-    <path d="${GA.sliver(kB[0], kB[1], kA[0], kA[1], 30, kopt({}))}" fill="#D62C34" filter="url(#blur6)" opacity=".8"/>
-    <path d="${GA.sliver(kB[0], kB[1], kA[0], kA[1], 20, kopt({}))}" fill="#0A090C"/>
-    <path d="${GA.sliver(kB[0], kB[1], kA[0], kA[1], 16, kopt({ skew: 0.55 }))}" fill="#C9C4CC"/>
+    <path d="${GA.sliver(kB[0], kB[1], kA[0], kA[1], 34, kopt({}))}" fill="#D62C34" filter="url(#blur6)" opacity=".85"/>
+    <path d="${GA.sliver(kB[0], kB[1], kH[0], kH[1], 17, { peak: 0.5, pa: 0.01, pb: 0.01 })}" fill="#1A1216" stroke="#050305" stroke-width="3"/>
+    <path d="${GA.sliver(kB[0], kB[1], kH[0], kH[1], 17, { peak: 0.5, pa: 0.01, pb: 0.01 })}" fill="none" stroke="#D62C34" stroke-width="2" stroke-dasharray="3 7" opacity=".9"/>
+    <path d="${GA.sliver(kB[0], kB[1], kA[0], kA[1], 21, kopt({}))}" fill="#0A090C"/>
+    <path d="${GA.sliver(kB[0], kB[1], kA[0], kA[1], 17, kopt({ skew: 0.55 }))}" fill="#C9C4CC"/>
     <path d="${GA.sliver(kB[0], kB[1], kA[0], kA[1], 7, kopt({ skew: 1 }))}" fill="#FFFFFF"/>
-    <path d="${GA.sliver(kB[0], kB[1], kA[0], kA[1], 5, kopt({ skew: 0 }))}" fill="#FF4A48"/></g>`;
+    <path d="${GA.sliver(kB[0], kB[1], kA[0], kA[1], 5, kopt({ skew: 0 }))}" fill="#FF4A48"/>
+    <ellipse cx="${kB[0]}" cy="${kB[1]}" rx="7" ry="19" transform="rotate(${kang.toFixed(1)} ${kB[0]} ${kB[1]})" fill="#2A2228" stroke="#050305" stroke-width="3"/></g>`;
 
-  /* ---------- 4. ash particles streaming toward the impact ---------- */
-  let flakes = '', embers = '';
+  /* ---------- 4. black ash peeling off the slash, streaming right ---------- */
+  let flakes = '', hot = '', embers = '';
   const ar = GA.rng(77);
-  for (let i = 0; i < 150; i++) {
-    const t = ar(), x = GA.C && (P.x + 20 + Math.pow(ar(), 0.7) * 280), y = P.y - 80 + ar() * 330;
-    const inAsh = (x - B[0]) * (A[1] - B[1]) - (y - B[1]) * (A[0] - B[0]) < 0;
-    if (!inAsh) continue;
-    const sz = ar.range(2, 9) * (0.6 + t * 0.6);
-    const col = ar.pick(['#2B272E', '#3B363F', '#58535C', '#8C8790', '#1A171C']);
-    flakes += `<path d="${GA.flake(x, y, sz, ar() * 6.28, ar)}" fill="${col}"/>`;
-    if (ar() < 0.22) embers += `<path d="${GA.streak(x, y + ar.range(-20, 20), Math.atan2(P.y - y, P.x - x), ar.range(6, 18), ar.range(1.5, 3))}" fill="${ar() < 0.5 ? '#FF5A4E' : '#FFB08A'}"/>`;
+  const sx = B[0], sy = B[1], ux = U[0], uy = U[1], nx = -uy, ny = ux;   // normal to the split; sgn picks the ash side
+  const sgn = onAsh(sx + nx * 20 + ux * 200, sy + ny * 20 + uy * 200) ? 1 : -1;
+  const Ltot = Math.hypot(A[0] - B[0], A[1] - B[1]);
+  for (let i = 0; i < 190; i++) {
+    const t = ar.range(0.08, 0.98), d = Math.pow(ar(), 1.8) * 260 + 14;
+    const x = sx + ux * Ltot * t + sgn * nx * d + ar.range(-10, 10), y = sy + uy * Ltot * t + sgn * ny * d;
+    if (!onAsh(x, y) || y > 380 && x < 470 && x > 50) continue;
+    const big = d < 90 && ar() < 0.45;
+    const sz = big ? ar.range(7, 15) : ar.range(2, 7);
+    const col = ar.pick(['#0E0C10', '#1A171C', '#2B272E', '#3B363F', '#58535C']);
+    const fl = GA.flake(x, y, sz, ar() * 6.28, ar);
+    if (big) hot += `<path d="${fl}" fill="#0E0C10" stroke="#E0343C" stroke-width="1.4"/>`;
+    else flakes += `<path d="${fl}" fill="${col}" ${ar() < 0.3 ? 'opacity=".7"' : ''}/>`;
+    if (ar() < 0.16) embers += `<path d="${GA.streak(x + 6, y - 4, -0.35 + ar.range(-0.3, 0.3), ar.range(6, 16), ar.range(1.4, 2.6))}" fill="${ar() < 0.6 ? '#FF5A4E' : '#FFB08A'}"/>`;
   }
-  s += `<g opacity=".95">${flakes}</g><g filter="url(#bloom)">${embers}</g>`;
+  s += `<g>${flakes}</g><g filter="url(#bloom)">${hot}${embers}</g>`;
 
   /* ---------- 5. the crimson ash slash (the split) ---------- */
-  const sl = (w, extra = {}) => GA.sliver(B[0] - 20, B[1] + 30, A[0] + 16, A[1] - 30, w, Object.assign({ peak: 0.3, bow: 0 }, extra));
-  s += `<path d="${sl(86)}" fill="#D62C34" filter="url(#blur14)" opacity=".85"/>
-    <path d="${sl(56)}" fill="url(#slashFill)"/>
-    <path d="${sl(38, { skew: 0.45 })}" fill="#120E12"/>
-    <path d="${sl(6, { skew: 0.1 })}" fill="#FFE2DA" transform="translate(-9 -5)"/>`;
+  const sl = (w, extra = {}, off = 0) => GA.sliver(B[0] - 20 + nx * off, B[1] + 30 + ny * off, A[0] + 16 + nx * off, A[1] - 30 + ny * off, w, Object.assign({ peak: 0.3, bow: 0 }, extra));
+  s += `<path d="${sl(96)}" fill="#D62C34" filter="url(#blur14)" opacity=".9"/>
+    <path d="${sl(62)}" fill="url(#slashFill)"/>
+    <path d="${sl(42, { skew: 0.45 })}" fill="#0E0B0E"/>
+    <path d="${sl(6, { skew: 0.1 })}" fill="#FFE2DA" transform="translate(-10 -5)"/>
+    <path d="${sl(16, { peak: 0.62 }, sgn * 40)}" fill="#D62C34" filter="url(#blur2)"/>
+    <path d="${sl(8, { peak: 0.62 }, sgn * 40)}" fill="#1A0A0C"/>`;
 
-  /* ---------- 6. impact burst ---------- */
+  /* ---------- 6. impact burst: gold half vs crimson half ---------- */
   s += `<circle cx="${P.x}" cy="${P.y}" r="150" fill="url(#flashRed)"/>
-    <path d="${GA.rays(P.x, P.y, 22, 10, 140, 8, GA.rng(12), { even: true })}" fill="#FFF2C4" filter="url(#blur2)"/>
-    <path d="${GA.rays(P.x, P.y, 12, 8, 100, 5, GA.rng(13), { even: true })}" fill="#FFFFFF"/>
+    <g clip-path="url(#clipGold)"><path d="${GA.rays(P.x, P.y, 26, 10, 160, 9, GA.rng(12), { even: true })}" fill="#FFE27A" filter="url(#blur2)"/></g>
+    <g clip-path="url(#clipAsh)"><path d="${GA.rays(P.x, P.y, 22, 10, 150, 8, GA.rng(15), { even: true })}" fill="#FF4A48" filter="url(#blur2)"/></g>
+    <path d="${GA.rays(P.x, P.y, 12, 8, 104, 5, GA.rng(13), { even: true })}" fill="#FFFFFF"/>
     <circle cx="${P.x}" cy="${P.y}" r="78" fill="url(#flash)"/>`;
-  // sparks
+  // sparks: gold ones fly into the gold side, red ones into the ash side
   let sp = '';
   const sr = GA.rng(31);
-  for (let i = 0; i < 40; i++) {
-    const a = sr() * 6.28, r = sr.range(40, 190);
-    sp += `<path d="${GA.streak(P.x + Math.cos(a) * r, P.y + Math.sin(a) * r, a, sr.range(8, 26), sr.range(1.5, 3.5))}" fill="${sr() < 0.5 ? '#FFFFFF' : sr() < 0.5 ? '#FFD76A' : '#FF6A5A'}"/>`;
+  for (let i = 0; i < 46; i++) {
+    const a = sr() * 6.28, r = sr.range(40, 200), x = P.x + Math.cos(a) * r, y = P.y + Math.sin(a) * r;
+    const col = onAsh(x, y) ? (sr() < 0.6 ? '#FF6A5A' : '#FFFFFF') : (sr() < 0.6 ? '#FFE27A' : '#FFFFFF');
+    sp += `<path d="${GA.streak(x, y, a, sr.range(8, 28), sr.range(1.6, 3.6))}" fill="${col}"/>`;
   }
   s += `<g filter="url(#bloom)">${sp}</g>`;
 
@@ -148,7 +174,7 @@ function draw() {
     s += main('', words('fill="url(#txtGold)"', 'fill="url(#txtAsh)"'));
     s += `<text class="en" x="256" y="${ty + 42}" text-anchor="middle" font-size="30" letter-spacing="8" fill="#FFE8A0" stroke="#1A0B04" stroke-width="7" paint-order="stroke" stroke-linejoin="round">GOLD &amp; ASH</text>`;
   } else {
-    const main = (attrs, inner) => `<text class="en" x="256" y="${ty}" text-anchor="middle" font-size="112" letter-spacing="1" ${attrs}>${inner}</text>`;
+    const main = (attrs, inner) => `<text class="en" x="256" y="${ty}" text-anchor="middle" font-size="104" letter-spacing="1" ${attrs}>${inner}</text>`;
     const words = (a, b, c) => `<tspan ${a}>GOLD</tspan><tspan dx="10" ${c}>&amp;</tspan><tspan dx="10" ${b}>ASH</tspan>`;
     s += main('fill="#000" stroke="#000" stroke-width="30" stroke-linejoin="round" filter="url(#textShadow)" opacity=".8" transform="translate(0 8)"', words('', '', ''));
     s += main('fill="#1A0B04" stroke="#1A0B04" stroke-width="24" stroke-linejoin="round" transform="translate(0 7)"', words('', '', ''));

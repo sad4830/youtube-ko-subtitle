@@ -40,7 +40,6 @@ FONT_DIR = Path(os.environ.get("GOLDASH_FONT_DIR", Path.home() / ".cache" / "gol
 FONTS = {
     "Black Han Sans": ("BlackHanSans.ttf", "https://fonts.gstatic.com/s/blackhansans/v24/ea8Aad44WunzF9a-dL6toA8r8nqV.ttf"),
     "Anton": ("Anton.ttf", "https://fonts.gstatic.com/s/anton/v27/1Ptgg87LROyAm0K0.ttf"),
-    "Do Hyeon": ("DoHyeon.ttf", "https://fonts.gstatic.com/s/dohyeon/v21/TwMN-I8CRRU2zM86HFE3.ttf"),
 }
 
 JOBS = {
