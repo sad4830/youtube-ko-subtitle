@@ -1,0 +1,6 @@
+sourcemap.json
+build/scripts_only.rbxl
+build/map_preview.rbxl
+build/*.png
+tools/__pycache__/
+*.pyc
