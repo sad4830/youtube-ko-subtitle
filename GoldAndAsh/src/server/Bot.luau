@@ -12,6 +12,7 @@ local Combat = require(script.Parent.Combat)
 local Actions = require(script.Parent.Actions)
 local MapService = require(script.Parent.MapService)
 local CharacterService = require(script.Parent.CharacterService)
+local AvatarService = require(script.Parent.AvatarService)
 
 type Entity = Combat.Entity
 
@@ -175,8 +176,10 @@ local function think(b: BotState)
 	end
 end
 
+local pending = 0 -- 아바타를 불러오는 중인 봇 수
+
 function Bot.count(): number
-	local n = 0
+	local n = pending
 	for _, b in bots do
 		if b.ent.model.Parent then
 			n += 1
@@ -195,14 +198,19 @@ function Bot.spawn(charId: string?): Entity?
 	end
 	local cid = id :: string
 	local def = CharacterDefs.get(cid)
-	local model = RigBuilder.build(cid)
+	-- 로블록스 기본 아바타 + 캐릭터 무기 (옷 색만 캐릭터 테마로)
+	pending += 1
+	local model = if cid == "KanzakiRen"
+		then AvatarService.buildDefault(Color3.fromRGB(34, 34, 40), Color3.fromRGB(24, 24, 28))
+		else AvatarService.buildDefault(Color3.fromRGB(236, 232, 222), Color3.fromRGB(112, 78, 46))
+	pending -= 1
+	RigBuilder.equip(model, cid)
 	model.Name = "[봇] " .. (if def then def.name else cid)
-	local plate = model:FindFirstChild("Nameplate", true)
-	if plate then
-		local label = plate:FindFirstChild("NameLabel")
-		if label and label:IsA("TextLabel") then
-			label.Text = model.Name
-		end
+	RigBuilder.setNameplate(model, model.Name, if def then def.color else nil)
+	local hum = model:FindFirstChildOfClass("Humanoid") :: Humanoid
+	if def then
+		hum.MaxHealth = def.maxHealth
+		hum.Health = def.maxHealth
 	end
 	RigBuilder.place(model, MapService.getSpawn())
 	model.Parent = workspace

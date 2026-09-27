@@ -79,6 +79,12 @@ local Config = {
 		PerPropCut = 2,
 	},
 
+	-- 전투에서 벗어나면 체력 회복
+	Regen = {
+		Delay = 7,
+		PerSec = 2.5,
+	},
+
 	-- 부서지는 소품
 	PropRespawn = 22,
 

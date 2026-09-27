@@ -3,6 +3,7 @@
 -- 콤보, 킬 피드, 알림, 각성 타이틀, 사망 화면, 조작법, 모바일 버튼
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -128,8 +129,43 @@ end
 ----------------------------------------------------------------------
 -- 캐릭터 선택 화면
 ----------------------------------------------------------------------
-type Preview = { model: Model, vp: ViewportFrame, angle: number }
+type Preview = { model: Model?, world: WorldModel, vp: ViewportFrame, angle: number, charId: string, pick: TextButton? }
 local previews: { Preview } = {}
+local closeButton: TextButton
+
+-- 미리보기: 내 로블록스 아바타(서버가 올려 준 복제본)에 캐릭터 무기를 들려서 보여 준다
+local function avatarSource(): Model?
+	local folder = ReplicatedStorage:FindFirstChild("AvatarPreviews")
+	local m = folder and folder:FindFirstChild(tostring(player.UserId))
+	return if m and m:IsA("Model") then m else nil
+end
+
+local function setPreviewModel(p: Preview)
+	local old = p.model
+	if old then
+		old:Destroy()
+	end
+	local src = avatarSource()
+	local model: Model
+	if src then
+		model = src:Clone()
+	else
+		local skin = Color3.fromRGB(234, 184, 146)
+		model = RigBuilder.buildFallback({ head = skin, torso = Color3.fromRGB(40, 120, 200), arms = skin, legs = Color3.fromRGB(60, 60, 70) })
+	end
+	RigBuilder.equip(model, p.charId)
+	local plate = model:FindFirstChild("Nameplate", true)
+	if plate then
+		plate:Destroy()
+	end
+	local root = model:FindFirstChild("HumanoidRootPart")
+	if root and root:IsA("BasePart") then
+		root.Anchored = true
+	end
+	model:PivotTo(CFrame.new(0, 3, 0))
+	model.Parent = p.world
+	p.model = model
+end
 
 local function statBar(parent: Instance, y: number, name: string, value: number, color: Color3)
 	label(parent, "Stat" .. name, name, UDim2.new(0, 60, 0, 16), UDim2.new(0, 0, 0, y), 13, MUTED, FONT).TextXAlignment = Enum.TextXAlignment.Left
@@ -171,21 +207,14 @@ local function buildCard(parent: Instance, def: CharacterDefs.CharDef, xScale: n
 	grad.Parent = vp
 	local world = Instance.new("WorldModel")
 	world.Parent = vp
-	local model = RigBuilder.build(def.id)
-	local plate = model:FindFirstChild("Nameplate", true)
-	if plate then
-		plate:Destroy()
-	end
-	local root = model:FindFirstChild("HumanoidRootPart") :: BasePart
-	root.Anchored = true
-	model:PivotTo(CFrame.new(0, 3, 0))
-	model.Parent = world
 	local cam = Instance.new("Camera")
 	cam.FieldOfView = 32
 	cam.CFrame = CFrame.lookAt(Vector3.new(0, 3.4, -13.5), Vector3.new(0, 2.7, 0))
 	cam.Parent = vp
 	vp.CurrentCamera = cam
-	table.insert(previews, { model = model, vp = vp, angle = 0 })
+	local preview: Preview = { model = nil, world = world, vp = vp, angle = 0, charId = def.id, pick = nil }
+	table.insert(previews, preview)
+	setPreviewModel(preview)
 
 	local y0 = 0.43
 	local info = frame(card, "Info", UDim2.new(1, -28, 0.57, -70), UDim2.new(0, 14, y0, 6), PANEL, 1)
@@ -218,6 +247,7 @@ local function buildCard(parent: Instance, def: CharacterDefs.CharDef, xScale: n
 	local pick = button(card, "Pick", "이 캐릭터로 싸운다", UDim2.new(1, -28, 0, 46), UDim2.new(0, 14, 1, -58), def.color, 18)
 	pick.TextColor3 = if def.id == "LinYuan" then Color3.fromRGB(40, 24, 8) else WHITE
 	pick.Font = FONT_HEAVY
+	preview.pick = pick
 	pick.Activated:Connect(function()
 		Sounds.play("ui_confirm", {})
 		local cb = UI.onSelect
@@ -249,7 +279,31 @@ local function buildSelect()
 	local tg = Instance.new("UIGradient")
 	tg.Color = ColorSequence.new(Color3.fromRGB(255, 210, 110), Color3.fromRGB(230, 60, 60))
 	tg.Parent = title
-	label(selectFrame, "Subtitle", Config.GameSubtitle .. "  ·  캐릭터를 고르세요", UDim2.new(1, 0, 0, 24), UDim2.new(0, 0, 0.03, 66), 18, MUTED, FONT)
+	label(selectFrame, "Subtitle", Config.GameSubtitle .. "  ·  내 아바타로 싸울 캐릭터(기술)를 고르세요", UDim2.new(1, 0, 0, 24), UDim2.new(0, 0, 0.03, 66), 18, MUTED, FONT)
+	closeButton = button(selectFrame, "Close", "✕  닫기", UDim2.new(0, 110, 0, 36), UDim2.new(1, -130, 0, 20), Color3.fromRGB(60, 56, 66), 15)
+	closeButton.Visible = false
+	closeButton.Activated:Connect(function()
+		UI.showSelect(false)
+	end)
+	-- 서버가 내 아바타 미리보기를 올리면 카드 미리보기를 다시 만든다
+	task.spawn(function()
+		local folder = ReplicatedStorage:WaitForChild("AvatarPreviews", 30)
+		if folder then
+			folder.ChildAdded:Connect(function(child)
+				if child.Name == tostring(player.UserId) then
+					task.wait(0.2)
+					for _, p in previews do
+						setPreviewModel(p)
+					end
+				end
+			end)
+			if avatarSource() then
+				for _, p in previews do
+					setPreviewModel(p)
+				end
+			end
+		end
+	end)
 	local order = CharacterDefs.Order
 	for i, id in order do
 		local def = CharacterDefs.get(id)
@@ -394,7 +448,7 @@ local function buildHud()
 	charTitle.TextXAlignment = Enum.TextXAlignment.Left
 	local b1 = button(top, "Change", "캐릭터 변경", UDim2.new(1, -20, 0, 26), UDim2.new(0, 10, 0, 58), Color3.fromRGB(60, 56, 66), 13)
 	b1.Activated:Connect(function()
-		action("Unselect", nil)
+		UI.showSelect(true, true)
 	end)
 	local b2 = button(top, "BotLin", "봇 소환 · 린 위안", UDim2.new(1, -20, 0, 26), UDim2.new(0, 10, 0, 88), Color3.fromRGB(150, 110, 30), 13)
 	b2.Activated:Connect(function()
@@ -523,12 +577,18 @@ end
 ----------------------------------------------------------------------
 -- 공개 API
 ----------------------------------------------------------------------
-function UI.showSelect(show: boolean)
+-- closable = true 이면 게임 도중 여는 캐릭터 변경 창 (닫기 버튼 표시)
+function UI.showSelect(show: boolean, closable: boolean?)
 	selectFrame.Visible = show
 	hud.Visible = not show
-	if show then
+	closeButton.Visible = show and closable == true
+	if show and not closable then
 		deathFrame.Visible = false
 	end
+end
+
+function UI.isSelectOpen(): boolean
+	return selectFrame.Visible
 end
 
 function UI.setCharacter(charId: string?)
@@ -542,6 +602,12 @@ function UI.setCharacter(charId: string?)
 		hpFill.BackgroundColor3 = def.color
 		awFill.BackgroundColor3 = def.color
 		ashRow.Visible = def.id == "KanzakiRen"
+	end
+	for _, p in previews do
+		local pick = p.pick
+		if pick then
+			pick.Text = if p.charId == charId then "사용 중 ✓" else "이 캐릭터로 싸운다"
+		end
 	end
 end
 
@@ -678,10 +744,11 @@ end
 
 local function update(dt: number)
 	for _, p in previews do
-		if selectFrame.Visible then
+		local m = p.model
+		if selectFrame.Visible and m then
 			p.angle += dt * 0.5
-			p.model:PivotTo(CFrame.new(0, 3, 0) * CFrame.Angles(0, math.rad(200) + math.sin(p.angle) * 0.6, 0))
-			Animator.stepModel(p.model, dt)
+			m:PivotTo(CFrame.new(0, 3, 0) * CFrame.Angles(0, math.rad(200) + math.sin(p.angle) * 0.6, 0))
+			Animator.stepModel(m, dt)
 		end
 	end
 	if not hud.Visible then

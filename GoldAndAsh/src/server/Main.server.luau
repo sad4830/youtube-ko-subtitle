@@ -2,6 +2,7 @@
 -- 서버 진입점
 
 local Players = game:GetService("Players")
+local PhysicsService = game:GetService("PhysicsService")
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
@@ -15,6 +16,16 @@ local CharacterService = require(script.Parent.CharacterService)
 local Bot = require(script.Parent.Bot)
 
 Players.CharacterAutoLoads = false
+
+-- 충돌 그룹: 캐릭터끼리는 서로 통과하고(가강전처럼 몸으로 밀어 날리는 버그 방지),
+-- 부서져 날아가는 파편도 캐릭터와 부딪히지 않는다. 캐릭터와 맵은 정상적으로 충돌한다.
+for _, g in { "Characters", "Debris" } do
+	if not PhysicsService:IsCollisionGroupRegistered(g) then
+		PhysicsService:RegisterCollisionGroup(g)
+	end
+end
+PhysicsService:CollisionGroupSetCollidable("Characters", "Characters", false)
+PhysicsService:CollisionGroupSetCollidable("Debris", "Characters", false)
 
 MapService.init()
 Combat.MapService = MapService
@@ -43,9 +54,6 @@ Remotes.Action.OnServerEvent:Connect(function(player: Player, action: any, paylo
 
 	if action == "Select" then
 		CharacterService.select(player, payload)
-		return
-	elseif action == "Unselect" then
-		CharacterService.unselect(player)
 		return
 	elseif action == "SpawnBot" then
 		local charId = if typeof(payload) == "table" and typeof(payload.charId) == "string" then payload.charId else nil

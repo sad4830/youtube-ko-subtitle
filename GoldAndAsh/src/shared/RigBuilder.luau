@@ -1,21 +1,15 @@
 --!strict
--- 캐릭터 모델을 에셋 업로드 없이 파트만으로 조립한다 (R6 규격 리그).
--- 관절 C0/C1 을 "회전 없는" 형태로 잡아 두어서, 애니메이션 쪽에서
--- Motor6D.Transform 을 x=앞뒤, y=좌우 회전, z=옆 기울기 로 직관적으로 쓸 수 있다.
+-- 캐릭터 준비 / 장비
+--  · 플레이어와 봇은 로블록스 아바타(R6)를 그대로 쓰고, 캐릭터별 무기·소품만 붙인다 (가강전 방식)
+--      린 위안   : 등에 멘 목봉 + 삿갓, 기술을 쓸 때 손에 드는 목봉
+--      칸자키 렌 : 손에 든 카타나, 왼쪽 허리 칼집(봉인선 10개), 칼집에 꽂힌 칼자루(최대 출력용)
+--  · 훈련용 허수아비 / 아바타를 못 불러왔을 때는 파트로 조립한 R6 리그를 쓴다
+--
+-- 애니메이터는 관절의 C0 회전을 보정하므로, 로블록스 기본 R6 관절이든 직접 만든 관절이든 똑같이 움직인다.
 
 local RigBuilder = {}
 
 local rad = math.rad
-
-export type Joints = {
-	Root: Motor6D,
-	Neck: Motor6D,
-	RS: Motor6D,
-	LS: Motor6D,
-	RH: Motor6D,
-	LH: Motor6D,
-}
-
 local SMOOTH = Enum.SurfaceType.Smooth
 
 local function basePart(name: string, size: Vector3, color: Color3, material: Enum.Material?): Part
@@ -61,22 +55,6 @@ local function deco(
 	return p
 end
 
-local function ellipsoid(
-	container: Instance,
-	attachTo: BasePart,
-	name: string,
-	size: Vector3,
-	rel: CFrame,
-	color: Color3,
-	material: Enum.Material?
-): Part
-	local p = deco(container, attachTo, name, size, rel, color, material)
-	local m = Instance.new("SpecialMesh")
-	m.MeshType = Enum.MeshType.Sphere
-	m.Parent = p
-	return p
-end
-
 -- 가로로 누운 원판(원기둥). axis 가 Z 방향이 되도록 회전한다.
 local function discZ(container: Instance, attachTo: BasePart, name: string, diameter: number, thickness: number, rel: CFrame, color: Color3, material: Enum.Material?): Part
 	return deco(container, attachTo, name, Vector3.new(thickness, diameter, diameter), rel * CFrame.Angles(0, rad(90), 0), color, material, Enum.PartType.Cylinder)
@@ -87,42 +65,89 @@ local function cylY(container: Instance, attachTo: BasePart, name: string, lengt
 	return deco(container, attachTo, name, Vector3.new(length, diameter, diameter), rel * CFrame.Angles(0, 0, rad(90)), color, material, Enum.PartType.Cylinder)
 end
 
-local function motor(name: string, part0: BasePart, part1: BasePart, c0: CFrame, c1: CFrame): Motor6D
+local function motor(name: string, part0: BasePart, part1: BasePart, c0: CFrame, c1: CFrame, parent: Instance?): Motor6D
 	local m = Instance.new("Motor6D")
 	m.Name = name
 	m.Part0 = part0
 	m.Part1 = part1
 	m.C0 = c0
 	m.C1 = c1
-	m.Parent = part0
+	m.Parent = parent or part0
 	return m
 end
 
--- 래그돌용 볼소켓 (평소엔 꺼져 있음)
-local function ragdollSocket(jointName: string, part0: BasePart, part1: BasePart, c0: CFrame, c1: CFrame, cone: number, twist: number)
-	local down = CFrame.Angles(0, 0, rad(-90)) -- 부착점의 X축이 아래(팔다리 방향)를 향하게
+local function makeTrail(container: Instance, a0: Attachment, a1: Attachment, c0: Color3, c1: Color3, lifetime: number): Trail
+	local t = Instance.new("Trail")
+	t.Name = "WeaponTrail"
+	t.Attachment0 = a0
+	t.Attachment1 = a1
+	t.Color = ColorSequence.new(c0, c1)
+	t.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.15),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	t.Lifetime = lifetime
+	t.LightEmission = 0.6
+	t.FaceCamera = false
+	t.MinLength = 0.05
+	t.Enabled = false
+	t.Parent = container
+	return t
+end
+
+-- 기술을 쓸 때만 보이는 소품: 보일 때의 투명도를 기억해 두고 숨긴다
+local function hideProp(m: Instance)
+	for _, p in m:GetDescendants() do
+		if p:IsA("BasePart") then
+			p:SetAttribute("ShowT", p.Transparency)
+			p.Transparency = 1
+		end
+	end
+end
+
+----------------------------------------------------------------------
+-- 준비: 래그돌 관절, 충돌, 이름표 (아바타/파트 리그 공통)
+----------------------------------------------------------------------
+type RagSpec = { motor: string, key: string, cone: number, twist: number }
+local RAG_SPECS: { RagSpec } = {
+	{ motor = "Neck", key = "Neck", cone = 30, twist = 40 },
+	{ motor = "Right Shoulder", key = "RS", cone = 80, twist = 45 },
+	{ motor = "Left Shoulder", key = "LS", cone = 80, twist = 45 },
+	{ motor = "Right Hip", key = "RH", cone = 50, twist = 20 },
+	{ motor = "Left Hip", key = "LH", cone = 50, twist = 20 },
+}
+local LIMBS = { "Right Arm", "Left Arm", "Right Leg", "Left Leg" }
+
+-- 래그돌용 볼소켓 (평소엔 꺼져 있음). 관절의 회전과 무관하게 "팔다리 방향(아래)"으로 원뿔을 잡는다.
+local function ragdollSocket(key: string, m: Motor6D, spec: RagSpec)
+	local part0 = m.Part0
+	local part1 = m.Part1
+	if not part0 or not part1 then
+		return
+	end
+	local down = CFrame.Angles(0, 0, rad(-90))
 	local a0 = Instance.new("Attachment")
-	a0.Name = "RagA_" .. jointName
-	a0.CFrame = c0 * down
+	a0.Name = "RagA_" .. key
+	a0.CFrame = CFrame.new(m.C0.Position) * down
 	a0.Parent = part0
 	local a1 = Instance.new("Attachment")
-	a1.Name = "RagB_" .. jointName
-	a1.CFrame = c1 * down
+	a1.Name = "RagB_" .. key
+	a1.CFrame = CFrame.new(m.C1.Position) * down
 	a1.Parent = part1
 	local s = Instance.new("BallSocketConstraint")
-	s.Name = "RagSocket_" .. jointName
+	s.Name = "RagSocket_" .. key
 	s.Attachment0 = a0
 	s.Attachment1 = a1
 	s.LimitsEnabled = true
-	s.UpperAngle = cone
+	s.UpperAngle = spec.cone
 	s.TwistLimitsEnabled = true
-	s.TwistLowerAngle = -twist
-	s.TwistUpperAngle = twist
+	s.TwistLowerAngle = -spec.twist
+	s.TwistUpperAngle = spec.twist
 	s.Enabled = false
 	s.Parent = part1
 end
 
-local function collider(limb: BasePart, torso: BasePart)
+local function collider(limb: BasePart)
 	local c = Instance.new("Part")
 	c.Name = "RagCollider"
 	c.Size = limb.Size * Vector3.new(0.8, 0.9, 0.8)
@@ -136,182 +161,17 @@ local function collider(limb: BasePart, torso: BasePart)
 	w.Part0 = limb
 	w.Part1 = c
 	w.Parent = c
-	local nc = Instance.new("NoCollisionConstraint")
-	nc.Part0 = c
-	nc.Part1 = torso
-	nc.Parent = c
 	c.Parent = limb
 end
 
-type Palette = {
-	skin: Color3,
-	torso: Color3,
-	arms: Color3,
-	legs: Color3,
-}
-
-type Rig = {
-	model: Model,
-	root: Part,
-	torso: Part,
-	head: Part,
-	rightArm: Part,
-	leftArm: Part,
-	rightLeg: Part,
-	leftLeg: Part,
-	humanoid: Humanoid,
-	joints: Joints,
-}
-
-local function buildBase(name: string, pal: Palette, maxHealth: number, walkSpeed: number): Rig
-	local model = Instance.new("Model")
-	model.Name = name
-
-	local root = basePart("HumanoidRootPart", Vector3.new(2, 2, 1), Color3.new(1, 1, 1))
-	root.Transparency = 1
-	root.CanCollide = false
-	root.CFrame = CFrame.new(0, 3, 0)
-	root.Parent = model
-
-	local torso = basePart("Torso", Vector3.new(2, 2, 1), pal.torso, Enum.Material.Fabric)
-	torso.CFrame = CFrame.new(0, 3, 0)
-	torso.Parent = model
-
-	local head = basePart("Head", Vector3.new(1.2, 1.2, 1.2), pal.skin)
-	head.CFrame = CFrame.new(0, 4.6, 0)
-	local headMesh = Instance.new("SpecialMesh")
-	headMesh.MeshType = Enum.MeshType.Head
-	headMesh.Scale = Vector3.new(1, 1, 1)
-	headMesh.Parent = head
-	head.Parent = model
-
-	local rightArm = basePart("Right Arm", Vector3.new(1, 2, 1), pal.arms, Enum.Material.Fabric)
-	rightArm.CFrame = CFrame.new(1.5, 3, 0)
-	rightArm.CanCollide = false
-	rightArm.Parent = model
-	local leftArm = basePart("Left Arm", Vector3.new(1, 2, 1), pal.arms, Enum.Material.Fabric)
-	leftArm.CFrame = CFrame.new(-1.5, 3, 0)
-	leftArm.CanCollide = false
-	leftArm.Parent = model
-	local rightLeg = basePart("Right Leg", Vector3.new(1, 2, 1), pal.legs, Enum.Material.Fabric)
-	rightLeg.CFrame = CFrame.new(0.5, 1, 0)
-	rightLeg.CanCollide = false
-	rightLeg.Parent = model
-	local leftLeg = basePart("Left Leg", Vector3.new(1, 2, 1), pal.legs, Enum.Material.Fabric)
-	leftLeg.CFrame = CFrame.new(-0.5, 1, 0)
-	leftLeg.CanCollide = false
-	leftLeg.Parent = model
-
-	local joints: Joints = {
-		Root = motor("RootJoint", root, torso, CFrame.new(), CFrame.new()),
-		Neck = motor("Neck", torso, head, CFrame.new(0, 1, 0), CFrame.new(0, -0.6, 0)),
-		RS = motor("Right Shoulder", torso, rightArm, CFrame.new(1, 0.5, 0), CFrame.new(-0.5, 0.5, 0)),
-		LS = motor("Left Shoulder", torso, leftArm, CFrame.new(-1, 0.5, 0), CFrame.new(0.5, 0.5, 0)),
-		RH = motor("Right Hip", torso, rightLeg, CFrame.new(0.5, -1, 0), CFrame.new(0, 1, 0)),
-		LH = motor("Left Hip", torso, leftLeg, CFrame.new(-0.5, -1, 0), CFrame.new(0, 1, 0)),
-	}
-
-	ragdollSocket("Neck", torso, head, CFrame.new(0, 1, 0), CFrame.new(0, -0.6, 0), 30, 40)
-	ragdollSocket("RS", torso, rightArm, CFrame.new(1, 0.5, 0), CFrame.new(-0.5, 0.5, 0), 80, 45)
-	ragdollSocket("LS", torso, leftArm, CFrame.new(-1, 0.5, 0), CFrame.new(0.5, 0.5, 0), 80, 45)
-	ragdollSocket("RH", torso, rightLeg, CFrame.new(0.5, -1, 0), CFrame.new(0, 1, 0), 50, 20)
-	ragdollSocket("LH", torso, leftLeg, CFrame.new(-0.5, -1, 0), CFrame.new(0, 1, 0), 50, 20)
-	for _, limb in { rightArm, leftArm, rightLeg, leftLeg } do
-		collider(limb, torso)
+local function nameplate(head: BasePart, displayName: string, color: Color3)
+	local old = head:FindFirstChild("Nameplate")
+	if old then
+		old:Destroy()
 	end
-
-	local humanoid = Instance.new("Humanoid")
-	humanoid.RigType = Enum.HumanoidRigType.R6
-	humanoid.MaxHealth = maxHealth
-	humanoid.Health = maxHealth
-	humanoid.WalkSpeed = walkSpeed
-	humanoid.UseJumpPower = true
-	humanoid.JumpPower = 50
-	humanoid.BreakJointsOnDeath = false
-	-- 래그돌 때 목 관절을 끄므로, 목이 끊겼다고 즉사하지 않게 한다
-	humanoid.RequiresNeck = false
-	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
-	humanoid.Parent = model
-
-	model.PrimaryPart = root
-
-	return {
-		model = model,
-		root = root,
-		torso = torso,
-		head = head,
-		rightArm = rightArm,
-		leftArm = leftArm,
-		rightLeg = rightLeg,
-		leftLeg = leftLeg,
-		humanoid = humanoid,
-		joints = joints,
-	}
-end
-
--- 무기 관절: 오른손 끝에서 무기의 +Y 축이 "앞"을 향하도록.
-local function weaponMotor(rig: Rig, handleName: string): Part
-	local handle = basePart(handleName, Vector3.new(0.3, 0.3, 0.3), Color3.new(0, 0, 0))
-	handle.Transparency = 1
-	handle.CanCollide = false
-	handle.CanQuery = false
-	handle.CanTouch = false
-	handle.Massless = true
-	local c0 = CFrame.new(0, -0.95, 0) * CFrame.Angles(rad(-90), 0, 0)
-	handle.CFrame = rig.rightArm.CFrame * c0
-	handle.Parent = rig.model
-	motor("Weapon", rig.rightArm, handle, c0, CFrame.new())
-	return handle
-end
-
-local function face(rig: Rig, folder: Instance, eyeColor: Color3, browColor: Color3, style: string)
-	local head = rig.head
-	local eyeGlow = style == "sharp"
-	for _, side in { -1, 1 } do
-		local eye = deco(
-			folder,
-			head,
-			"Eye",
-			Vector3.new(0.15, if eyeGlow then 0.12 else 0.2, 0.05),
-			CFrame.new(side * 0.21, 0.04, -0.585),
-			eyeColor,
-			if eyeGlow then Enum.Material.Neon else Enum.Material.SmoothPlastic
-		)
-		eye.CastShadow = false
-		local browRot = if style == "sharp" then CFrame.Angles(0, 0, rad(side * 16)) else CFrame.Angles(0, 0, rad(side * -6))
-		local brow = deco(folder, head, "Brow", Vector3.new(0.3, 0.05, 0.05), CFrame.new(side * 0.22, 0.22, -0.585) * browRot, browColor)
-		brow.CastShadow = false
-		if style == "sharp" then
-			-- 위로 길게 뻗은 눈꼬리
-			local lash = deco(folder, head, "Lash", Vector3.new(0.16, 0.035, 0.05), CFrame.new(side * 0.3, 0.1, -0.58) * CFrame.Angles(0, 0, rad(side * 25)), browColor)
-			lash.CastShadow = false
-		end
-	end
-	if style == "sharp" then
-		local mouth = deco(folder, head, "Mouth", Vector3.new(0.2, 0.035, 0.05), CFrame.new(0.03, -0.27, -0.58) * CFrame.Angles(0, 0, rad(-6)), Color3.fromRGB(120, 60, 60))
-		mouth.CastShadow = false
-	else
-		-- 잘 웃는 둥근 얼굴
-		local mouthColor = Color3.fromRGB(110, 50, 40)
-		local m1 = deco(folder, head, "Mouth", Vector3.new(0.22, 0.045, 0.05), CFrame.new(0, -0.26, -0.585), mouthColor)
-		m1.CastShadow = false
-		for _, side in { -1, 1 } do
-			local m2 = deco(folder, head, "MouthCorner", Vector3.new(0.09, 0.045, 0.05), CFrame.new(side * 0.14, -0.23, -0.58) * CFrame.Angles(0, 0, rad(side * 35)), mouthColor)
-			m2.CastShadow = false
-		end
-		for _, side in { -1, 1 } do
-			local blush = deco(folder, head, "Blush", Vector3.new(0.16, 0.08, 0.04), CFrame.new(side * 0.33, -0.12, -0.55), Color3.fromRGB(226, 140, 120))
-			blush.Transparency = 0.45
-			blush.CastShadow = false
-		end
-	end
-end
-
-local function nameplate(rig: Rig, displayName: string, color: Color3)
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Nameplate"
-	gui.Size = UDim2.fromOffset(160, 38)
+	gui.Size = UDim2.fromOffset(170, 38)
 	gui.StudsOffset = Vector3.new(0, 2.3, 0)
 	gui.AlwaysOnTop = false
 	gui.MaxDistance = 90
@@ -340,131 +200,149 @@ local function nameplate(rig: Rig, displayName: string, color: Color3)
 	fill.BackgroundColor3 = color
 	fill.BorderSizePixel = 0
 	fill.Parent = barBack
-	gui.Parent = rig.head
+	gui.Parent = head
 end
 
-local function makeTrail(container: Instance, a0: Attachment, a1: Attachment, c0: Color3, c1: Color3, lifetime: number): Trail
-	local t = Instance.new("Trail")
-	t.Name = "WeaponTrail"
-	t.Attachment0 = a0
-	t.Attachment1 = a1
-	t.Color = ColorSequence.new(c0, c1)
-	t.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.15),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	t.Lifetime = lifetime
-	t.LightEmission = 0.6
-	t.FaceCamera = false
-	t.MinLength = 0.05
-	t.Enabled = false
-	t.Parent = container
-	return t
+export type PrepareOptions = {
+	displayName: string?,
+	plateColor: Color3?,
+	collisionGroup: string?, -- 서버에서만 지정 ("Characters")
+}
+
+function RigBuilder.prepare(model: Model, opts: PrepareOptions?)
+	local o: PrepareOptions = opts or {}
+	-- 기본 애니메이션/체력 스크립트와 Animator 제거 (관절은 우리 애니메이터가 직접 움직인다)
+	for _, d in model:GetDescendants() do
+		if (d:IsA("LocalScript") or d:IsA("Script")) and (d.Name == "Animate" or d.Name == "Health") then
+			d:Destroy()
+		elseif d:IsA("Animator") then
+			d:Destroy()
+		end
+	end
+
+	local hum = model:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.RigType = Enum.HumanoidRigType.R6
+		hum.BreakJointsOnDeath = false
+		hum.RequiresNeck = false -- 래그돌 때 목 관절을 끄므로
+		hum.UseJumpPower = true
+		hum.JumpPower = 50
+		hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+	end
+
+	-- 액세서리는 판정/충돌에 끼지 않게 (날개·망토 때문에 피격 범위가 커지지 않도록)
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") and d:FindFirstAncestorOfClass("Accessory") then
+			d.CanQuery = false
+			d.CanTouch = false
+			d.CanCollide = false
+			d.Massless = true
+		end
+	end
+
+	local torso = model:FindFirstChild("Torso")
+	if torso and torso:IsA("BasePart") then
+		for _, spec in RAG_SPECS do
+			local m = torso:FindFirstChild(spec.motor)
+			if m and m:IsA("Motor6D") and not model:FindFirstChild("RagSocket_" .. spec.key, true) then
+				ragdollSocket(spec.key, m, spec)
+			end
+		end
+	end
+	for _, name in LIMBS do
+		local limb = model:FindFirstChild(name)
+		if limb and limb:IsA("BasePart") and not limb:FindFirstChild("RagCollider") then
+			collider(limb)
+		end
+	end
+
+	local head = model:FindFirstChild("Head")
+	if head and head:IsA("BasePart") then
+		nameplate(head, o.displayName or model.Name, o.plateColor or Color3.fromRGB(120, 200, 120))
+	end
+
+	local group = o.collisionGroup
+	if group then
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.CollisionGroup = group
+			end
+		end
+	end
+
+	local root = model:FindFirstChild("HumanoidRootPart")
+	if root and root:IsA("BasePart") then
+		model.PrimaryPart = root
+	end
+end
+
+function RigBuilder.setNameplate(model: Model, text: string, color: Color3?)
+	local head = model:FindFirstChild("Head")
+	local plate = head and head:FindFirstChild("Nameplate")
+	if not plate then
+		return
+	end
+	local label = plate:FindFirstChild("NameLabel")
+	if label and label:IsA("TextLabel") then
+		label.Text = text
+	end
+	local bar = plate:FindFirstChild("Bar")
+	local fill = bar and bar:FindFirstChild("Fill")
+	if color and fill and fill:IsA("Frame") then
+		fill.BackgroundColor3 = color
+	end
 end
 
 ----------------------------------------------------------------------
--- 린 위안
+-- 장비
 ----------------------------------------------------------------------
-local function buildLinYuan(): Model
-	local skin = Color3.fromRGB(226, 178, 132)
-	local white = Color3.fromRGB(238, 234, 224)
-	local vest = Color3.fromRGB(30, 27, 26)
-	local pants = Color3.fromRGB(112, 78, 46)
-	local hair = Color3.fromRGB(22, 18, 17)
-	local gold = Color3.fromRGB(232, 182, 74)
+-- 무기 관절: 오른손 끝에서 무기의 +Y 축이 "앞"을 향하도록.
+local function weaponMotor(gear: Instance, rightArm: BasePart, handleName: string): Part
+	local handle = basePart(handleName, Vector3.new(0.3, 0.3, 0.3), Color3.new(0, 0, 0))
+	handle.Transparency = 1
+	handle.CanCollide = false
+	handle.CanQuery = false
+	handle.CanTouch = false
+	handle.Massless = true
+	local c0 = CFrame.new(0, -0.95, 0) * CFrame.Angles(rad(-90), 0, 0)
+	handle.CFrame = rightArm.CFrame * c0
+	handle.Parent = gear
+	motor("Weapon", rightArm, handle, c0, CFrame.new(), gear)
+	return handle
+end
+
+local function linGear(gear: Folder, torso: BasePart, rightArm: BasePart)
 	local wood = Color3.fromRGB(126, 84, 48)
-
-	local rig = buildBase("린 위안", { skin = skin, torso = white, arms = skin, legs = pants }, 115, 17)
-	local model = rig.model
-	local deco_ = Instance.new("Folder")
-	deco_.Name = "Look"
-	deco_.Parent = model
-
-	-- 얼굴 & 머리
-	face(rig, deco_, Color3.fromRGB(58, 34, 20), hair, "soft")
-	local head = rig.head
-	deco(deco_, head, "HairCap", Vector3.new(1.3, 0.34, 1.3), CFrame.new(0, 0.55, 0.02), hair, Enum.Material.SmoothPlastic)
-	deco(deco_, head, "HairBack", Vector3.new(1.3, 0.75, 0.3), CFrame.new(0, 0.2, 0.52), hair)
-	for _, side in { -1, 1 } do
-		deco(deco_, head, "HairSide", Vector3.new(0.18, 0.55, 0.9), CFrame.new(side * 0.62, 0.28, 0.12), hair)
-	end
-	-- 헝클어진 머리 삐침
-	local tufts = {
-		{ 0.25, 0.78, -0.25, 25, 0, -20 },
-		{ -0.3, 0.8, -0.1, -15, 0, 25 },
-		{ 0.05, 0.84, 0.25, 10, 30, 10 },
-		{ -0.15, 0.62, -0.58, -40, 0, 15 },
-		{ 0.2, 0.6, -0.6, -35, 0, -20 },
-		{ 0.45, 0.68, 0.2, 0, 0, -45 },
-		{ -0.48, 0.66, 0.25, 0, 0, 45 },
-	}
-	for i, t in tufts do
-		deco(deco_, head, "Tuft" .. i, Vector3.new(0.34, 0.26, 0.34), CFrame.new(t[1], t[2], t[3]) * CFrame.Angles(rad(t[4]), rad(t[5]), rad(t[6])), hair)
-	end
-
-	-- 몸통: 흰 상의 + 검은 소매 없는 겉옷 + 넉넉한 체형
-	local torso = rig.torso
-	ellipsoid(deco_, torso, "Belly", Vector3.new(2.05, 1.5, 1.35), CFrame.new(0, -0.35, -0.08), white, Enum.Material.Fabric)
-	ellipsoid(deco_, torso, "Chest", Vector3.new(2.15, 1.3, 1.2), CFrame.new(0, 0.45, 0), white, Enum.Material.Fabric)
-	for _, side in { -1, 1 } do
-		deco(deco_, torso, "VestFront", Vector3.new(0.72, 2.05, 0.14), CFrame.new(side * 0.68, 0.02, -0.62) * CFrame.Angles(0, rad(side * -8), 0), vest, Enum.Material.Fabric)
-		deco(deco_, torso, "VestTrim", Vector3.new(0.08, 2.05, 0.16), CFrame.new(side * 0.33, 0.02, -0.66), gold, Enum.Material.Fabric)
-		deco(deco_, torso, "VestSide", Vector3.new(0.16, 2.05, 1.25), CFrame.new(side * 1.04, 0.02, 0), vest, Enum.Material.Fabric)
-		ellipsoid(deco_, torso, "Shoulder", Vector3.new(1.0, 0.7, 1.2), CFrame.new(side * 0.95, 0.85, 0), vest, Enum.Material.Fabric)
-	end
-	deco(deco_, torso, "VestBack", Vector3.new(2.2, 2.05, 0.14), CFrame.new(0, 0.02, 0.64), vest, Enum.Material.Fabric)
-	deco(deco_, torso, "Sash", Vector3.new(2.25, 0.34, 1.42), CFrame.new(0, -0.82, -0.02), Color3.fromRGB(128, 52, 30), Enum.Material.Fabric)
-	deco(deco_, torso, "SashKnot", Vector3.new(0.34, 0.5, 0.2), CFrame.new(0.55, -0.98, -0.72) * CFrame.Angles(0, 0, rad(15)), Color3.fromRGB(128, 52, 30), Enum.Material.Fabric)
-
-	-- 삿갓 (등 뒤)
-	local hatRel = CFrame.new(0, 0.35, 0.95) * CFrame.Angles(rad(-12), 0, rad(8))
-	discZ(deco_, torso, "HatBrim", 2.7, 0.1, hatRel, Color3.fromRGB(196, 160, 96), Enum.Material.Wood)
-	discZ(deco_, torso, "HatMid", 1.8, 0.14, hatRel * CFrame.new(0, 0, 0.12), Color3.fromRGB(186, 150, 88), Enum.Material.Wood)
-	discZ(deco_, torso, "HatTop", 0.9, 0.16, hatRel * CFrame.new(0, 0, 0.26), Color3.fromRGB(170, 134, 76), Enum.Material.Wood)
-	deco(deco_, torso, "HatCord", Vector3.new(0.06, 2.3, 0.06), CFrame.new(0.3, 0.3, -0.66) * CFrame.Angles(0, 0, rad(38)), Color3.fromRGB(90, 60, 30))
+	local grip = Color3.fromRGB(60, 36, 20)
 
 	-- 등에 멘 목봉
 	local staffBack = Instance.new("Model")
 	staffBack.Name = "StaffBack"
-	staffBack.Parent = deco_
-	local backRel = CFrame.new(0, 0, 0.78) * CFrame.Angles(0, 0, rad(58))
+	staffBack.Parent = gear
+	local backRel = CFrame.new(0, 0, 0.72) * CFrame.Angles(0, 0, rad(58))
 	deco(staffBack, torso, "Staff", Vector3.new(5.6, 0.26, 0.26), backRel, wood, Enum.Material.Wood, Enum.PartType.Cylinder)
-	deco(staffBack, torso, "Grip1", Vector3.new(0.4, 0.3, 0.3), backRel * CFrame.new(1.0, 0, 0), Color3.fromRGB(60, 36, 20), Enum.Material.Fabric, Enum.PartType.Cylinder)
-	deco(staffBack, torso, "Grip2", Vector3.new(0.4, 0.3, 0.3), backRel * CFrame.new(-1.0, 0, 0), Color3.fromRGB(60, 36, 20), Enum.Material.Fabric, Enum.PartType.Cylinder)
+	deco(staffBack, torso, "Grip1", Vector3.new(0.4, 0.3, 0.3), backRel * CFrame.new(1.0, 0, 0), grip, Enum.Material.Fabric, Enum.PartType.Cylinder)
+	deco(staffBack, torso, "Grip2", Vector3.new(0.4, 0.3, 0.3), backRel * CFrame.new(-1.0, 0, 0), grip, Enum.Material.Fabric, Enum.PartType.Cylinder)
 
-	-- 팔: 흰 소매(걷어 올림) + 굳은살 손
-	for _, arm in { rig.rightArm, rig.leftArm } do
-		deco(deco_, arm, "Sleeve", Vector3.new(1.12, 1.05, 1.12), CFrame.new(0, 0.5, 0), white, Enum.Material.Fabric)
-		deco(deco_, arm, "Cuff", Vector3.new(1.16, 0.18, 1.16), CFrame.new(0, -0.05, 0), Color3.fromRGB(214, 208, 196), Enum.Material.Fabric)
-		deco(deco_, arm, "Wrap", Vector3.new(1.06, 0.28, 1.06), CFrame.new(0, -0.62, 0), Color3.fromRGB(200, 186, 160), Enum.Material.Fabric)
-		-- 각성 시 드러나는 금빛 영력의 결
-		local line = deco(deco_, arm, "ChiLine", Vector3.new(0.08, 1.9, 1.08), CFrame.new(0, 0, 0), gold, Enum.Material.Neon)
-		line.Transparency = 1
-		local line2 = deco(deco_, arm, "ChiLine", Vector3.new(1.08, 1.9, 0.08), CFrame.new(0, 0, 0), gold, Enum.Material.Neon)
-		line2.Transparency = 1
-	end
-
-	-- 다리: 넉넉한 바지 + 낡은 천 신발
-	for _, leg in { rig.rightLeg, rig.leftLeg } do
-		ellipsoid(deco_, leg, "Baggy", Vector3.new(1.25, 1.7, 1.3), CFrame.new(0, 0.25, 0), pants, Enum.Material.Fabric)
-		deco(deco_, leg, "Ankle", Vector3.new(1.08, 0.3, 1.08), CFrame.new(0, -0.65, 0), Color3.fromRGB(214, 206, 188), Enum.Material.Fabric)
-		deco(deco_, leg, "Shoe", Vector3.new(1.06, 0.34, 1.28), CFrame.new(0, -0.84, -0.1), Color3.fromRGB(44, 38, 34), Enum.Material.Fabric)
-	end
+	-- 등 뒤의 삿갓
+	local hat = Instance.new("Model")
+	hat.Name = "Hat"
+	hat.Parent = gear
+	local hatRel = CFrame.new(0, 0.3, 0.86) * CFrame.Angles(rad(-12), 0, rad(8))
+	discZ(hat, torso, "HatBrim", 2.5, 0.1, hatRel, Color3.fromRGB(196, 160, 96), Enum.Material.Wood)
+	discZ(hat, torso, "HatMid", 1.7, 0.14, hatRel * CFrame.new(0, 0, 0.12), Color3.fromRGB(186, 150, 88), Enum.Material.Wood)
+	discZ(hat, torso, "HatTop", 0.85, 0.16, hatRel * CFrame.new(0, 0, 0.26), Color3.fromRGB(170, 134, 76), Enum.Material.Wood)
 
 	-- 손에 쥐는 목봉 (기술 사용 시에만 보임)
-	local handle = weaponMotor(rig, "StaffHandle")
+	local handle = weaponMotor(gear, rightArm, "StaffHandle")
 	local staffHand = Instance.new("Model")
 	staffHand.Name = "StaffHand"
-	staffHand.Parent = model
+	staffHand.Parent = gear
 	local hand = cylY(staffHand, handle, "Staff", 5.6, 0.26, CFrame.new(0, 0.4, 0), wood, Enum.Material.Wood)
-	cylY(staffHand, handle, "Grip1", 0.4, 0.3, CFrame.new(0, 1.4, 0), Color3.fromRGB(60, 36, 20), Enum.Material.Fabric)
-	cylY(staffHand, handle, "Grip2", 0.4, 0.3, CFrame.new(0, -0.6, 0), Color3.fromRGB(60, 36, 20), Enum.Material.Fabric)
-	for _, p in staffHand:GetDescendants() do
-		if p:IsA("BasePart") then
-			p:SetAttribute("ShowT", p.Transparency)
-			p.Transparency = 1
-		end
-	end
+	cylY(staffHand, handle, "Grip1", 0.4, 0.3, CFrame.new(0, 1.4, 0), grip, Enum.Material.Fabric)
+	cylY(staffHand, handle, "Grip2", 0.4, 0.3, CFrame.new(0, -0.6, 0), grip, Enum.Material.Fabric)
+	hideProp(staffHand)
 	local a0 = Instance.new("Attachment")
 	a0.Name = "TrailA"
 	a0.Position = Vector3.new(2.7, 0, 0)
@@ -474,88 +352,18 @@ local function buildLinYuan(): Model
 	a1.Position = Vector3.new(-2.7, 0, 0)
 	a1.Parent = hand
 	makeTrail(hand, a0, a1, Color3.fromRGB(255, 220, 120), Color3.fromRGB(255, 160, 40), 0.2)
-
-	model:SetAttribute("CharId", "LinYuan")
-	nameplate(rig, "린 위안", Color3.fromRGB(255, 196, 74))
-	return model
 end
 
-----------------------------------------------------------------------
--- 칸자키 렌
-----------------------------------------------------------------------
-local function buildKanzakiRen(): Model
-	local skin = Color3.fromRGB(242, 214, 196)
-	local shirt = Color3.fromRGB(80, 80, 90)
-	local jacket = Color3.fromRGB(36, 36, 44)
+local function renGear(gear: Folder, torso: BasePart, rightArm: BasePart)
 	local red = Color3.fromRGB(150, 28, 32)
-	local pants = Color3.fromRGB(44, 44, 52)
-	local hair = Color3.fromRGB(20, 18, 24)
 	local steel = Color3.fromRGB(200, 204, 212)
 
-	local rig = buildBase("칸자키 렌", { skin = skin, torso = shirt, arms = jacket, legs = pants }, 100, 19)
-	local model = rig.model
-	local deco_ = Instance.new("Folder")
-	deco_.Name = "Look"
-	deco_.Parent = model
-
-	-- 얼굴: 선명한 적색 눈, 위로 뻗은 날카로운 눈매
-	face(rig, deco_, Color3.fromRGB(214, 36, 52), hair, "sharp")
-	local head = rig.head
-	-- 턱선을 조금 넘는 거친 검은 단발
-	deco(deco_, head, "HairCap", Vector3.new(1.34, 0.32, 1.34), CFrame.new(0, 0.56, 0.02), hair)
-	deco(deco_, head, "HairBack", Vector3.new(1.38, 1.1, 0.32), CFrame.new(0, 0.05, 0.56), hair)
-	for _, side in { -1, 1 } do
-		deco(deco_, head, "HairSide", Vector3.new(0.22, 1.05, 1.18), CFrame.new(side * 0.66, 0.08, 0.05), hair)
-		deco(deco_, head, "HairSideTip", Vector3.new(0.2, 0.3, 0.4), CFrame.new(side * 0.68, -0.52, -0.25) * CFrame.Angles(rad(-20), 0, rad(side * -10)), hair)
-	end
-	-- 불규칙하게 갈라진 앞머리
-	local bangs = {
-		{ -0.42, 0.34, 0.24, 0.5, 8 },
-		{ -0.18, 0.3, 0.22, 0.62, -4 },
-		{ 0.06, 0.36, 0.2, 0.46, 6 },
-		{ 0.28, 0.3, 0.24, 0.58, -8 },
-		{ 0.48, 0.36, 0.2, 0.44, -14 },
-	}
-	for i, b in bangs do
-		deco(deco_, head, "Bang" .. i, Vector3.new(b[3], b[4], 0.14), CFrame.new(b[1], b[2], -0.6) * CFrame.Angles(rad(-8), 0, rad(b[5])), hair)
-	end
-	-- 목덜미 쪽 짧게 들뜬 머리
-	for i, x in { -0.4, 0, 0.4 } do
-		deco(deco_, head, "Nape" .. i, Vector3.new(0.3, 0.22, 0.22), CFrame.new(x, -0.5, 0.62) * CFrame.Angles(rad(35), 0, rad(x * 30)), hair)
-	end
-
-	-- 몸통: 숯빛 셔츠 + 허리까지 오는 짧은 현장 재킷(안감 적색)
-	local torso = rig.torso
-	for _, side in { -1, 1 } do
-		deco(deco_, torso, "JacketFront", Vector3.new(0.74, 1.75, 0.14), CFrame.new(side * 0.64, 0.14, -0.55), jacket, Enum.Material.Fabric)
-		deco(deco_, torso, "Lining", Vector3.new(0.07, 1.75, 0.15), CFrame.new(side * 0.25, 0.14, -0.56), red, Enum.Material.Fabric)
-		deco(deco_, torso, "JacketSide", Vector3.new(0.14, 1.75, 1.12), CFrame.new(side * 1.03, 0.14, 0), jacket, Enum.Material.Fabric)
-		deco(deco_, torso, "Pocket", Vector3.new(0.4, 0.3, 0.06), CFrame.new(side * 0.62, -0.4, -0.64), Color3.fromRGB(34, 34, 38), Enum.Material.Fabric)
-	end
-	deco(deco_, torso, "JacketBack", Vector3.new(2.1, 1.75, 0.14), CFrame.new(0, 0.14, 0.55), jacket, Enum.Material.Fabric)
-	deco(deco_, torso, "Collar", Vector3.new(2.16, 0.34, 1.2), CFrame.new(0, 0.96, 0.02), jacket, Enum.Material.Fabric)
-	deco(deco_, torso, "CollarBack", Vector3.new(1.6, 0.45, 0.16), CFrame.new(0, 1.12, 0.52) * CFrame.Angles(rad(-15), 0, 0), jacket, Enum.Material.Fabric)
-	deco(deco_, torso, "Belt", Vector3.new(2.08, 0.22, 1.1), CFrame.new(0, -0.9, 0), Color3.fromRGB(16, 16, 18), Enum.Material.Fabric)
-	deco(deco_, torso, "Buckle", Vector3.new(0.28, 0.2, 0.06), CFrame.new(0, -0.9, -0.56), Color3.fromRGB(150, 150, 156), Enum.Material.Metal)
-	-- 목에 느슨하게 건 방진 마스크
-	deco(deco_, torso, "Mask", Vector3.new(0.9, 0.34, 0.22), CFrame.new(0, 0.9, -0.66) * CFrame.Angles(rad(20), 0, 0), Color3.fromRGB(150, 152, 158), Enum.Material.Fabric)
-	for _, side in { -1, 1 } do
-		deco(deco_, torso, "MaskStrap", Vector3.new(0.05, 0.05, 0.9), CFrame.new(side * 0.5, 1.0, -0.2) * CFrame.Angles(rad(-15), 0, 0), Color3.fromRGB(60, 60, 64))
-	end
-	-- 오른쪽 허리: ARK 단말 + 밀폐형 회분 수거통
-	deco(deco_, torso, "ARK", Vector3.new(0.14, 0.5, 0.36), CFrame.new(1.08, -0.72, -0.15), Color3.fromRGB(30, 32, 36), Enum.Material.Metal)
-	local arkLight = deco(deco_, torso, "ARKLight", Vector3.new(0.05, 0.08, 0.08), CFrame.new(1.16, -0.6, -0.15), Color3.fromRGB(80, 220, 210), Enum.Material.Neon)
-	arkLight.CastShadow = false
-	cylY(deco_, torso, "AshCanister", 0.6, 0.42, CFrame.new(0.95, -0.85, 0.42), Color3.fromRGB(70, 72, 78), Enum.Material.Metal)
-	cylY(deco_, torso, "AshCanisterCap", 0.1, 0.46, CFrame.new(0.95, -0.52, 0.42), Color3.fromRGB(150, 28, 32), Enum.Material.Metal)
-
-	-- 왼쪽 허리: 무광 검은 칼집 + 봉인선 10개
+	-- 왼쪽 허리: 무광 검은 칼집 + 봉인선 10개 (칼자루 쪽이 앞·위, 끝이 뒤·아래)
 	local scabbard = Instance.new("Model")
 	scabbard.Name = "Scabbard"
-	scabbard.Parent = model
+	scabbard.Parent = gear
 	local scabRel = CFrame.new(-1.18, -0.8, 0.2) * CFrame.Angles(rad(24), rad(-8), 0)
 	local sheath = deco(scabbard, torso, "Sheath", Vector3.new(0.24, 0.3, 3.3), scabRel, Color3.fromRGB(14, 14, 16), Enum.Material.SmoothPlastic)
-	sheath.Name = "Sheath"
 	deco(scabbard, torso, "Koiguchi", Vector3.new(0.28, 0.34, 0.14), scabRel * CFrame.new(0, 0, -1.62), Color3.fromRGB(60, 60, 66), Enum.Material.Metal)
 	for i = 1, 10 do
 		local seal = deco(scabbard, torso, "Seal" .. i, Vector3.new(0.27, 0.33, 0.06), scabRel * CFrame.new(0, 0, -1.35 + (i - 1) * 0.28), Color3.fromRGB(255, 40, 50), Enum.Material.Neon)
@@ -566,42 +374,21 @@ local function buildKanzakiRen(): Model
 	ashVent.Name = "AshVent"
 	ashVent.Position = Vector3.new(0, 0, -1.7)
 	ashVent.Parent = sheath
-	-- 칼집에 꽂힌 상태의 칼자루 (최대 출력 충전 중에만 보임)
+
+	-- 칼집에 꽂힌 칼자루 (최대 출력 충전 중에만 보임)
 	local sheathed = Instance.new("Model")
 	sheathed.Name = "KatanaSheathed"
-	sheathed.Parent = model
+	sheathed.Parent = gear
 	deco(sheathed, torso, "Tsuba", Vector3.new(0.5, 0.5, 0.06), scabRel * CFrame.new(0, 0, -1.72), Color3.fromRGB(40, 40, 44), Enum.Material.Metal)
 	deco(sheathed, torso, "Hilt", Vector3.new(0.2, 0.22, 0.95), scabRel * CFrame.new(0, 0, -2.22), Color3.fromRGB(18, 18, 20), Enum.Material.Fabric)
 	deco(sheathed, torso, "HiltWrap", Vector3.new(0.22, 0.24, 0.7), scabRel * CFrame.new(0, 0, -2.22), red, Enum.Material.Fabric).Transparency = 0.4
-	for _, p in sheathed:GetDescendants() do
-		if p:IsA("BasePart") then
-			p:SetAttribute("ShowT", p.Transparency)
-			p.Transparency = 1
-		end
-	end
-
-	-- 팔: 재킷 소매 + 왼팔 적색 식별선 + 얇게 가공된 장갑
-	for i, arm in { rig.rightArm, rig.leftArm } do
-		deco(deco_, arm, "Sleeve", Vector3.new(1.1, 1.5, 1.1), CFrame.new(0, 0.28, 0), jacket, Enum.Material.Fabric)
-		deco(deco_, arm, "Cuff", Vector3.new(1.14, 0.16, 1.14), CFrame.new(0, -0.45, 0), Color3.fromRGB(34, 34, 38), Enum.Material.Fabric)
-		deco(deco_, arm, "Glove", Vector3.new(1.05, 0.5, 1.05), CFrame.new(0, -0.76, 0), Color3.fromRGB(12, 12, 14), Enum.Material.Fabric)
-		if i == 2 then
-			deco(deco_, arm, "IDStripe", Vector3.new(1.14, 0.18, 1.14), CFrame.new(0, 0.62, 0), red, Enum.Material.Fabric)
-		end
-	end
-
-	-- 다리: 검은 전술 바지 + 무릎 보호대 + 부츠
-	for _, leg in { rig.rightLeg, rig.leftLeg } do
-		deco(deco_, leg, "Pants", Vector3.new(1.08, 1.5, 1.1), CFrame.new(0, 0.25, 0), pants, Enum.Material.Fabric)
-		deco(deco_, leg, "KneePad", Vector3.new(0.7, 0.45, 0.14), CFrame.new(0, -0.1, -0.56), Color3.fromRGB(46, 46, 52), Enum.Material.Fabric)
-		deco(deco_, leg, "Boot", Vector3.new(1.08, 0.55, 1.24), CFrame.new(0, -0.74, -0.08), Color3.fromRGB(14, 14, 16), Enum.Material.SmoothPlastic)
-	end
+	hideProp(sheathed)
 
 	-- 손에 쥔 JN-47 영력전도 도검
-	local handle = weaponMotor(rig, "KatanaHandle")
+	local handle = weaponMotor(gear, rightArm, "KatanaHandle")
 	local katana = Instance.new("Model")
 	katana.Name = "KatanaHand"
-	katana.Parent = model
+	katana.Parent = gear
 	deco(katana, handle, "Hilt", Vector3.new(0.2, 0.95, 0.22), CFrame.new(0, 0.05, 0), Color3.fromRGB(18, 18, 20), Enum.Material.Fabric)
 	deco(katana, handle, "HiltWrap", Vector3.new(0.22, 0.7, 0.24), CFrame.new(0, 0.05, 0), red, Enum.Material.Fabric).Transparency = 0.4
 	deco(katana, handle, "Tsuba", Vector3.new(0.5, 0.06, 0.5), CFrame.new(0, 0.56, 0), Color3.fromRGB(40, 40, 44), Enum.Material.Metal)
@@ -620,44 +407,124 @@ local function buildKanzakiRen(): Model
 	tb.Position = Vector3.new(0, 1.3, 0)
 	tb.Parent = blade
 	makeTrail(blade, ta, tb, Color3.fromRGB(255, 70, 70), Color3.fromRGB(20, 16, 18), 0.16)
+end
 
-	model:SetAttribute("CharId", "KanzakiRen")
-	nameplate(rig, "칸자키 렌", Color3.fromRGB(214, 44, 52))
-	return model
+function RigBuilder.unequip(model: Model)
+	local g = model:FindFirstChild("Gear")
+	if g then
+		g:Destroy()
+	end
+end
+
+-- 캐릭터(무브셋)에 맞는 무기·소품을 붙이고 CharId 를 기록한다
+function RigBuilder.equip(model: Model, charId: string)
+	RigBuilder.unequip(model)
+	local torso = model:FindFirstChild("Torso")
+	local rightArm = model:FindFirstChild("Right Arm")
+	if torso and torso:IsA("BasePart") and rightArm and rightArm:IsA("BasePart") then
+		local gear = Instance.new("Folder")
+		gear.Name = "Gear"
+		gear.Parent = model
+		if charId == "LinYuan" then
+			linGear(gear, torso, rightArm)
+		elseif charId == "KanzakiRen" then
+			renGear(gear, torso, rightArm)
+		end
+	end
+	model:SetAttribute("CharId", charId)
+	local v = model:GetAttribute("GearVersion")
+	model:SetAttribute("GearVersion", (if typeof(v) == "number" then v else 0) + 1)
 end
 
 ----------------------------------------------------------------------
+-- 파트로 조립한 R6 리그 (허수아비 / 아바타를 못 불러왔을 때)
+----------------------------------------------------------------------
+export type Palette = { head: Color3, torso: Color3, arms: Color3, legs: Color3 }
+
+local function buildBase(name: string, pal: Palette): Model
+	local model = Instance.new("Model")
+	model.Name = name
+
+	local root = basePart("HumanoidRootPart", Vector3.new(2, 2, 1), Color3.new(1, 1, 1))
+	root.Transparency = 1
+	root.CanCollide = false
+	root.CFrame = CFrame.new(0, 3, 0)
+	root.Parent = model
+
+	local torso = basePart("Torso", Vector3.new(2, 2, 1), pal.torso)
+	torso.CFrame = CFrame.new(0, 3, 0)
+	torso.Parent = model
+
+	local head = basePart("Head", Vector3.new(2, 1, 1), pal.head)
+	head.CFrame = CFrame.new(0, 4.5, 0)
+	local headMesh = Instance.new("SpecialMesh")
+	headMesh.MeshType = Enum.MeshType.Head
+	headMesh.Scale = Vector3.new(1.25, 1.25, 1.25)
+	headMesh.Parent = head
+	head.Parent = model
+
+	type LimbSpec = { name: string, pos: Vector3, color: Color3 }
+	local limbSpecs: { LimbSpec } = {
+		{ name = "Right Arm", pos = Vector3.new(1.5, 3, 0), color = pal.arms },
+		{ name = "Left Arm", pos = Vector3.new(-1.5, 3, 0), color = pal.arms },
+		{ name = "Right Leg", pos = Vector3.new(0.5, 1, 0), color = pal.legs },
+		{ name = "Left Leg", pos = Vector3.new(-0.5, 1, 0), color = pal.legs },
+	}
+	local limbs: { [string]: Part } = {}
+	for _, spec in limbSpecs do
+		local p = basePart(spec.name, Vector3.new(1, 2, 1), spec.color)
+		p.CFrame = CFrame.new(spec.pos)
+		p.CanCollide = false
+		p.Parent = model
+		limbs[spec.name] = p
+	end
+
+	motor("RootJoint", root, torso, CFrame.new(), CFrame.new())
+	motor("Neck", torso, head, CFrame.new(0, 1, 0), CFrame.new(0, -0.5, 0))
+	motor("Right Shoulder", torso, limbs["Right Arm"], CFrame.new(1, 0.5, 0), CFrame.new(-0.5, 0.5, 0))
+	motor("Left Shoulder", torso, limbs["Left Arm"], CFrame.new(-1, 0.5, 0), CFrame.new(0.5, 0.5, 0))
+	motor("Right Hip", torso, limbs["Right Leg"], CFrame.new(0.5, -1, 0), CFrame.new(0, 1, 0))
+	motor("Left Hip", torso, limbs["Left Leg"], CFrame.new(-0.5, -1, 0), CFrame.new(0, 1, 0))
+
+	local humanoid = Instance.new("Humanoid")
+	humanoid.RigType = Enum.HumanoidRigType.R6
+	humanoid.Parent = model
+	model.PrimaryPart = root
+	return model
+end
+
+-- 아바타 대신 쓸 기본 모양 (로블록스 기본 얼굴)
+function RigBuilder.buildFallback(pal: Palette): Model
+	local model = buildBase("Fighter", pal)
+	local head = model:FindFirstChild("Head") :: BasePart
+	local face = Instance.new("Decal")
+	face.Name = "face"
+	face.Texture = "rbxasset://textures/face.png"
+	face.Face = Enum.NormalId.Front
+	face.Parent = head
+	return model
+end
+
 -- 훈련용 허수아비
-----------------------------------------------------------------------
-local function buildDummy(): Model
+function RigBuilder.buildDummy(): Model
 	local burlap = Color3.fromRGB(184, 156, 108)
-	local rig = buildBase("훈련용 허수아비", { skin = burlap, torso = burlap, arms = burlap, legs = Color3.fromRGB(150, 120, 80) }, 200, 0)
-	local model = rig.model
-	local deco_ = Instance.new("Folder")
-	deco_.Name = "Look"
-	deco_.Parent = model
-	local head = rig.head
+	local model = buildBase("훈련용 허수아비", { head = burlap, torso = burlap, arms = burlap, legs = Color3.fromRGB(150, 120, 80) })
+	local look = Instance.new("Folder")
+	look.Name = "Look"
+	look.Parent = model
+	local head = model:FindFirstChild("Head") :: BasePart
+	local torso = model:FindFirstChild("Torso") :: BasePart
+	local dark = Color3.fromRGB(40, 30, 20)
 	for _, side in { -1, 1 } do
-		deco(deco_, head, "XEye", Vector3.new(0.3, 0.06, 0.05), CFrame.new(side * 0.22, 0.05, -0.59) * CFrame.Angles(0, 0, rad(45)), Color3.fromRGB(40, 30, 20))
-		deco(deco_, head, "XEye", Vector3.new(0.3, 0.06, 0.05), CFrame.new(side * 0.22, 0.05, -0.59) * CFrame.Angles(0, 0, rad(-45)), Color3.fromRGB(40, 30, 20))
+		deco(look, head, "XEye", Vector3.new(0.3, 0.06, 0.05), CFrame.new(side * 0.22, 0.05, -0.61) * CFrame.Angles(0, 0, rad(45)), dark)
+		deco(look, head, "XEye", Vector3.new(0.3, 0.06, 0.05), CFrame.new(side * 0.22, 0.05, -0.61) * CFrame.Angles(0, 0, rad(-45)), dark)
 	end
-	discZ(deco_, rig.torso, "Target", 1.4, 0.06, CFrame.new(0, 0.1, -0.52), Color3.fromRGB(200, 40, 40))
-	discZ(deco_, rig.torso, "TargetIn", 0.9, 0.07, CFrame.new(0, 0.1, -0.53), Color3.fromRGB(240, 235, 225))
-	discZ(deco_, rig.torso, "TargetDot", 0.4, 0.08, CFrame.new(0, 0.1, -0.54), Color3.fromRGB(200, 40, 40))
-	deco(deco_, rig.torso, "Vest", Vector3.new(2.1, 0.5, 1.1), CFrame.new(0, 0.75, 0), Color3.fromRGB(30, 30, 34), Enum.Material.Fabric)
-	deco(deco_, head, "Stitch", Vector3.new(0.05, 1.0, 0.05), CFrame.new(0, 0.1, 0.6), Color3.fromRGB(90, 70, 40))
+	discZ(look, torso, "Target", 1.4, 0.06, CFrame.new(0, 0.1, -0.52), Color3.fromRGB(200, 40, 40))
+	discZ(look, torso, "TargetIn", 0.9, 0.07, CFrame.new(0, 0.1, -0.53), Color3.fromRGB(240, 235, 225))
+	discZ(look, torso, "TargetDot", 0.4, 0.08, CFrame.new(0, 0.1, -0.54), Color3.fromRGB(200, 40, 40))
+	deco(look, torso, "Vest", Vector3.new(2.1, 0.5, 1.1), CFrame.new(0, 0.75, 0), Color3.fromRGB(30, 30, 34), Enum.Material.Fabric)
 	model:SetAttribute("CharId", "Dummy")
-	nameplate(rig, "훈련용 허수아비", Color3.fromRGB(120, 200, 120))
 	return model
-end
-
-function RigBuilder.build(charId: string): Model
-	if charId == "LinYuan" then
-		return buildLinYuan()
-	elseif charId == "KanzakiRen" then
-		return buildKanzakiRen()
-	end
-	return buildDummy()
 end
 
 -- 발끝이 cf 위치의 지면에 닿도록 배치 (HRP 는 지면 + 3)

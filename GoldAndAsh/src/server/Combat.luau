@@ -10,6 +10,8 @@ local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
 local CharacterDefs = require(Shared.CharacterDefs)
+local Physics = require(Shared.Physics)
+local RigBuilder = require(Shared.RigBuilder)
 
 local Combat = {}
 
@@ -233,30 +235,8 @@ end
 ----------------------------------------------------------------------
 -- 물리: 밀치기 / 래그돌
 ----------------------------------------------------------------------
-local function applyPushServer(root: BasePart, vel: Vector3, duration: number)
-	local att = root:FindFirstChild("PushAttachment") :: Attachment?
-	if not att then
-		local a = Instance.new("Attachment")
-		a.Name = "PushAttachment"
-		a.Parent = root
-		att = a
-	end
-	for _, c in root:GetChildren() do
-		if c.Name == "PushVelocity" then
-			c:Destroy()
-		end
-	end
-	local lv = Instance.new("LinearVelocity")
-	lv.Name = "PushVelocity"
-	lv.Attachment0 = att
-	lv.RelativeTo = Enum.ActuatorRelativeTo.World
-	lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
-	lv.MaxForce = math.huge
-	lv.VectorVelocity = vel
-	lv.Parent = root
-	Debris:AddItem(lv, duration)
-end
-
+-- 캐릭터 물리는 그 캐릭터를 소유한 쪽(플레이어 클라이언트 / 서버)이 계산한다.
+-- 수평은 유한한 힘의 평면 속도, 수직은 한 번의 발사 (Shared.Physics 참고)
 function Combat.push(ent: Entity, vel: Vector3, duration: number)
 	if not ent.alive and not ent.ragdolled then
 		return
@@ -265,7 +245,7 @@ function Combat.push(ent: Entity, vel: Vector3, duration: number)
 	if p and p.Parent then
 		Remotes.Push:FireClient(p, vel, duration)
 	else
-		applyPushServer(ent.root, vel, duration)
+		Physics.push(ent.root, vel, duration)
 	end
 end
 
@@ -317,7 +297,8 @@ function Combat.unragdoll(ent: Entity)
 		ent.ragdolled = false
 		ent.ragdollUntil = 0
 		setRagdollJoints(ent, false)
-		-- 넘어진 상태에서 일어설 때 몸을 세운다
+		Physics.stop(ent.root)
+		-- 넘어진 상태에서 일어설 때 몸을 세운다 (플레이어는 클라이언트가 직접 세운다)
 		if not ent.player then
 			local pos = ent.root.Position
 			local look = ent.root.CFrame.LookVector * Vector3.new(1, 0, 1)
@@ -503,6 +484,7 @@ local function applyDamage(att: Entity?, tgt: Entity, dmg: number)
 	else
 		hum.Health = math.max(0, hum.Health - dmg)
 	end
+	tgt.data.lastDamaged = now()
 	if att then
 		tgt.lastHitBy = att
 		tgt.lastHitTime = now()
@@ -581,6 +563,14 @@ function Combat.hit(att: Entity, tgt: Entity, info: HitInfo): string
 		end
 		if info.ragdoll then
 			Combat.ragdoll(tgt, info.ragdoll)
+		end
+		-- 크게 날아가면: 바람 궤적 + 벽에 부딪히는지 검사 (벽꽝)
+		local knock = info.knock
+		if knock and info.ragdoll and Vector3.new(knock.X, 0, knock.Z).Magnitude > 45 then
+			tgt.data.wallCheckUntil = t + 0.9
+			tgt.data.wallAttacker = att
+			local ad = att.def
+			Combat.fx("Knockback", { model = tgt.model, duration = 0.7, color = if ad then ad.color else nil })
 		end
 	end
 
@@ -866,6 +856,46 @@ function Combat.syncAttributes(ent: Entity, force: boolean?)
 	set("Exhausted", ent.exhaustedUntil > t)
 end
 
+local wallParams = RaycastParams.new()
+wallParams.FilterType = Enum.RaycastFilterType.Exclude
+
+-- 살아 있는 상태에서 캐릭터(무브셋) 교체: 무기를 바꿔 끼우고 게이지·쿨타임을 초기화한다
+function Combat.changeCharacter(ent: Entity, charId: string)
+	local def = CharacterDefs.get(charId)
+	if not def then
+		return
+	end
+	if ent.awakened then
+		ent.awakened = false
+		Combat.setHighlight(ent, nil)
+		Combat.fx("AwakenEnd", { model = ent.model, charId = ent.charId })
+	end
+	ent.token += 1
+	ent.busyUntil = 0
+	ent.moveName = nil
+	ent.blocking = false
+	ent.counterUntil = 0
+	ent.armorUntil = 0
+	ent.charId = charId
+	ent.def = def
+	ent.awakening = 0
+	ent.ash = 0
+	ent.combo = 0
+	ent.cooldowns = {}
+	ent.noSkillUntil = 0
+	ent.exhaustedUntil = 0
+	ent.data.speedMul = nil
+	RigBuilder.equip(ent.model, charId)
+	ent.humanoid.MaxHealth = def.maxHealth
+	ent.humanoid.Health = def.maxHealth
+	Combat.anim(ent, nil)
+	if ent.player then
+		Remotes.Cooldown:FireClient(ent.player, "*", 0, 0)
+	end
+	Combat.fx("Spawn", { model = ent.model, pos = ent.root.Position })
+	Combat.syncAttributes(ent, true)
+end
+
 local function updateEntity(ent: Entity, dt: number, t: number)
 	local hum = ent.humanoid
 	if not ent.alive then
@@ -894,6 +924,41 @@ local function updateEntity(ent: Entity, dt: number, t: number)
 		elseif ent.ash > 0 and t >= ent.ashExpire then
 			ent.ash = 0
 			Combat.notify(ent, "회분이 흩어졌다", "info")
+		end
+	end
+
+	-- 벽꽝: 크게 날아가던 중 벽에 부딪히면 추가 피해 + 파편
+	local wallUntil = ent.data.wallCheckUntil
+	if typeof(wallUntil) == "number" and wallUntil > t then
+		local v = ent.root.AssemblyLinearVelocity
+		local hv = Vector3.new(v.X, 0, v.Z)
+		if hv.Magnitude > 30 then
+			local ignore: { Instance } = { fxFolder }
+			for m in entities do
+				table.insert(ignore, m)
+			end
+			wallParams.FilterDescendantsInstances = ignore
+			local reach = math.clamp(hv.Magnitude * 0.08, 2.5, 6)
+			local hit = workspace:Raycast(ent.root.Position, hv.Unit * reach, wallParams)
+			if hit and math.abs(hit.Normal.Y) < 0.6 then
+				ent.data.wallCheckUntil = 0
+				if hit.Instance:GetAttribute("Breakable") == true and Combat.MapService then
+					Combat.MapService.breakPart(hit.Instance, ent.root.Position, hv.Unit, false)
+				end
+				Combat.fx("WallSlam", { pos = hit.Position, normal = hit.Normal, model = ent.model })
+				applyDamage(ent.data.wallAttacker :: Entity?, ent, 3)
+				ent.ragdollUntil = math.max(ent.ragdollUntil, t + 0.5)
+				ent.stunUntil = math.max(ent.stunUntil, ent.ragdollUntil + 0.35)
+				Combat.push(ent, hit.Normal * 10 + Vector3.new(0, 12, 0), 0.1)
+			end
+		end
+	end
+
+	-- 전투에서 벗어나 있으면 체력이 천천히 찬다
+	local lastDamaged = ent.data.lastDamaged
+	if not ent.isDummy and hum.Health > 0 and hum.Health < hum.MaxHealth then
+		if typeof(lastDamaged) ~= "number" or t - lastDamaged > Config.Regen.Delay then
+			hum.Health = math.min(hum.MaxHealth, hum.Health + Config.Regen.PerSec * dt)
 		end
 	end
 

@@ -20,6 +20,7 @@ type Saved = {
 	canCollide: boolean,
 	canQuery: boolean,
 	anchored: boolean,
+	group: string,
 }
 local saved: { [BasePart]: Saved } = {}
 
@@ -100,6 +101,7 @@ local function restore(part: BasePart)
 	part.Transparency = s.transparency
 	part.CanCollide = s.canCollide
 	part.CanQuery = s.canQuery
+	part.CollisionGroup = s.group
 	part:SetAttribute("Broken", false)
 	Remotes.FX:FireAllClients("PropRestore", { pos = s.cf.Position, size = part.Size })
 end
@@ -117,6 +119,7 @@ function MapService.breakPart(part: BasePart, fromPos: Vector3, dir: Vector3, to
 			canCollide = part.CanCollide,
 			canQuery = part.CanQuery,
 			anchored = part.Anchored,
+			group = part.CollisionGroup,
 		}
 	end
 	local pos = part.Position
@@ -128,6 +131,8 @@ function MapService.breakPart(part: BasePart, fromPos: Vector3, dir: Vector3, to
 	else
 		Remotes.FX:FireAllClients("PropBreak", { pos = pos, size = part.Size, color = part.Color, material = part.Material })
 		part.CanQuery = false
+		-- 날아가는 파편이 캐릭터를 튕겨 내지 않도록 캐릭터와는 충돌하지 않게 한다
+		part.CollisionGroup = "Debris"
 		part.Anchored = false
 		local away = pos - fromPos
 		local push = if away.Magnitude > 0.1 then away.Unit else dir

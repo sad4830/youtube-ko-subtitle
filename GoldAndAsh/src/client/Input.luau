@@ -5,10 +5,10 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local Debris = game:GetService("Debris")
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Physics = require(Shared.Physics)
 
 local Animator = require(script.Parent.Animator)
 local VFX = require(script.Parent.VFX)
@@ -72,30 +72,9 @@ end
 
 function Input.applyPush(vel: Vector3, duration: number)
 	local _, _, root = char()
-	if not root then
-		return
+	if root then
+		Physics.push(root, vel, duration)
 	end
-	local att = root:FindFirstChild("PushAttachment") :: Attachment?
-	if not att then
-		local a = Instance.new("Attachment")
-		a.Name = "PushAttachment"
-		a.Parent = root
-		att = a
-	end
-	for _, ch in root:GetChildren() do
-		if ch.Name == "LocalPush" then
-			ch:Destroy()
-		end
-	end
-	local lv = Instance.new("LinearVelocity")
-	lv.Name = "LocalPush"
-	lv.Attachment0 = att
-	lv.RelativeTo = Enum.ActuatorRelativeTo.World
-	lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
-	lv.MaxForce = math.huge
-	lv.VectorVelocity = vel
-	lv.Parent = root
-	Debris:AddItem(lv, duration)
 end
 
 ----------------------------------------------------------------------

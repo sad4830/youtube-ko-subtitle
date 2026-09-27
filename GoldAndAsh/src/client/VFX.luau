@@ -729,6 +729,77 @@ handlers.Hit = function(d)
 	end
 end
 
+-- 벽꽝: 벽에 금이 가며 파편이 튀고 먼지가 인다
+handlers.WallSlam = function(d)
+	local pos = d.pos :: Vector3
+	local normal = (d.normal :: Vector3).Unit
+	local up = if math.abs(normal.Y) > 0.9 then Vector3.new(1, 0, 0) else Vector3.new(0, 1, 0)
+	local right = normal:Cross(up).Unit
+	local wallUp = right:Cross(normal).Unit
+	local base = CFrame.fromMatrix(pos, right, wallUp, -normal)
+	-- 금 간 벽면 (방사형 균열 + 튀어나온 돌)
+	for i = 1, 9 do
+		local a = (i / 9) * math.pi * 2 + rng:NextNumber(-0.25, 0.25)
+		local len = rng:NextNumber(2.5, 5)
+		local dir = right * math.cos(a) + wallUp * math.sin(a)
+		local mid = pos + dir * (len / 2) + normal * 0.08
+		local crack = newPart(Vector3.new(0.18, 0.12, len), CFrame.lookAt(mid, mid + dir), Color3.fromRGB(30, 26, 24), Enum.Material.Slate, 0)
+		task.delay(2, function()
+			fadeOut(crack, 0.8)
+		end)
+		local s = rng:NextNumber(0.7, 1.4)
+		local rock = newPart(Vector3.new(s, s * 0.7, s), base * CFrame.new(math.cos(a) * len * 0.45, math.sin(a) * len * 0.45, -0.3) * CFrame.Angles(rng:NextNumber(-1, 1), rng:NextNumber(-1, 1), 0), Color3.fromRGB(110, 100, 94), Enum.Material.Slate, 0)
+		task.delay(1.6, function()
+			fadeOut(rock, 0.8)
+		end)
+	end
+	shardBurst(pos + normal * 0.5, 12, Color3.fromRGB(120, 110, 100), 30, 0.6, 0.8, Enum.Material.Slate, 70, normal)
+	dust(pos + normal * 1.5, 12, 3)
+	ring(pos + normal * 0.2, normal, 2, 12, Color3.fromRGB(230, 220, 205), 0.3, 0.25)
+	Sounds.play("ground_crack", { position = pos, random = 0.08 })
+	Sounds.play("m1_hit_heavy", { position = pos, volume = 0.8, pitch = 0.85 })
+	local lr = rootOf(player.Character)
+	if isLocal(d.model) then
+		CameraFX.shake(0.55)
+		CameraFX.impact(0.6)
+	elseif lr and (lr.Position - pos).Magnitude < 40 then
+		CameraFX.shake(0.2)
+	end
+end
+
+-- 크게 날아가는 동안 몸에 바람 궤적이 붙는다
+handlers.Knockback = function(d)
+	local model = d.model :: Model?
+	local torso = model and model:FindFirstChild("Torso")
+	if not torso or not torso:IsA("BasePart") then
+		return
+	end
+	local color = (d.color :: Color3?) or Color3.new(1, 1, 1)
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(0, 1.2, 0)
+	a0.Parent = torso
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(0, -1.2, 0)
+	a1.Parent = torso
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = a0
+	trail.Attachment1 = a1
+	trail.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
+	trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
+	trail.Lifetime = 0.25
+	trail.LightEmission = 0.5
+	trail.FaceCamera = true
+	trail.Parent = torso
+	Sounds.play("knockback_whoosh", { at = torso, random = 0.1 })
+	local dur = (d.duration :: number?) or 0.7
+	task.delay(dur, function()
+		trail.Enabled = false
+		Debris:AddItem(trail, 0.4)
+		Debris:AddItem(a0, 0.4)
+		Debris:AddItem(a1, 0.4)
+	end)
+end
+
 handlers.Block = function(d)
 	local pos = d.pos :: Vector3
 	flash(pos, 2, Color3.fromRGB(170, 210, 255), 0.12)
@@ -1158,6 +1229,9 @@ handlers.AwakenStart = function(d)
 			ashPuff(root.Position, 40, 4, 30)
 			slashLine(root.Position + Vector3.new(0, 1, 0), 30, RED, 0.5, 0.4, CFrame.new(root.Position + Vector3.new(0, 1, 0)) * CFrame.Angles(0, math.rad(90), 0))
 		end)
+	end
+	if isLocal(model) then
+		CameraFX.cutscene(root, if isLin then 1.6 else 1.4)
 	end
 	local lr = rootOf(player.Character)
 	if lr and (lr.Position - root.Position).Magnitude < 90 then

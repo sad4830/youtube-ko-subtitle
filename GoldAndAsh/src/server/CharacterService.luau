@@ -1,5 +1,7 @@
 --!strict
--- 캐릭터 선택/스폰/부활, 훈련용 허수아비
+-- 캐릭터(무브셋) 선택 / 스폰 / 부활, 킬 기록, 훈련용 허수아비
+-- 가강전처럼 자기 아바타로 싸우고, 캐릭터는 "무브셋 + 무기"로 고른다.
+-- 전투 중이 아니면 살아 있는 상태에서 바로 캐릭터를 바꿀 수 있다.
 
 local Players = game:GetService("Players")
 
@@ -11,6 +13,7 @@ local RigBuilder = require(Shared.RigBuilder)
 
 local Combat = require(script.Parent.Combat)
 local MapService = require(script.Parent.MapService)
+local AvatarService = require(script.Parent.AvatarService)
 
 type Entity = Combat.Entity
 
@@ -18,6 +21,8 @@ local CharacterService = {}
 
 local chosen: { [Player]: string } = {}
 CharacterService.onBotDied = nil :: ((ent: Entity) -> ())?
+
+local COMBAT_LOCK = 5 -- 마지막으로 맞은 뒤 이 시간 동안은 캐릭터 변경 불가
 
 local function clearCharacter(player: Player)
 	local old = player.Character
@@ -27,22 +32,30 @@ local function clearCharacter(player: Player)
 	end
 end
 
+local function plateText(player: Player, def: CharacterDefs.CharDef): string
+	return def.name .. " · " .. player.DisplayName
+end
+
 function CharacterService.spawnPlayer(player: Player, charId: string)
-	if not CharacterDefs.get(charId) or not player.Parent then
+	local def = CharacterDefs.get(charId)
+	if not def or not player.Parent then
 		return
 	end
 	chosen[player] = charId
-	clearCharacter(player)
-	local model = RigBuilder.build(charId)
-	model.Name = player.Name
-	RigBuilder.place(model, MapService.getSpawn())
-	local plate = model:FindFirstChild("Nameplate", true)
-	if plate then
-		local label = plate:FindFirstChild("NameLabel")
-		if label and label:IsA("TextLabel") then
-			label.Text = label.Text .. " · " .. player.DisplayName
-		end
+	local model = AvatarService.spawnModel(player)
+	if not player.Parent then
+		model:Destroy()
+		return
 	end
+	clearCharacter(player)
+	RigBuilder.equip(model, charId)
+	RigBuilder.setNameplate(model, plateText(player, def), def.color)
+	model.Name = player.Name
+	local hum = model:FindFirstChildOfClass("Humanoid") :: Humanoid
+	hum.MaxHealth = def.maxHealth
+	hum.Health = def.maxHealth
+	hum.WalkSpeed = def.walkSpeed
+	RigBuilder.place(model, MapService.getSpawn())
 	player.Character = model
 	model.Parent = workspace
 	local root = model:FindFirstChild("HumanoidRootPart") :: BasePart
@@ -54,30 +67,87 @@ function CharacterService.spawnPlayer(player: Player, charId: string)
 	Combat.fx("Spawn", { model = model, pos = root.Position })
 end
 
--- 클라이언트 요청: 캐릭터 선택
+local function inCombat(ent: Entity): boolean
+	return ent.lastHitBy ~= nil and os.clock() - ent.lastHitTime < COMBAT_LOCK
+end
+
+-- 클라이언트 요청: 캐릭터 선택 (처음이면 스폰, 살아 있으면 그 자리에서 무브셋 교체)
 function CharacterService.select(player: Player, payload: any)
 	local charId = if typeof(payload) == "table" then payload.charId else nil
-	if typeof(charId) ~= "string" or not CharacterDefs.get(charId) then
+	if typeof(charId) ~= "string" then
+		return
+	end
+	local def = CharacterDefs.get(charId)
+	if not def then
 		return
 	end
 	local ent = Combat.fromPlayer(player)
-	if ent and ent.alive and os.clock() - ent.lastHitTime < 5 and ent.lastHitBy ~= nil then
-		Combat.notify(ent, "전투 중에는 캐릭터를 바꿀 수 없다 (5초)", "warn")
+	if ent and ent.alive then
+		if ent.charId == charId then
+			Remotes.Selected:FireClient(player, charId)
+			return
+		end
+		if inCombat(ent) then
+			Combat.notify(ent, "전투 중에는 캐릭터를 바꿀 수 없다 (" .. COMBAT_LOCK .. "초)", "warn")
+			return
+		end
+		chosen[player] = charId
+		Combat.changeCharacter(ent, charId)
+		RigBuilder.setNameplate(ent.model, plateText(player, def), def.color)
+		Remotes.Selected:FireClient(player, charId)
+		return
+	end
+	if ent and not ent.alive then
+		-- 죽어 있는 동안 고르면 부활할 때 적용
+		chosen[player] = charId
+		Remotes.Notify:FireClient(player, def.name .. "(으)로 부활합니다", "info")
 		return
 	end
 	CharacterService.spawnPlayer(player, charId)
 end
 
--- 클라이언트 요청: 선택 화면으로 돌아가기
-function CharacterService.unselect(player: Player)
-	local ent = Combat.fromPlayer(player)
-	if ent and ent.alive and os.clock() - ent.lastHitTime < 5 and ent.lastHitBy ~= nil then
-		Combat.notify(ent, "전투 중에는 나갈 수 없다 (5초)", "warn")
-		return
+----------------------------------------------------------------------
+-- 킬 기록 (리더보드)
+----------------------------------------------------------------------
+local function setupStats(player: Player)
+	local stats = Instance.new("Folder")
+	stats.Name = "leaderstats"
+	local kills = Instance.new("IntValue")
+	kills.Name = "처치"
+	kills.Parent = stats
+	local streak = Instance.new("IntValue")
+	streak.Name = "연속"
+	streak.Parent = stats
+	stats.Parent = player
+end
+
+local function statOf(player: Player?, name: string): IntValue?
+	if not player then
+		return nil
 	end
-	chosen[player] = nil
-	clearCharacter(player)
-	Remotes.Selected:FireClient(player, nil)
+	local stats = player:FindFirstChild("leaderstats")
+	local v = stats and stats:FindFirstChild(name)
+	return if v and v:IsA("IntValue") then v else nil
+end
+
+function CharacterService.recordKill(killer: Entity?, victim: Entity)
+	local vs = statOf(victim.player, "연속")
+	if vs then
+		vs.Value = 0
+	end
+	if killer and killer ~= victim then
+		local k = statOf(killer.player, "처치")
+		if k then
+			k.Value += 1
+		end
+		local s = statOf(killer.player, "연속")
+		if s then
+			s.Value += 1
+			if s.Value >= 3 and killer.player then
+				Remotes.Notify:FireAllClients(killer.player.DisplayName .. " — " .. s.Value .. "연속 처치!", "awaken")
+			end
+		end
+	end
 end
 
 ----------------------------------------------------------------------
@@ -87,15 +157,13 @@ type Dummy = { ent: Entity?, home: CFrame, mode: string }
 local dummies: { Dummy } = {}
 
 local function spawnDummy(d: Dummy)
-	local model = RigBuilder.build("Dummy")
+	local model = RigBuilder.buildDummy()
 	model.Name = if d.mode == "block" then "훈련용 허수아비 (막기)" else "훈련용 허수아비"
-	local plate = model:FindFirstChild("Nameplate", true)
-	if plate then
-		local label = plate:FindFirstChild("NameLabel")
-		if label and label:IsA("TextLabel") then
-			label.Text = model.Name
-		end
-	end
+	RigBuilder.prepare(model, { displayName = model.Name, collisionGroup = "Characters" })
+	local hum = model:FindFirstChildOfClass("Humanoid") :: Humanoid
+	hum.MaxHealth = 200
+	hum.Health = 200
+	hum.WalkSpeed = 0
 	RigBuilder.place(model, d.home)
 	model.Parent = workspace
 	local root = model:FindFirstChild("HumanoidRootPart") :: BasePart
@@ -152,6 +220,8 @@ function CharacterService.init()
 	task.spawn(dummyLoop)
 
 	Combat.onDied = function(ent: Entity)
+		local killer = ent.lastHitBy
+		CharacterService.recordKill(if killer and os.clock() - ent.lastHitTime < 12 then killer else nil, ent)
 		task.wait(Config.RespawnDelay)
 		local player = ent.player
 		if player then
@@ -173,12 +243,23 @@ function CharacterService.init()
 		end
 	end
 
+	local function onPlayer(player: Player)
+		setupStats(player)
+		-- 아바타를 미리 불러와 선택 화면 미리보기를 준비한다
+		task.spawn(AvatarService.base, player)
+	end
+	Players.PlayerAdded:Connect(onPlayer)
+	for _, p in Players:GetPlayers() do
+		onPlayer(p)
+	end
+
 	Players.PlayerRemoving:Connect(function(player)
 		chosen[player] = nil
 		local c = player.Character
 		if c then
 			c:Destroy()
 		end
+		AvatarService.forget(player)
 	end)
 end
 

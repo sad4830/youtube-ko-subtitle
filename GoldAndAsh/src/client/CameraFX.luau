@@ -12,6 +12,16 @@ local fovOffset = 0
 local fovTarget = 0
 local baseFov = 70
 
+local cutsceneTarget: BasePart? = nil
+local cutsceneUntil = 0
+local cutsceneLength = 1
+
+function CameraFX.cutscene(target: BasePart, duration: number)
+	cutsceneTarget = target
+	cutsceneLength = duration
+	cutsceneUntil = os.clock() + duration
+end
+
 local cc: ColorCorrectionEffect
 local veilCC: ColorCorrectionEffect
 local blur: BlurEffect
@@ -37,6 +47,18 @@ function CameraFX.init()
 		fovOffset += (fovTarget - fovOffset) * math.min(1, dt * 14)
 		fovTarget += (0 - fovTarget) * math.min(1, dt * 6)
 		cam.FieldOfView = baseFov + fovOffset
+		-- 각성 컷신: 잠깐 카메라가 캐릭터 정면으로 돌아 들어간다
+		local target = cutsceneTarget
+		if target and os.clock() < cutsceneUntil and target.Parent then
+			local k = 1 - (cutsceneUntil - os.clock()) / cutsceneLength
+			local cf = target.CFrame
+			local side = math.sin(k * math.pi) * 4
+			local dist = 11 - k * 3.5
+			local eye = cf.Position + cf.LookVector * dist + cf.RightVector * side + Vector3.new(0, 2.4 - k * 0.8, 0)
+			cam.CFrame = CFrame.lookAt(eye, cf.Position + Vector3.new(0, 1.3, 0))
+		elseif target then
+			cutsceneTarget = nil
+		end
 		if trauma > 0 then
 			local s = trauma * trauma
 			local t = os.clock() * 38

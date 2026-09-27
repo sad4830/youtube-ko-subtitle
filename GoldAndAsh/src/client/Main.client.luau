@@ -76,10 +76,23 @@ end)
 Remotes.Ragdoll.OnClientEvent:Connect(function(on: boolean)
 	local c = player.Character
 	local hum = c and c:FindFirstChildOfClass("Humanoid")
+	local root = c and c:FindFirstChild("HumanoidRootPart")
 	if hum then
 		if on then
 			hum:ChangeState(Enum.HumanoidStateType.Physics)
 		else
+			-- 넘어진 몸을 똑바로 세운 뒤 일어난다 (옆으로 누운 채 튀어 오르는 현상 방지)
+			if root and root:IsA("BasePart") then
+				local pos = root.Position
+				local look = root.CFrame.LookVector * Vector3.new(1, 0, 1)
+				if look.Magnitude < 0.1 then
+					look = Vector3.new(0, 0, -1)
+				end
+				local up = pos + Vector3.new(0, 1.2, 0)
+				root.AssemblyLinearVelocity = Vector3.zero
+				root.AssemblyAngularVelocity = Vector3.zero
+				root.CFrame = CFrame.lookAt(up, up + look.Unit)
+			end
 			hum:ChangeState(Enum.HumanoidStateType.GettingUp)
 		end
 	end
@@ -114,7 +127,7 @@ end
 
 local function enterSelect()
 	selecting = true
-	UI.showSelect(true)
+	UI.showSelect(true, false)
 	UI.setDead(false)
 	Sounds.playMusic("lobby")
 	local cam = workspace.CurrentCamera

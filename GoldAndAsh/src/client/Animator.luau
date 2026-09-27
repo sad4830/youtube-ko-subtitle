@@ -44,6 +44,8 @@ type Rig = {
 	humanoid: Humanoid?,
 	charId: string,
 	motors: { [string]: Motor6D },
+	jointRot: { [string]: CFrame }, -- 관절 C0 의 회전 (기본 R6 아바타는 C0 가 돌아가 있다)
+	jointRotInv: { [string]: CFrame },
 	idle: Compiled?,
 	idleTime: number,
 	runPhase: number,
@@ -74,6 +76,7 @@ local JOINT_ORDER = { "Root", "Neck", "RS", "LS", "RH", "LH", "W" }
 local PROP_NAMES = { "StaffHand", "StaffBack", "KatanaHand", "KatanaSheathed" }
 
 local rigs: { [Model]: Rig } = {}
+local watched: { [Model]: boolean } = {}
 local compiledCache: { [string]: Compiled } = {}
 
 local ZERO6: Vec6 = { 0, 0, 0, 0, 0, 0 }
@@ -279,10 +282,17 @@ function Animator.register(model: Model): Rig?
 		return nil
 	end
 	local motors: { [string]: Motor6D } = {}
+	local jointRot: { [string]: CFrame } = {}
+	local jointRotInv: { [string]: CFrame } = {}
 	for key, motorName in JOINT_MOTORS do
 		local m = model:FindFirstChild(motorName, true)
 		if m and m:IsA("Motor6D") then
 			motors[key] = m
+			-- 포즈 값은 "부모 파트 기준 회전"으로 적혀 있으므로, C0 의 회전으로 켤레 변환해서 Transform 에 넣는다
+			--   Transform = R0⁻¹ · Pose · R0   (R0 = C0 의 회전)
+			local r = m.C0.Rotation
+			jointRot[key] = r
+			jointRotInv[key] = r:Inverse()
 		end
 	end
 	if not motors.Root then
@@ -323,6 +333,8 @@ function Animator.register(model: Model): Rig?
 		humanoid = hum,
 		charId = cid,
 		motors = motors,
+		jointRot = jointRot,
+		jointRotInv = jointRotInv,
 		idle = compile("idle_" .. cid) or compile("idle_Dummy"),
 		idleTime = math.random() * 2,
 		runPhase = 0,
@@ -340,12 +352,40 @@ function Animator.register(model: Model): Rig?
 		manual = false,
 	}
 	rigs[model] = rig
-	model.AncestryChanged:Connect(function(_, parent)
-		if parent == nil then
-			rigs[model] = nil
-		end
-	end)
+	if not watched[model] then
+		watched[model] = true
+		model.AncestryChanged:Connect(function(_, parent)
+			if parent == nil then
+				rigs[model] = nil
+				watched[model] = nil
+			end
+		end)
+		-- 캐릭터(무기)를 바꾸면 관절·소품을 다시 찾는다
+		model:GetAttributeChangedSignal("GearVersion"):Connect(function()
+			task.delay(0.15, function()
+				if model.Parent then
+					Animator.refresh(model)
+				end
+			end)
+		end)
+	end
 	return rig
+end
+
+function Animator.refresh(model: Model)
+	local old = rigs[model]
+	if old then
+		local cur = old.current
+		if cur then
+			endTrack(old, cur)
+		end
+	end
+	rigs[model] = nil
+	local rig = Animator.register(model)
+	if rig and old then
+		rig.manual = old.manual
+		rig.grounded = old.grounded
+	end
 end
 
 function Animator.play(model: Model, name: string, speed: number?)
@@ -624,7 +664,9 @@ local function stepRig(rig: Rig, dt: number, now: number)
 
 	for j, motor in rig.motors do
 		if motor.Enabled then
-			motor.Transform = toCFrame(pose[j] or ZERO6)
+			local cf = toCFrame(pose[j] or ZERO6)
+			local r = rig.jointRot[j]
+			motor.Transform = if r then rig.jointRotInv[j] * cf * r else cf
 		end
 	end
 end
