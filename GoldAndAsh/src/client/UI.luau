@@ -132,6 +132,8 @@ end
 type Preview = { model: Model?, world: WorldModel, vp: ViewportFrame, angle: number, charId: string, pick: TextButton? }
 local previews: { Preview } = {}
 local closeButton: TextButton
+local pendingSelect = false
+local errorBox: TextButton
 
 -- 미리보기: 내 로블록스 아바타(서버가 올려 준 복제본)에 캐릭터 무기를 들려서 보여 준다
 local function avatarSource(): Model?
@@ -249,11 +251,23 @@ local function buildCard(parent: Instance, def: CharacterDefs.CharDef, xScale: n
 	pick.Font = FONT_HEAVY
 	preview.pick = pick
 	pick.Activated:Connect(function()
+		if pendingSelect then
+			return
+		end
 		Sounds.play("ui_confirm", {})
+		pendingSelect = true
+		pick.Text = "불러오는 중..."
 		local cb = UI.onSelect
 		if cb then
 			cb(def.id)
 		end
+		task.delay(15, function()
+			if pendingSelect then
+				pendingSelect = false
+				pick.Text = "이 캐릭터로 싸운다"
+				UI.notify("서버 응답이 없어요 — 다시 눌러 주세요 (화면 아래 빨간 글씨가 있으면 캡처해 주세요)", "warn")
+			end
+		end)
 	end)
 	card.MouseEnter:Connect(function()
 		TweenService:Create(scale, TweenInfo.new(0.15), { Scale = 1.03 }):Play()
@@ -477,7 +491,8 @@ local function buildHud()
 	cs.Parent = comboLabel
 
 	-- 알림
-	notifyLabel = label(hud, "Notify", "", UDim2.new(0, 600, 0, 30), UDim2.new(0.5, -300, 0.2, 0), 20, WHITE, FONT_HEAVY)
+	notifyLabel = label(gui, "Notify", "", UDim2.new(0, 600, 0, 30), UDim2.new(0.5, -300, 0.2, 0), 20, WHITE, FONT_HEAVY)
+	notifyLabel.ZIndex = 20
 	notifyLabel.TextStrokeTransparency = 0.3
 	notifyLabel.TextTransparency = 1
 
@@ -592,6 +607,7 @@ function UI.isSelectOpen(): boolean
 end
 
 function UI.setCharacter(charId: string?)
+	pendingSelect = false
 	currentChar = charId
 	table.clear(cooldownEnds)
 	local def = if charId then CharacterDefs.get(charId) else nil
@@ -719,6 +735,12 @@ end
 
 function UI.awakenReady()
 	awStroke.Transparency = 0
+end
+
+-- 오류를 화면 아래에 빨간 글씨로 보여 준다 (누르면 닫힘)
+function UI.showError(text: string)
+	errorBox.Text = "⚠ 오류 (이 부분을 캡처해서 보내 주세요)\n" .. string.sub(text, -1200)
+	errorBox.Visible = true
 end
 
 function UI.toggleHelp()
@@ -857,6 +879,26 @@ function UI.init()
 	gui.Parent = player:WaitForChild("PlayerGui")
 	buildSelect()
 	buildHud()
+	errorBox = Instance.new("TextButton")
+	errorBox.Name = "Errors"
+	errorBox.AutoButtonColor = false
+	errorBox.Size = UDim2.new(0.62, 0, 0, 150)
+	errorBox.Position = UDim2.new(0.19, 0, 1, -160)
+	errorBox.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+	errorBox.BackgroundTransparency = 0.15
+	errorBox.TextColor3 = Color3.fromRGB(255, 120, 120)
+	errorBox.Font = Enum.Font.Code
+	errorBox.TextSize = 13
+	errorBox.TextWrapped = true
+	errorBox.TextXAlignment = Enum.TextXAlignment.Left
+	errorBox.TextYAlignment = Enum.TextYAlignment.Top
+	errorBox.ZIndex = 50
+	errorBox.Visible = false
+	errorBox.Parent = gui
+	corner(errorBox, 8)
+	errorBox.Activated:Connect(function()
+		errorBox.Visible = false
+	end)
 	UI.showSelect(true)
 	RunService.RenderStepped:Connect(update)
 end

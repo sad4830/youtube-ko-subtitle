@@ -169,7 +169,24 @@ Remotes.Selected.OnClientEvent:Connect(function(charId: string?)
 	if charId then
 		enterGame(charId)
 	else
-		enterSelect()
+		-- 오류가 나면 화면에 표시 (서버 오류는 ReplicatedStorage.ServerErrors 로 전달된다)
+game:GetService("ScriptContext").Error:Connect(function(message: string, trace: string)
+	UI.showError("클라이언트: " .. message .. "\n" .. trace)
+end)
+task.spawn(function()
+	local v = game:GetService("ReplicatedStorage"):WaitForChild("ServerErrors", 30)
+	if v and v:IsA("StringValue") then
+		local function show()
+			if v.Value ~= "" then
+				UI.showError("서버: " .. v.Value)
+			end
+		end
+		show()
+		v.Changed:Connect(show)
+	end
+end)
+
+enterSelect()
 	end
 end)
 
@@ -225,6 +242,40 @@ RunService.Heartbeat:Connect(function()
 				end
 			end
 		end
+	end
+end)
+
+-- 오류가 나면 화면에 표시 (서버 오류는 ReplicatedStorage.ServerErrors 로 전달된다)
+game:GetService("ScriptContext").Error:Connect(function(message: string, trace: string)
+	UI.showError("클라이언트: " .. message .. "\n" .. trace)
+end)
+task.spawn(function()
+	local v = game:GetService("ReplicatedStorage"):WaitForChild("ServerErrors", 30)
+	if v and v:IsA("StringValue") then
+		local function show()
+			if v.Value ~= "" then
+				UI.showError("서버: " .. v.Value)
+			end
+		end
+		show()
+		v.Changed:Connect(show)
+	end
+end)
+
+-- 오류가 나면 화면에 표시 (서버 오류는 ReplicatedStorage.ServerErrors 로 전달된다)
+game:GetService("ScriptContext").Error:Connect(function(message: string, trace: string)
+	UI.showError("클라이언트: " .. message .. "\n" .. trace)
+end)
+task.spawn(function()
+	local v = game:GetService("ReplicatedStorage"):WaitForChild("ServerErrors", 30)
+	if v and v:IsA("StringValue") then
+		local function show()
+			if v.Value ~= "" then
+				UI.showError("서버: " .. v.Value)
+			end
+		end
+		show()
+		v.Changed:Connect(show)
 	end
 end)
 

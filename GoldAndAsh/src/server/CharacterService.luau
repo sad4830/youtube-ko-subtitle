@@ -177,11 +177,9 @@ local function spawnDummy(d: Dummy)
 	end
 end
 
-local function dummyLoop()
-	while true do
-		task.wait(0.5)
-		local t = os.clock()
-		for _, d in dummies do
+local function dummyTick()
+	local t = os.clock()
+	for _, d in dummies do
 			local ent = d.ent
 			if not ent or not ent.model.Parent then
 				spawnDummy(d)
@@ -202,6 +200,15 @@ local function dummyLoop()
 					ent.humanoid.Health = ent.humanoid.MaxHealth
 				end
 			end
+		end
+end
+
+local function dummyLoop()
+	while true do
+		task.wait(0.5)
+		local ok, err = pcall(dummyTick :: any)
+		if not ok and Combat.onError then
+			Combat.onError("허수아비", err)
 		end
 	end
 end
@@ -246,7 +253,12 @@ function CharacterService.init()
 	local function onPlayer(player: Player)
 		setupStats(player)
 		-- 아바타를 미리 불러와 선택 화면 미리보기를 준비한다
-		task.spawn(AvatarService.base, player)
+		task.spawn(function()
+			local ok, err = pcall(AvatarService.base, player)
+			if not ok and Combat.onError then
+				Combat.onError("아바타 불러오기", err)
+			end
+		end)
 	end
 	Players.PlayerAdded:Connect(onPlayer)
 	for _, p in Players:GetPlayers() do

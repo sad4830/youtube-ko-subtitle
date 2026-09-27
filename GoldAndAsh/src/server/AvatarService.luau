@@ -21,14 +21,33 @@ previews.Parent = ReplicatedStorage
 
 local SKIN = Color3.fromRGB(234, 184, 146)
 
+-- 로블록스 API 호출이 멈춰 버려도 게임이 영원히 기다리지 않도록 시간 제한을 둔다
+local function withTimeout(seconds: number, fn: () -> any): (boolean, any)
+	local done = false
+	local ok = false
+	local result: any = nil
+	task.spawn(function()
+		ok, result = pcall(fn)
+		done = true
+	end)
+	local t0 = os.clock()
+	while not done and os.clock() - t0 < seconds do
+		task.wait(0.1)
+	end
+	if not done then
+		return false, "시간 초과"
+	end
+	return ok, result
+end
+
 local function fromDescription(desc: HumanoidDescription): Model?
-	local ok, model = pcall(function()
+	local ok, model = withTimeout(10, function()
 		return Players:CreateHumanoidModelFromDescriptionAsync(desc, Enum.HumanoidRigType.R6)
 	end)
-	if ok and model then
+	if ok and typeof(model) == "Instance" and model:IsA("Model") then
 		return model
 	end
-	warn("[AvatarService] 아바타 모델 생성 실패: " .. tostring(model))
+	warn("[AvatarService] 아바타 모델 생성 실패 → 기본 모양 사용: " .. tostring(model))
 	return nil
 end
 
@@ -49,11 +68,13 @@ end
 local function buildFor(player: Player): Model
 	local model: Model? = nil
 	if player.UserId > 0 then
-		local ok, desc = pcall(function()
+		local ok, desc = withTimeout(8, function()
 			return Players:GetHumanoidDescriptionFromUserIdAsync(player.UserId)
 		end)
-		if ok and desc then
+		if ok and typeof(desc) == "Instance" and desc:IsA("HumanoidDescription") then
 			model = fromDescription(desc)
+		else
+			warn("[AvatarService] 아바타 정보 불러오기 실패 → 기본 모양 사용: " .. tostring(desc))
 		end
 	end
 	if not model then
@@ -76,7 +97,16 @@ function AvatarService.base(player: Player): Model
 		return cached
 	end
 	loading[id] = true
-	local model = buildFor(player)
+	local ok, built = pcall(buildFor, player)
+	local model: Model
+	if ok and built then
+		model = built
+	else
+		warn("[AvatarService] 아바타 준비 중 오류 → 기본 모양 사용: " .. tostring(built))
+		model = RigBuilder.buildFallback({ head = SKIN, torso = Color3.fromRGB(40, 120, 200), arms = SKIN, legs = Color3.fromRGB(60, 60, 70) })
+		model.Name = player.Name
+		RigBuilder.prepare(model, { displayName = player.DisplayName, collisionGroup = "Characters" })
+	end
 	cache[id] = model
 	loading[id] = nil
 

@@ -97,6 +97,8 @@ Combat.entities = entities
 Combat.Moves = {} :: { [string]: { [string]: any } }
 -- 사망 시 콜백 (CharacterService 가 등록)
 Combat.onDied = nil :: ((ent: Entity) -> ())?
+-- 오류 보고 콜백 (Main 이 등록 → 화면에 표시)
+Combat.onError = nil :: ((where: string, err: any) -> ())?
 
 local fxFolder = Instance.new("Folder")
 fxFolder.Name = "ServerFX"
@@ -1009,13 +1011,29 @@ local function updateEntity(ent: Entity, dt: number, t: number)
 	end
 end
 
+local function reportError(where: string, err: any)
+	local cb = Combat.onError
+	if cb then
+		cb(where, err)
+	else
+		warn(where, err)
+	end
+end
+
 function Combat.start()
 	RunService.Heartbeat:Connect(function(dt)
 		local t = now()
 		for _, ent in entities do
-			updateEntity(ent, dt, t)
+			-- 한 캐릭터에서 오류가 나도 나머지 전투는 계속 돌아가게
+			local ok, err = pcall(updateEntity :: any, ent, dt, t)
+			if not ok then
+				reportError("전투 갱신 (" .. ent.model.Name .. ")", err)
+			end
 		end
-		stepProjectiles(dt)
+		local ok, err = pcall(stepProjectiles :: any, dt)
+		if not ok then
+			reportError("투사체", err)
+		end
 	end)
 end
 
