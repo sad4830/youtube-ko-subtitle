@@ -2144,6 +2144,58 @@ MUSIC = [
 #  Output
 # =============================================================================================
 
+def _ogg_crc_table() -> list[int]:
+    tbl = []
+    for i in range(256):
+        r = i << 24
+        for _ in range(8):
+            r = ((r << 1) ^ 0x04C11DB7) if r & 0x80000000 else (r << 1)
+            r &= 0xFFFFFFFF
+        tbl.append(r)
+    return tbl
+
+
+_OGG_CRC = _ogg_crc_table()
+
+
+def _ogg_crc(data) -> int:
+    crc, tbl = 0, _OGG_CRC
+    for byte in data:
+        crc = ((crc << 8) & 0xFFFFFFFF) ^ tbl[((crc >> 24) ^ byte) & 0xFF]
+    return crc
+
+
+def _fix_ogg_serial(path: Path) -> None:
+    """libsndfile picks a random (time-seeded) Ogg stream serial number, so identical audio would give
+    different bytes on every run. Rewrite it to a value derived from the file name (and redo page CRCs)
+    so that re-running the generator produces byte-identical files."""
+    serial = (zlib.crc32(path.name.encode("utf-8")) & 0x7FFFFFFF).to_bytes(4, "little")
+    b = bytearray(path.read_bytes())
+    i = 0
+    while i + 27 <= len(b):
+        if b[i:i + 4] != b"OggS":
+            raise ValueError(f"{path}: unexpected Ogg page layout")
+        nseg = b[i + 26]
+        end = i + 27 + nseg + sum(b[i + 27:i + 27 + nseg])
+        b[i + 14:i + 18] = serial
+        b[i + 22:i + 26] = b"\0\0\0\0"
+        b[i + 22:i + 26] = _ogg_crc(memoryview(b)[i:end]).to_bytes(4, "little")
+        i = end
+    path.write_bytes(bytes(b))
+
+
+def match_loop_seam(y: np.ndarray, ms: float = 25.0) -> np.ndarray:
+    """Bend the last few ms of a loop so its final sample meets the first one (no click when Looped)."""
+    n = max(2, int(SR * ms / 1000))
+    y = y.copy()
+    ramp = np.linspace(0.0, 1.0, n)
+    if y.ndim == 1:
+        y[-n:] += (y[0] - y[-1]) * ramp
+    else:
+        y[-n:] += (y[0] - y[-1])[None, :] * ramp[:, None]
+    return y
+
+
 def write_ogg(path: Path, data: np.ndarray, level: float) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data = np.clip(data, -1.0, 1.0).astype(np.float32)
@@ -2157,6 +2209,7 @@ def write_ogg(path: Path, data: np.ndarray, level: float) -> None:
     with f:
         for i in range(0, len(data), 16384):
             f.write(data[i:i + 16384])
+    _fix_ogg_serial(path)
 
 
 def fmt(x: float) -> str:
@@ -2263,6 +2316,7 @@ def main() -> int:
         for key, fname, fn in MUSIC:
             t0 = time.time()
             y, song = fn()
+            y = match_loop_seam(y)
             write_ogg(OUT_DIR / fname, y, MUSIC_VORBIS_LEVEL)
             if args.wav_dir:
                 sf.write(str(args.wav_dir / fname.replace(".ogg", ".wav")), y.astype(np.float32), SR, subtype="FLOAT")
