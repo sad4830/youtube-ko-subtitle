@@ -11,6 +11,16 @@ export type MoveDef = {
 	cooldown: number,
 }
 
+-- 영어 번역 (선택 화면·HUD·각성 타이틀에서 언어에 맞춰 골라 쓴다)
+export type EnText = {
+	name: string,
+	title: string,
+	quote: string,
+	blurb: string,
+	moves: { [string]: { name: string, desc: string } },
+	awakening: { name: string, sub: string, desc: string, quote: string },
+}
+
 export type CharDef = {
 	id: string,
 	name: string,
@@ -29,6 +39,7 @@ export type CharDef = {
 	awakenedMoves: { MoveDef },
 	awakening: { name: string, sub: string, desc: string, quote: string },
 	music: string,
+	en: EnText,
 }
 
 local LinYuan: CharDef = {
@@ -104,6 +115,52 @@ local LinYuan: CharDef = {
 		quote = "“이제 알겠어요. 제가 누구인지.”",
 	},
 	music = "lin_awaken",
+	en = {
+		name = "Lin Yuan",
+		title = "The Golden Returner",
+		quote = "“Let's all go home together. Before the food gets cold.”",
+		blurb = "A staff-and-palm master raised in a noodle shop. Stays rooted with a low stance and core rotation, and lets incoming force flow right back out.",
+		moves = {
+			GoldenPalm = {
+				name = "Qi Form · Golden Palm",
+				desc = "Hardens spirit energy into a giant golden palm and thrusts it forward. Enemies hit are sent flying.",
+			},
+			Redirect = {
+				name = "Flow Reversal",
+				desc = "A receiving stance. If a melee attack or projectile lands during the window, its force is turned back.",
+			},
+			StaffSpin = {
+				name = "Staff Art · Heaven Spin",
+				desc = "Draws the wooden staff and spins, sweeping the area three times. The last hit launches.",
+			},
+			Kneading = {
+				name = "A Thousand Kneads",
+				desc = "A barrage from dough-kneading hands, finished with a staff blow that sends the enemy flying.",
+			},
+			DragonClaw = {
+				name = "Dragon Claw",
+				desc = "Each punch extends a golden dragon's claw far in the same direction.",
+			},
+			DragonCoil = {
+				name = "Dragon Coil",
+				desc = "The dragon coils around the body and absorbs attacks, then blasts everything away when it ends.",
+			},
+			RisingDragon = {
+				name = "Rising Dragon",
+				desc = "A rising palm strike as the dragon soars, dragging the enemy skyward and slamming them down.",
+			},
+			GoldenReturn = {
+				name = "Return of the Golden Dragon",
+				desc = "Max output. A 20m dragon circles the battlefield. Ends the awakening and leaves you exhausted.",
+			},
+		},
+		awakening = {
+			name = "MIND, QI & BODY AS ONE",
+			sub = "心氣體一 — Dragon Warrior",
+			desc = "Body, mind and qi become one, manifesting the golden dragon's outer form. Spirit energy is unusable for a while afterwards.",
+			quote = "“Now I get it. Who I am.”",
+		},
+	},
 }
 
 local KanzakiRen: CharDef = {
@@ -179,7 +236,55 @@ local KanzakiRen: CharDef = {
 		quote = "“시끄러워. 전부 정리한다.”",
 	},
 	music = "ren_awaken",
+	en = {
+		name = "Kanzaki Ren",
+		title = "Ashmark · Ash Scar",
+		quote = "“As long as there's something left to clean up, the blade stays out.”",
+		blurb = "A field-termination agent. The blade turns any non-living matter it cuts into black ash, stores it in the scabbard, and fires it back as straight slashes.",
+		moves = {
+			Peel = {
+				name = "Flameless Peel",
+				desc = "Lunges in with a quick-draw slash. Cutting enemy gear or nearby objects grants +2 Ash.",
+			},
+			AshReturn = {
+				name = "Ash Return",
+				desc = "Spends scabbard Ash (max 3) to fire a straight slash. More Ash = longer and wider.",
+			},
+			SideShave = {
+				name = "Side Shave",
+				desc = "Spends 1 Ash for a low slash that skims the ground. Knocks down on hit.",
+			},
+			AshVeil = {
+				name = "Ash Veil",
+				desc = "Scatters 1 Ash into a black dust cloud that blinds enemies inside it.",
+			},
+			ChainReturn = {
+				name = "Chain Return",
+				desc = "Fires three ash slashes in a fan, one after another.",
+			},
+			Severance = {
+				name = "Severance Line",
+				desc = "Cuts straight through the enemy; the line left behind explodes a beat later.",
+			},
+			VeilHunt = {
+				name = "Ash Veil · Hunt",
+				desc = "Spreads a wide dust cloud and moves fast inside it, sensing enemies in the dust.",
+			},
+			MaxOutput = {
+				name = "Ten-Seal Max Output",
+				desc = "Sheathes the blade, lights all ten seal lines, then unleashes a giant quick-draw slash. Abilities lock briefly after.",
+			},
+		},
+		awakening = {
+			name = "FLAMELESS SEVERANCE · FULL DRAW",
+			sub = "無炎裁斷 — 全力拔刀",
+			desc = "The scabbard fills with Ash that never scatters. A game-only awakened mode — in canon, this power has not awakened yet.",
+			quote = "“Shut up. I'm cleaning all of it up.”",
+		},
+	},
 }
+
+local Locale = require(script.Parent.Locale)
 
 local CharacterDefs = {
 	LinYuan = LinYuan,
@@ -194,6 +299,41 @@ function CharacterDefs.get(id: string): CharDef?
 		return KanzakiRen
 	end
 	return nil
+end
+
+-- 현재 언어에 맞는 글자들
+export type Texts = {
+	name: string,
+	title: string,
+	quote: string,
+	blurb: string,
+	awakening: { name: string, sub: string, desc: string, quote: string },
+}
+
+function CharacterDefs.texts(def: CharDef, lang: Locale.Lang?): Texts
+	if (lang or Locale.lang) == "en" then
+		local e = def.en
+		return { name = e.name, title = e.title, quote = e.quote, blurb = e.blurb, awakening = e.awakening }
+	end
+	return { name = def.name, title = def.title, quote = def.quote, blurb = def.blurb, awakening = def.awakening }
+end
+
+function CharacterDefs.moveName(def: CharDef, mv: MoveDef, lang: Locale.Lang?): string
+	if (lang or Locale.lang) == "en" then
+		local e = def.en.moves[mv.id]
+		if e then
+			return e.name
+		end
+	end
+	return mv.name
+end
+
+-- 서버가 인자로 보낼 때 쓰는 두 언어 이름 ({ ko, en })
+function CharacterDefs.names(def: CharDef?): { ko: string, en: string }
+	if not def then
+		return { ko = "?", en = "?" }
+	end
+	return { ko = def.name, en = def.en.name }
 end
 
 function CharacterDefs.moveList(def: CharDef, awakened: boolean): { MoveDef }

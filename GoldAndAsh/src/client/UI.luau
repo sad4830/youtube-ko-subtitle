@@ -10,10 +10,10 @@ local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
-local Config = require(Shared.Config)
 local CharacterDefs = require(Shared.CharacterDefs)
 local RigBuilder = require(Shared.RigBuilder)
 local Sounds = require(Shared.Sounds)
+local Locale = require(Shared.Locale)
 
 local Animator = require(script.Parent.Animator)
 local CameraFX = require(script.Parent.CameraFX)
@@ -84,6 +84,16 @@ local function label(parent: Instance, name: string, text: string, size: UDim2, 
 	return l
 end
 
+-- 긴 글(영어가 더 길다)이 칸을 넘치면 글자를 줄여서 맞춘다
+local function fit(l: TextLabel, maxSize: number): TextLabel
+	l.TextScaled = true
+	local c = Instance.new("UITextSizeConstraint")
+	c.MaxTextSize = maxSize
+	c.MinTextSize = math.min(9, maxSize)
+	c.Parent = l
+	return l
+end
+
 local function button(parent: Instance, name: string, text: string, size: UDim2, pos: UDim2, color: Color3, textSize: number?): TextButton
 	local b = Instance.new("TextButton")
 	b.Name = name
@@ -102,6 +112,21 @@ local function button(parent: Instance, name: string, text: string, size: UDim2,
 		Sounds.play("ui_hover", { volume = 0.5 })
 	end)
 	return b
+end
+
+-- 언어가 바뀌면 다시 칠할 글자들 (HUD 쪽 고정 글자)
+type Binding = { inst: Instance, key: string, args: { [string]: any }? }
+local bound: { Binding } = {}
+
+local function setText(inst: Instance, text: string)
+	local obj: any = inst
+	obj.Text = text
+end
+
+local function tr<T>(inst: T & Instance, key: string, args: { [string]: any }?): T
+	table.insert(bound, { inst = inst, key = key, args = args })
+	setText(inst, Locale.t(key, args))
+	return inst
 end
 
 local function action(name: string, payload: any)
@@ -169,8 +194,9 @@ local function setPreviewModel(p: Preview)
 	p.model = model
 end
 
-local function statBar(parent: Instance, y: number, name: string, value: number, color: Color3)
-	label(parent, "Stat" .. name, name, UDim2.new(0, 60, 0, 16), UDim2.new(0, 0, 0, y), 13, MUTED, FONT).TextXAlignment = Enum.TextXAlignment.Left
+local function statBar(parent: Instance, y: number, key: string, value: number, color: Color3)
+	local name = key
+	label(parent, "Stat" .. name, Locale.t("stat." .. key), UDim2.new(0, 60, 0, 16), UDim2.new(0, 0, 0, y), 13, MUTED, FONT).TextXAlignment = Enum.TextXAlignment.Left
 	local back = frame(parent, "Bar" .. name, UDim2.new(1, -70, 0, 8), UDim2.new(0, 66, 0, y + 4), Color3.fromRGB(40, 38, 44))
 	corner(back, 4)
 	local fill = frame(back, "Fill", UDim2.new(value / 5, 0, 1, 0), UDim2.new(0, 0, 0, 0), color)
@@ -218,35 +244,36 @@ local function buildCard(parent: Instance, def: CharacterDefs.CharDef, xScale: n
 	table.insert(previews, preview)
 	setPreviewModel(preview)
 
+	local tx = CharacterDefs.texts(def)
 	local y0 = 0.43
 	local info = frame(card, "Info", UDim2.new(1, -28, 0.57, -70), UDim2.new(0, 14, y0, 6), PANEL, 1)
-	local nameL = label(info, "Name", def.name, UDim2.new(1, 0, 0, 34), UDim2.new(0, 0, 0, 0), 30, WHITE, FONT_HEAVY)
+	local nameL = label(info, "Name", tx.name, UDim2.new(1, 0, 0, 34), UDim2.new(0, 0, 0, 0), 30, WHITE, FONT_HEAVY)
 	nameL.TextXAlignment = Enum.TextXAlignment.Left
-	local code = label(info, "Code", def.nameEn .. "  ·  " .. def.code, UDim2.new(1, 0, 0, 16), UDim2.new(0, 0, 0, 34), 12, MUTED, FONT)
+	local code = label(info, "Code", (if Locale.lang == "ko" then def.nameEn else def.name) .. "  ·  " .. def.code, UDim2.new(1, 0, 0, 16), UDim2.new(0, 0, 0, 34), 12, MUTED, FONT)
 	code.TextXAlignment = Enum.TextXAlignment.Left
-	local title = label(info, "Title", def.title, UDim2.new(1, 0, 0, 20), UDim2.new(0, 0, 0, 52), 16, def.color, FONT)
+	local title = fit(label(info, "Title", tx.title, UDim2.new(1, 0, 0, 20), UDim2.new(0, 0, 0, 52), 16, def.color, FONT), 16)
 	title.TextXAlignment = Enum.TextXAlignment.Left
-	local quote = label(info, "Quote", def.quote, UDim2.new(1, 0, 0, 18), UDim2.new(0, 0, 0, 74), 13, def.accent, FONT_BODY)
+	local quote = fit(label(info, "Quote", tx.quote, UDim2.new(1, 0, 0, 18), UDim2.new(0, 0, 0, 74), 13, def.accent, FONT_BODY), 13)
 	quote.TextXAlignment = Enum.TextXAlignment.Left
-	local blurb = label(info, "Blurb", def.blurb, UDim2.new(1, 0, 0, 36), UDim2.new(0, 0, 0, 96), 12, Color3.fromRGB(210, 204, 200), FONT_BODY)
+	local blurb = fit(label(info, "Blurb", tx.blurb, UDim2.new(1, 0, 0, 38), UDim2.new(0, 0, 0, 96), 12, Color3.fromRGB(210, 204, 200), FONT_BODY), 12)
 	blurb.TextXAlignment = Enum.TextXAlignment.Left
 	blurb.TextYAlignment = Enum.TextYAlignment.Top
 
 	local stats = frame(info, "Stats", UDim2.new(1, 0, 0, 80), UDim2.new(0, 0, 0, 138), PANEL, 1)
-	statBar(stats, 0, "파워", def.stats.power, def.color)
-	statBar(stats, 18, "속도", def.stats.speed, def.color)
-	statBar(stats, 36, "사거리", def.stats.range, def.color)
-	statBar(stats, 54, "난이도", def.stats.difficulty, Color3.fromRGB(200, 200, 210))
+	statBar(stats, 0, "power", def.stats.power, def.color)
+	statBar(stats, 18, "speed", def.stats.speed, def.color)
+	statBar(stats, 36, "range", def.stats.range, def.color)
+	statBar(stats, 54, "difficulty", def.stats.difficulty, Color3.fromRGB(200, 200, 210))
 
 	local moves = frame(info, "Moves", UDim2.new(1, 0, 0, 110), UDim2.new(0, 0, 0, 216), PANEL, 1)
 	for i, mv in def.moves do
-		local l = label(moves, "Move" .. i, tostring(i) .. "  " .. mv.name, UDim2.new(1, 0, 0, 18), UDim2.new(0, 0, 0, (i - 1) * 19), 13, WHITE, FONT)
+		local l = fit(label(moves, "Move" .. i, tostring(i) .. "  " .. CharacterDefs.moveName(def, mv), UDim2.new(1, 0, 0, 18), UDim2.new(0, 0, 0, (i - 1) * 19), 13, WHITE, FONT), 13)
 		l.TextXAlignment = Enum.TextXAlignment.Left
 	end
-	local aw = label(moves, "Awaken", "G  " .. def.awakening.name .. "  —  " .. def.awakening.sub, UDim2.new(1, 0, 0, 18), UDim2.new(0, 0, 0, 80), 13, def.color, FONT)
+	local aw = fit(label(moves, "Awaken", "G  " .. tx.awakening.name .. "  —  " .. tx.awakening.sub, UDim2.new(1, 0, 0, 18), UDim2.new(0, 0, 0, 80), 13, def.color, FONT), 13)
 	aw.TextXAlignment = Enum.TextXAlignment.Left
 
-	local pick = button(card, "Pick", "이 캐릭터로 싸운다", UDim2.new(1, -28, 0, 46), UDim2.new(0, 14, 1, -58), def.color, 18)
+	local pick = button(card, "Pick", Locale.t(if currentChar == def.id then "select.using" else "select.pick"), UDim2.new(1, -28, 0, 46), UDim2.new(0, 14, 1, -58), def.color, 18)
 	pick.TextColor3 = if def.id == "LinYuan" then Color3.fromRGB(40, 24, 8) else WHITE
 	pick.Font = FONT_HEAVY
 	preview.pick = pick
@@ -256,7 +283,7 @@ local function buildCard(parent: Instance, def: CharacterDefs.CharDef, xScale: n
 		end
 		Sounds.play("ui_confirm", {})
 		pendingSelect = true
-		pick.Text = "불러오는 중..."
+		pick.Text = Locale.t("select.loading")
 		local cb = UI.onSelect
 		if cb then
 			cb(def.id)
@@ -264,8 +291,8 @@ local function buildCard(parent: Instance, def: CharacterDefs.CharDef, xScale: n
 		task.delay(15, function()
 			if pendingSelect then
 				pendingSelect = false
-				pick.Text = "이 캐릭터로 싸운다"
-				UI.notify("서버 응답이 없어요 — 다시 눌러 주세요 (화면 아래 빨간 글씨가 있으면 캡처해 주세요)", "warn")
+				pick.Text = Locale.t("select.pick")
+				UI.notify(Locale.t("select.timeout"), "warn")
 			end
 		end)
 	end)
@@ -289,35 +316,18 @@ local function buildSelect()
 	})
 	g.Transparency = NumberSequence.new(0.1)
 	g.Parent = selectFrame
-	local title = label(selectFrame, "Title", Config.GameTitle, UDim2.new(1, 0, 0, 64), UDim2.new(0, 0, 0.03, 0), 54, WHITE, FONT_HEAVY)
+	local title = label(selectFrame, "Title", Locale.t("game.title"), UDim2.new(1, 0, 0, 64), UDim2.new(0, 0, 0.03, 0), 54, WHITE, FONT_HEAVY)
 	local tg = Instance.new("UIGradient")
 	tg.Color = ColorSequence.new(Color3.fromRGB(255, 210, 110), Color3.fromRGB(230, 60, 60))
 	tg.Parent = title
-	label(selectFrame, "Subtitle", Config.GameSubtitle .. "  ·  내 아바타로 싸울 캐릭터(기술)를 고르세요", UDim2.new(1, 0, 0, 24), UDim2.new(0, 0, 0.03, 66), 18, MUTED, FONT)
-	closeButton = button(selectFrame, "Close", "✕  닫기", UDim2.new(0, 110, 0, 36), UDim2.new(1, -130, 0, 20), Color3.fromRGB(60, 56, 66), 15)
+	label(selectFrame, "Subtitle", Locale.t("game.subtitle") .. "  ·  " .. Locale.t("select.sub"), UDim2.new(1, 0, 0, 24), UDim2.new(0, 0, 0.03, 66), 18, MUTED, FONT)
+	closeButton = button(selectFrame, "Close", Locale.t("select.close"), UDim2.new(0, 110, 0, 36), UDim2.new(1, -130, 0, 20), Color3.fromRGB(60, 56, 66), 15)
 	closeButton.Visible = false
 	closeButton.Activated:Connect(function()
 		UI.showSelect(false)
 	end)
-	-- 서버가 내 아바타 미리보기를 올리면 카드 미리보기를 다시 만든다
-	task.spawn(function()
-		local folder = ReplicatedStorage:WaitForChild("AvatarPreviews", 30)
-		if folder then
-			folder.ChildAdded:Connect(function(child)
-				if child.Name == tostring(player.UserId) then
-					task.wait(0.2)
-					for _, p in previews do
-						setPreviewModel(p)
-					end
-				end
-			end)
-			if avatarSource() then
-				for _, p in previews do
-					setPreviewModel(p)
-				end
-			end
-		end
-	end)
+	local langB = button(selectFrame, "Language", Locale.t("lang.toggle"), UDim2.new(0, 130, 0, 36), UDim2.new(0, 20, 0, 20), Color3.fromRGB(60, 56, 66), 15)
+	langB.Activated:Connect(Locale.toggle)
 	local order = CharacterDefs.Order
 	for i, id in order do
 		local def = CharacterDefs.get(id)
@@ -325,7 +335,7 @@ local function buildSelect()
 			buildCard(selectFrame, def, if i == 1 then 0.32 else 0.68)
 		end
 	end
-	local hint = label(selectFrame, "Hint", "노션 「WACA // 기밀 인물 도감」의 두 요원 · 혼자라면 선택 후 왼쪽 위에서 봇을 소환하세요", UDim2.new(1, 0, 0, 20), UDim2.new(0, 0, 1, -30), 13, MUTED, FONT_BODY)
+	local hint = label(selectFrame, "Hint", Locale.t("select.hint"), UDim2.new(1, 0, 0, 20), UDim2.new(0, 0, 1, -30), 13, MUTED, FONT_BODY)
 	hint.TextTransparency = 0.2
 end
 
@@ -371,7 +381,7 @@ local function buildHud()
 
 	-- 회분 (칸자키 렌)
 	ashRow = frame(bottom, "Ash", UDim2.new(0, 360, 0, 18), UDim2.new(0.5, -180, 0, 0), PANEL, 1)
-	local ashL = label(ashRow, "Label", "회분", UDim2.new(0, 40, 1, 0), UDim2.new(0, 0, 0, 0), 13, Color3.fromRGB(255, 120, 110), FONT)
+	local ashL = tr(label(ashRow, "Label", "", UDim2.new(0, 40, 1, 0), UDim2.new(0, 0, 0, 0), 13, Color3.fromRGB(255, 120, 110), FONT), "hud.ash")
 	ashL.TextXAlignment = Enum.TextXAlignment.Left
 	for i = 1, 10 do
 		local seg = frame(ashRow, "Seg" .. i, UDim2.new(0, 22, 0, 12), UDim2.new(0, 44 + (i - 1) * 26, 0, 3), Color3.fromRGB(40, 36, 40))
@@ -404,7 +414,7 @@ local function buildHud()
 	awStroke = stroke(awBack, Color3.fromRGB(255, 220, 120), 1.5, 1)
 	awFill = frame(awBack, "Fill", UDim2.fromScale(0, 1), UDim2.fromScale(0, 0), Color3.fromRGB(255, 196, 74))
 	corner(awFill, 5)
-	awText = label(bottom, "AwakenText", "각성 0%", UDim2.new(1, 0, 0, 14), UDim2.new(0, 0, 0, 61), 12, MUTED, FONT)
+	awText = label(bottom, "AwakenText", "", UDim2.new(1, 0, 0, 14), UDim2.new(0, 0, 0, 61), 12, MUTED, FONT)
 	awText.TextXAlignment = Enum.TextXAlignment.Right
 
 	-- 기술 단축바
@@ -413,7 +423,7 @@ local function buildHud()
 		corner(sf, 10)
 		local st = stroke(sf, Color3.fromRGB(80, 74, 80), 1.5, 0.2)
 		local key = label(sf, "Key", tostring(i), UDim2.new(0, 22, 0, 22), UDim2.new(0, 6, 0, 5), 16, Color3.fromRGB(255, 220, 150), FONT_HEAVY)
-		local nm = label(sf, "Name", "", UDim2.new(1, -12, 0, 36), UDim2.new(0, 6, 0, 26), 14, WHITE, FONT)
+		local nm = fit(label(sf, "Name", "", UDim2.new(1, -12, 0, 36), UDim2.new(0, 6, 0, 26), 14, WHITE, FONT), 14)
 		nm.TextYAlignment = Enum.TextYAlignment.Top
 		local cd = frame(sf, "CD", UDim2.fromScale(1, 0), UDim2.fromScale(0, 0), Color3.new(0, 0, 0), 0.35)
 		corner(cd, 10)
@@ -435,51 +445,53 @@ local function buildHud()
 	local left = frame(hud, "Left", UDim2.new(0, 200, 0, 92), UDim2.new(0, 16, 1, -16), PANEL, 0.3)
 	left.AnchorPoint = Vector2.new(0, 1)
 	corner(left, 10)
-	local function smallBar(y: number, text: string, color: Color3): Frame
-		local l = label(left, "L" .. text, text, UDim2.new(0, 70, 0, 14), UDim2.new(0, 10, 0, y), 12, MUTED, FONT)
+	local function smallBar(y: number, key: string, color: Color3): Frame
+		local l = tr(label(left, "L" .. key, "", UDim2.new(0, 70, 0, 14), UDim2.new(0, 10, 0, y), 12, MUTED, FONT), key)
 		l.TextXAlignment = Enum.TextXAlignment.Left
-		local back = frame(left, "B" .. text, UDim2.new(1, -90, 0, 8), UDim2.new(0, 80, 0, y + 3), Color3.fromRGB(40, 36, 44))
+		local back = frame(left, "B" .. key, UDim2.new(1, -90, 0, 8), UDim2.new(0, 80, 0, y + 3), Color3.fromRGB(40, 36, 44))
 		corner(back, 4)
 		local fill = frame(back, "Fill", UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), color)
 		corner(fill, 4)
 		return fill
 	end
-	evFill = smallBar(10, "회피 [Q]", Color3.fromRGB(140, 220, 255))
-	guardFill = smallBar(30, "가드 [F]", Color3.fromRGB(180, 200, 255))
-	dashFront = label(left, "DashF", "앞 대시 ✓", UDim2.new(0.5, -10, 0, 16), UDim2.new(0, 10, 0, 54), 12, WHITE, FONT)
+	evFill = smallBar(10, "hud.evasive", Color3.fromRGB(140, 220, 255))
+	guardFill = smallBar(30, "hud.guard", Color3.fromRGB(180, 200, 255))
+	dashFront = label(left, "DashF", "", UDim2.new(0.5, -10, 0, 16), UDim2.new(0, 10, 0, 54), 12, WHITE, FONT)
 	dashFront.TextXAlignment = Enum.TextXAlignment.Left
-	dashSide = label(left, "DashS", "옆 대시 ✓", UDim2.new(0.5, -10, 0, 16), UDim2.new(0.5, 0, 0, 54), 12, WHITE, FONT)
+	dashSide = label(left, "DashS", "", UDim2.new(0.5, -10, 0, 16), UDim2.new(0.5, 0, 0, 54), 12, WHITE, FONT)
 	dashSide.TextXAlignment = Enum.TextXAlignment.Left
-	local tip = label(left, "Tip", "스턴 중 Q = 회피", UDim2.new(1, -20, 0, 14), UDim2.new(0, 10, 0, 72), 11, MUTED, FONT_BODY)
+	local tip = tr(label(left, "Tip", "", UDim2.new(1, -20, 0, 14), UDim2.new(0, 10, 0, 72), 11, MUTED, FONT_BODY), "hud.tip")
 	tip.TextXAlignment = Enum.TextXAlignment.Left
 
 	-- 왼쪽 위: 캐릭터 정보 + 메뉴
-	local top = frame(hud, "TopLeft", UDim2.new(0, 230, 0, 200), UDim2.new(0, 16, 0, 60), PANEL, 0.3)
+	local top = frame(hud, "TopLeft", UDim2.new(0, 230, 0, 214), UDim2.new(0, 16, 0, 60), PANEL, 0.3)
 	corner(top, 10)
 	charName = label(top, "Name", "", UDim2.new(1, -20, 0, 26), UDim2.new(0, 10, 0, 8), 22, WHITE, FONT_HEAVY)
 	charName.TextXAlignment = Enum.TextXAlignment.Left
-	charTitle = label(top, "Title", "", UDim2.new(1, -20, 0, 16), UDim2.new(0, 10, 0, 34), 13, MUTED, FONT)
+	charTitle = fit(label(top, "Title", "", UDim2.new(1, -20, 0, 16), UDim2.new(0, 10, 0, 34), 13, MUTED, FONT), 13)
 	charTitle.TextXAlignment = Enum.TextXAlignment.Left
-	local b1 = button(top, "Change", "캐릭터 변경", UDim2.new(1, -20, 0, 26), UDim2.new(0, 10, 0, 58), Color3.fromRGB(60, 56, 66), 13)
+	local b1 = tr(button(top, "Change", "", UDim2.new(1, -20, 0, 26), UDim2.new(0, 10, 0, 58), Color3.fromRGB(60, 56, 66), 13), "hud.change")
 	b1.Activated:Connect(function()
 		UI.showSelect(true, true)
 	end)
-	local b2 = button(top, "BotLin", "봇 소환 · 린 위안", UDim2.new(1, -20, 0, 26), UDim2.new(0, 10, 0, 88), Color3.fromRGB(150, 110, 30), 13)
+	local b2 = tr(button(top, "BotLin", "", UDim2.new(1, -20, 0, 26), UDim2.new(0, 10, 0, 88), Color3.fromRGB(150, 110, 30), 13), "hud.bot", { char = CharacterDefs.names(CharacterDefs.get("LinYuan")) })
 	b2.Activated:Connect(function()
 		action("SpawnBot", { charId = "LinYuan" })
 	end)
-	local b3 = button(top, "BotRen", "봇 소환 · 칸자키 렌", UDim2.new(1, -20, 0, 26), UDim2.new(0, 10, 0, 118), Color3.fromRGB(140, 30, 36), 13)
+	local b3 = tr(button(top, "BotRen", "", UDim2.new(1, -20, 0, 26), UDim2.new(0, 10, 0, 118), Color3.fromRGB(140, 30, 36), 13), "hud.bot", { char = CharacterDefs.names(CharacterDefs.get("KanzakiRen")) })
 	b3.Activated:Connect(function()
 		action("SpawnBot", { charId = "KanzakiRen" })
 	end)
-	local b4 = button(top, "ClearBots", "봇 모두 제거", UDim2.new(0.5, -14, 0, 26), UDim2.new(0, 10, 0, 148), Color3.fromRGB(50, 48, 54), 12)
+	local b4 = tr(button(top, "ClearBots", "", UDim2.new(0.5, -14, 0, 26), UDim2.new(0, 10, 0, 148), Color3.fromRGB(50, 48, 54), 12), "hud.clear_bots")
 	b4.Activated:Connect(function()
 		action("ClearBots", nil)
 	end)
-	local b5 = button(top, "Help", "조작법 [H]", UDim2.new(0.5, -14, 0, 26), UDim2.new(0.5, 4, 0, 148), Color3.fromRGB(50, 48, 54), 12)
+	local b5 = tr(button(top, "Help", "", UDim2.new(0.5, -14, 0, 26), UDim2.new(0.5, 4, 0, 148), Color3.fromRGB(50, 48, 54), 12), "hud.help")
 	b5.Activated:Connect(function()
 		UI.toggleHelp()
 	end)
+	local b6 = tr(button(top, "Language", "", UDim2.new(1, -20, 0, 26), UDim2.new(0, 10, 0, 180), Color3.fromRGB(50, 48, 54), 12), "lang.toggle")
+	b6.Activated:Connect(Locale.toggle)
 
 	-- 콤보
 	comboLabel = label(hud, "Combo", "", UDim2.new(0, 220, 0, 60), UDim2.new(1, -250, 0.42, 0), 42, WHITE, FONT_HEAVY)
@@ -491,7 +503,7 @@ local function buildHud()
 	cs.Parent = comboLabel
 
 	-- 알림
-	notifyLabel = label(gui, "Notify", "", UDim2.new(0, 600, 0, 30), UDim2.new(0.5, -300, 0.2, 0), 20, WHITE, FONT_HEAVY)
+	notifyLabel = fit(label(gui, "Notify", "", UDim2.new(0, 640, 0, 30), UDim2.new(0.5, -320, 0.2, 0), 20, WHITE, FONT_HEAVY), 20)
 	notifyLabel.ZIndex = 20
 	notifyLabel.TextStrokeTransparency = 0.3
 	notifyLabel.TextTransparency = 1
@@ -513,7 +525,7 @@ local function buildHud()
 	letterBottom = frame(gui, "LetterBottom", UDim2.new(1, 0, 0.12, 0), UDim2.new(0, 0, 1, 0), Color3.new(0, 0, 0))
 	titleCard = frame(gui, "TitleCard", UDim2.new(1, 0, 0, 140), UDim2.new(0, 0, 0.26, 0), PANEL, 1)
 	titleCard.Visible = false
-	local tname = label(titleCard, "Name", "", UDim2.new(1, 0, 0, 70), UDim2.new(0, 0, 0, 0), 64, WHITE, FONT_HEAVY)
+	local tname = fit(label(titleCard, "Name", "", UDim2.new(0.94, 0, 0, 70), UDim2.new(0.03, 0, 0, 0), 64, WHITE, FONT_HEAVY), 64)
 	tname.TextStrokeTransparency = 0.2
 	local tgrad = Instance.new("UIGradient")
 	tgrad.Name = "Grad"
@@ -524,33 +536,20 @@ local function buildHud()
 	-- 사망
 	deathFrame = frame(gui, "Death", UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), Color3.fromRGB(30, 0, 0), 0.6)
 	deathFrame.Visible = false
-	label(deathFrame, "Text", "쓰러졌다", UDim2.new(1, 0, 0, 60), UDim2.new(0, 0, 0.4, 0), 48, WHITE, FONT_HEAVY)
-	label(deathFrame, "Sub", "잠시 후 다시 일어섭니다", UDim2.new(1, 0, 0, 24), UDim2.new(0, 0, 0.4, 62), 18, MUTED, FONT)
+	tr(label(deathFrame, "Text", "", UDim2.new(1, 0, 0, 60), UDim2.new(0, 0, 0.4, 0), 48, WHITE, FONT_HEAVY), "death.title")
+	tr(label(deathFrame, "Sub", "", UDim2.new(1, 0, 0, 24), UDim2.new(0, 0, 0.4, 62), 18, MUTED, FONT), "death.sub")
 
 	-- 조작법
-	helpFrame = frame(gui, "Help", UDim2.new(0, 440, 0, 360), UDim2.new(0.5, -220, 0.5, -180), PANEL, 0.08)
+	helpFrame = frame(gui, "Help", UDim2.new(0, 460, 0, 420), UDim2.new(0.5, -230, 0.5, -210), PANEL, 0.08)
 	corner(helpFrame, 12)
 	stroke(helpFrame, Color3.fromRGB(255, 200, 120), 1.5, 0.3)
 	helpFrame.Visible = false
-	label(helpFrame, "Title", "조작법", UDim2.new(1, 0, 0, 36), UDim2.new(0, 0, 0, 10), 24, WHITE, FONT_HEAVY)
-	local lines = {
-		"좌클릭 (누르고 있기)  ·  M1 연타 (4타)",
-		"4타에서 Space 누른 채  ·  띄우기 / 공중 4타  ·  내려찍기",
-		"F (누르고 있기)  ·  막기  —  맞기 직전에 누르면 패리",
-		"Q + 방향키  ·  대시 (앞/뒤/좌/우)",
-		"스턴 중 Q  ·  회피 (회피 게이지 가득일 때)",
-		"1 ~ 4  ·  기술",
-		"G  ·  각성 (각성 게이지 100%)",
-		"Shift  ·  시점 고정 (Shift Lock)",
-		"H  ·  이 창 열기/닫기",
-		"칸자키 렌: 칼로 적/소품을 베면 회분이 쌓인다",
-		"린 위안: 2번 《유전》으로 공격·투사체를 되돌린다",
-	}
-	for i, t in lines do
-		local l = label(helpFrame, "Line" .. i, t, UDim2.new(1, -40, 0, 24), UDim2.new(0, 20, 0, 48 + (i - 1) * 26), 14, Color3.fromRGB(230, 226, 222), FONT)
+	tr(label(helpFrame, "Title", "", UDim2.new(1, 0, 0, 36), UDim2.new(0, 0, 0, 10), 24, WHITE, FONT_HEAVY), "help.title")
+	for i = 1, 12 do
+		local l = tr(fit(label(helpFrame, "Line" .. i, "", UDim2.new(1, -40, 0, 24), UDim2.new(0, 20, 0, 48 + (i - 1) * 26), 14, Color3.fromRGB(230, 226, 222), FONT), 14), "help." .. i)
 		l.TextXAlignment = Enum.TextXAlignment.Left
 	end
-	local close = button(helpFrame, "Close", "닫기", UDim2.new(0, 100, 0, 30), UDim2.new(0.5, -50, 1, -40), Color3.fromRGB(80, 70, 60), 14)
+	local close = tr(button(helpFrame, "Close", "", UDim2.new(0, 100, 0, 30), UDim2.new(0.5, -50, 1, -40), Color3.fromRGB(80, 70, 60), 14), "help.close")
 	close.Activated:Connect(function()
 		helpFrame.Visible = false
 	end)
@@ -558,31 +557,31 @@ local function buildHud()
 	-- 모바일 버튼
 	if UserInputService.TouchEnabled then
 		local pad = frame(hud, "Mobile", UDim2.new(0, 230, 0, 230), UDim2.new(1, -250, 1, -420), PANEL, 1)
-		local function mb(name: string, text: string, size: number, x: number, y: number, color: Color3): TextButton
-			local b = button(pad, name, text, UDim2.new(0, size, 0, size), UDim2.new(0, x, 0, y), color, 16)
+		local function mb(name: string, key: string, size: number, x: number, y: number, color: Color3): TextButton
+			local b = tr(button(pad, name, "", UDim2.new(0, size, 0, size), UDim2.new(0, x, 0, y), color, 16), key)
 			corner(b, math.floor(size / 2))
 			b.BackgroundTransparency = 0.2
 			return b
 		end
-		local atk = mb("Attack", "공격", 96, 120, 120, Color3.fromRGB(180, 60, 60))
+		local atk = mb("Attack", "mobile.attack", 96, 120, 120, Color3.fromRGB(180, 60, 60))
 		atk.MouseButton1Down:Connect(function()
 			action("M1Hold", true)
 		end)
 		atk.MouseButton1Up:Connect(function()
 			action("M1Hold", false)
 		end)
-		local blk = mb("Block", "막기", 64, 30, 150, Color3.fromRGB(70, 90, 150))
+		local blk = mb("Block", "mobile.block", 64, 30, 150, Color3.fromRGB(70, 90, 150))
 		blk.MouseButton1Down:Connect(function()
 			action("BlockHold", true)
 		end)
 		blk.MouseButton1Up:Connect(function()
 			action("BlockHold", false)
 		end)
-		local dsh = mb("Dash", "대시", 64, 150, 40, Color3.fromRGB(70, 130, 110))
+		local dsh = mb("Dash", "mobile.dash", 64, 150, 40, Color3.fromRGB(70, 130, 110))
 		dsh.Activated:Connect(function()
 			action("DashTap", nil)
 		end)
-		local awk = mb("Awaken", "각성", 58, 60, 70, Color3.fromRGB(190, 140, 40))
+		local awk = mb("Awaken", "mobile.awaken", 58, 60, 70, Color3.fromRGB(190, 140, 40))
 		awk.Activated:Connect(function()
 			action("AwakenTap", nil)
 		end)
@@ -606,25 +605,35 @@ function UI.isSelectOpen(): boolean
 	return selectFrame.Visible
 end
 
+-- 이름·칭호·선택 버튼 글자 (언어가 바뀔 때도 다시 부른다)
+local function applyCharTexts()
+	local charId = currentChar
+	local def = if charId then CharacterDefs.get(charId) else nil
+	if def then
+		local tx = CharacterDefs.texts(def)
+		charName.Text = tx.name
+		charTitle.Text = tx.title
+	end
+	for _, p in previews do
+		local pick = p.pick
+		if pick then
+			pick.Text = Locale.t(if p.charId == charId then "select.using" else "select.pick")
+		end
+	end
+end
+
 function UI.setCharacter(charId: string?)
 	pendingSelect = false
 	currentChar = charId
 	table.clear(cooldownEnds)
 	local def = if charId then CharacterDefs.get(charId) else nil
 	if def then
-		charName.Text = def.name
 		charName.TextColor3 = def.color
-		charTitle.Text = def.title
 		hpFill.BackgroundColor3 = def.color
 		awFill.BackgroundColor3 = def.color
 		ashRow.Visible = def.id == "KanzakiRen"
 	end
-	for _, p in previews do
-		local pick = p.pick
-		if pick then
-			pick.Text = if p.charId == charId then "사용 중 ✓" else "이 캐릭터로 싸운다"
-		end
-	end
+	applyCharTexts()
 end
 
 function UI.setCooldown(key: string, endsAt: number, duration: number)
@@ -663,11 +672,12 @@ function UI.notify(text: string, kind: string?)
 	end)
 end
 
-function UI.feed(killer: string, victim: string)
+-- killer / victim: 문자열 또는 { ko, en } (서버가 두 언어로 보낸다)
+function UI.feed(killer: any, victim: any)
 	local row = frame(feedList, "Row", UDim2.new(0, 360, 0, 26), UDim2.fromScale(0, 0), PANEL, 0.25)
 	corner(row, 6)
 	row.LayoutOrder = -math.floor(os.clock() * 100)
-	local l = label(row, "Text", killer .. "  ⚔  " .. victim, UDim2.new(1, -12, 1, 0), UDim2.new(0, 6, 0, 0), 13, WHITE, FONT)
+	local l = label(row, "Text", Locale.pick(killer) .. "  ⚔  " .. Locale.pick(victim), UDim2.new(1, -12, 1, 0), UDim2.new(0, 6, 0, 0), 13, WHITE, FONT)
 	l.TextXAlignment = Enum.TextXAlignment.Right
 	task.delay(6, function()
 		TweenService:Create(row, TweenInfo.new(0.5), { BackgroundTransparency = 1 }):Play()
@@ -707,9 +717,10 @@ function UI.awakenTitle(model: Model, charId: string)
 	local nameL = titleCard:FindFirstChild("Name") :: TextLabel
 	local sub = titleCard:FindFirstChild("Sub") :: TextLabel
 	local quote = titleCard:FindFirstChild("Quote") :: TextLabel
-	nameL.Text = def.awakening.name
-	sub.Text = def.name .. "  —  " .. def.awakening.sub
-	quote.Text = def.awakening.quote
+	local tx = CharacterDefs.texts(def)
+	nameL.Text = tx.awakening.name
+	sub.Text = tx.name .. "  —  " .. tx.awakening.sub
+	quote.Text = tx.awakening.quote
 	local grad = nameL:FindFirstChild("Grad") :: UIGradient
 	grad.Color = ColorSequence.new(def.accent, def.color)
 	titleCard.Visible = true
@@ -739,7 +750,7 @@ end
 
 -- 오류를 화면 아래에 빨간 글씨로 보여 준다 (누르면 닫힘)
 function UI.showError(text: string)
-	errorBox.Text = "⚠ 오류 (이 부분을 캡처해서 보내 주세요)\n" .. string.sub(text, -1200)
+	errorBox.Text = Locale.t("error.header") .. "\n" .. string.sub(text, -1200)
 	errorBox.Visible = true
 end
 
@@ -749,6 +760,23 @@ end
 
 function UI.setDead(dead: boolean)
 	deathFrame.Visible = dead
+end
+
+-- 언어 전환: 선택 화면은 통째로 다시 만들고, HUD 글자는 다시 칠한다
+local function refreshLanguage()
+	local wasVisible = selectFrame.Visible
+	local wasClosable = closeButton.Visible
+	selectFrame:Destroy()
+	table.clear(previews)
+	buildSelect()
+	selectFrame.Visible = wasVisible
+	closeButton.Visible = wasClosable
+	for _, b in bound do
+		if b.inst.Parent then
+			setText(b.inst, Locale.t(b.key, b.args))
+		end
+	end
+	applyCharTexts()
 end
 
 ----------------------------------------------------------------------
@@ -798,13 +826,13 @@ local function update(dt: number)
 	awFill.Size = UDim2.fromScale(math.clamp(aw / 100, 0, 1), 1)
 	if awakened then
 		local def = if currentChar then CharacterDefs.get(currentChar) else nil
-		awText.Text = (if def then def.awakening.name else "각성") .. " 중"
+		awText.Text = Locale.t("hud.awakened", { name = if def then CharacterDefs.texts(def).awakening.name else "" })
 		awStroke.Transparency = 0.2
 	elseif aw >= 100 then
-		awText.Text = "각성 가능! [G]"
+		awText.Text = Locale.t("hud.awaken_ready")
 		awStroke.Transparency = 0.2 + 0.6 * (0.5 + 0.5 * math.sin(os.clock() * 6))
 	else
-		awText.Text = "각성 " .. tostring(math.floor(aw)) .. "%"
+		awText.Text = Locale.t("hud.awaken_pct", { n = math.floor(aw) })
 		awStroke.Transparency = 1
 	end
 
@@ -812,8 +840,8 @@ local function update(dt: number)
 	guardFill.Size = UDim2.fromScale(math.clamp((attr(char, "Guard", 100) :: number) / 100, 0, 1), 1)
 	local df = UI.cooldownLeft("DashFront")
 	local ds = UI.cooldownLeft("DashSide")
-	dashFront.Text = if df > 0 then "앞 대시 " .. fmt(df) else "앞 대시 ✓"
-	dashSide.Text = if ds > 0 then "옆 대시 " .. fmt(ds) else "옆 대시 ✓"
+	dashFront.Text = Locale.t("hud.dash_front") .. " " .. (if df > 0 then fmt(df) else "✓")
+	dashSide.Text = Locale.t("hud.dash_side") .. " " .. (if ds > 0 then fmt(ds) else "✓")
 
 	-- 회분
 	if ashRow.Visible then
@@ -843,7 +871,7 @@ local function update(dt: number)
 		local exhausted = attr(char, "Exhausted", false) == true
 		for i, s in slots do
 			local mv = list[i]
-			s.name.Text = mv.name
+			s.name.Text = CharacterDefs.moveName(def, mv)
 			local left = UI.cooldownLeft(mv.id)
 			local total = cooldownDur[mv.id] or mv.cooldown
 			if left > 0 and total > 0 then
@@ -851,7 +879,7 @@ local function update(dt: number)
 				s.cdText.Text = fmt(left)
 			elseif exhausted then
 				s.cd.Size = UDim2.fromScale(1, 1)
-				s.cdText.Text = "탈진"
+				s.cdText.Text = Locale.t("hud.exhausted")
 			else
 				s.cd.Size = UDim2.fromScale(1, 0)
 				s.cdText.Text = ""
@@ -876,9 +904,32 @@ function UI.init()
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = true
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	-- 로블록스 자동 번역이 우리 번역 위에 한 번 더 덮어쓰지 않도록
+	gui.AutoLocalize = false
 	gui.Parent = player:WaitForChild("PlayerGui")
+	Locale.set(Locale.detect())
 	buildSelect()
 	buildHud()
+	-- 서버가 내 아바타 미리보기를 올리면 카드 미리보기를 다시 만든다
+	task.spawn(function()
+		local folder = ReplicatedStorage:WaitForChild("AvatarPreviews", 30)
+		if folder then
+			folder.ChildAdded:Connect(function(child)
+				if child.Name == tostring(player.UserId) then
+					task.wait(0.2)
+					for _, p in previews do
+						setPreviewModel(p)
+					end
+				end
+			end)
+			if avatarSource() then
+				for _, p in previews do
+					setPreviewModel(p)
+				end
+			end
+		end
+	end)
+	Locale.Changed:Connect(refreshLanguage)
 	errorBox = Instance.new("TextButton")
 	errorBox.Name = "Errors"
 	errorBox.AutoButtonColor = false

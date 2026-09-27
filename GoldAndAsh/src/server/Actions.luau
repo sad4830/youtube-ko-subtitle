@@ -234,7 +234,7 @@ function Actions.dash(ent: Entity, payload: any)
 			Combat.push(ent, -aim * 62 + UP * 32, 0.18)
 			Combat.fx("Evasive", { model = ent.model, pos = ent.root.Position })
 		else
-			Combat.notify(ent, "회피 게이지가 부족하다", "warn")
+			Combat.notify(ent, "n.evasive_low", "warn")
 		end
 		return
 	end
@@ -259,6 +259,56 @@ function Actions.dash(ent: Entity, payload: any)
 		Combat.push(ent, vel, time)
 	end
 	Combat.fx("Dash", { model = ent.model, dir = vel.Unit, exceptOwner = ent.player })
+
+	-- 주술 시네니건처럼: 앞대시로 상대에게 부딪히면 그대로 돌진 공격이 나간다
+	if dir == "front" then
+		local token = ent.token
+		task.spawn(function()
+			local elapsed = 0
+			while elapsed < time + 0.06 do
+				task.wait(0.03)
+				elapsed += 0.03
+				if ent.token ~= token or not ent.alive or Combat.isStunned(ent) then
+					return
+				end
+				local hits = Combat.front(ent, 3.4, Vector3.new(6, 6.5, 7), aim)
+				for _, target in hits do
+					if target ~= ent and target.alive and os.clock() >= target.iframeUntil then
+						Actions.dashStrike(ent, target, aim)
+						return
+					end
+				end
+			end
+		end)
+	end
+end
+
+-- 돌진 공격: 대시를 멈추고 상대를 짧게 경직시켜 M1 으로 이어 갈 수 있게 한다
+function Actions.dashStrike(ent: Entity, target: Entity, aim: Vector3)
+	Combat.beginMove(ent, "DashStrike", 0.42, 2)
+	Combat.push(ent, aim * 14, 0.12) -- 대시 속도를 끊고 상대 바로 앞에서 멈춘다
+	Combat.anim(ent, "dashhit_" .. ent.charId)
+	local blade = ent.charId == "KanzakiRen"
+	local res = Combat.hit(ent, target, {
+		damage = 4.5,
+		stun = 1.05,
+		knock = aim * 18 + UP * 8,
+		knockTime = 0.15,
+		fx = if blade then "slash_heavy" else "palm_heavy",
+		sound = if blade then "ren_slash_hit" else "m1_hit_heavy",
+		hitstop = 0.09,
+		shake = 0.45,
+		melee = true,
+	})
+	if res == "hit" then
+		if blade then
+			Combat.addAsh(ent, Config.Ash.PerM1Hit)
+		end
+		-- 바로 M1 으로 이어 칠 수 있게
+		ent.combo = 0
+		ent.m1Ready = os.clock() + 0.3
+	end
+	Combat.fx("DashStrike", { model = ent.model, pos = target.root.Position, dir = aim, charId = ent.charId })
 end
 
 ----------------------------------------------------------------------
@@ -284,7 +334,7 @@ end
 function Actions.awaken(ent: Entity)
 	if ent.awakened or ent.isDummy or ent.awakening < Config.Awakening.Max then
 		if not ent.awakened and ent.awakening < Config.Awakening.Max then
-			Combat.notify(ent, "각성 게이지가 아직 부족하다", "warn")
+			Combat.notify(ent, "n.awaken_low", "warn")
 		end
 		return
 	end
@@ -318,7 +368,7 @@ function Actions.skill(ent: Entity, payload: any)
 		return
 	end
 	if ent.noSkillUntil > os.clock() then
-		Combat.notify(ent, "지금은 이능을 쓸 수 없다", "warn")
+		Combat.notify(ent, "n.skills_locked", "warn")
 		return
 	end
 	if Combat.onCooldown(ent, mv.id) then

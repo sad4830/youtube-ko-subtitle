@@ -625,6 +625,47 @@ local HIT_SOUND: { [string]: string } = {
 	slam = "ground_crack",
 }
 
+-- 만화식 십자 섬광: 가늘고 긴 빛줄기 두 개가 교차하며 번쩍인다
+local function crossFlash(pos: Vector3, color: Color3, size: number, time: number?)
+	local t = time or 0.18
+	local cam = workspace.CurrentCamera
+	local face = if cam then CFrame.lookAt(pos, cam.CFrame.Position) else CFrame.new(pos)
+	local spin = rng:NextNumber(0, math.pi)
+	for i = 0, 1 do
+		local cf = face * CFrame.Angles(0, 0, spin + i * math.pi / 2)
+		local beam = newPart(Vector3.new(size * 0.06, size, 0.05), cf, color, Enum.Material.Neon, 0)
+		tween(beam, t, { Size = Vector3.new(0.02, size * 1.6, 0.02), Transparency = 1 }, Enum.EasingStyle.Quart)
+		Debris:AddItem(beam, t + 0.05)
+	end
+	local core = newPart(Vector3.new(size * 0.18, size * 0.18, 0.05), face * CFrame.Angles(0, 0, math.pi / 4 + spin), Color3.new(1, 1, 1), Enum.Material.Neon, 0)
+	fadeOut(core, t * 0.8, Vector3.new(size * 0.3, size * 0.3, 0.02))
+end
+
+-- 날아가는 방향으로 뻗는 충격 줄기
+local function impactStreaks(pos: Vector3, dir: Vector3, color: Color3, count: number, length: number)
+	for _ = 1, count do
+		local d = (dir + rng:NextUnitVector() * 0.45).Unit
+		local start = pos + d * rng:NextNumber(0.5, 1.5)
+		local l = length * rng:NextNumber(0.6, 1.2)
+		local streak = newPart(Vector3.new(0.12, 0.12, l * 0.3), CFrame.lookAt(start, start + d), color, Enum.Material.Neon, 0)
+		local endPos = start + d * l
+		tween(streak, 0.16, { CFrame = CFrame.lookAt(endPos, endPos + d), Size = Vector3.new(0.04, 0.04, l), Transparency = 1 }, Enum.EasingStyle.Quart)
+		Debris:AddItem(streak, 0.2)
+	end
+end
+
+-- 발밑 충격파: 흙먼지 고리 + 튀는 돌 조각
+local function groundShock(pos: Vector3, radius: number, color: Color3?)
+	local gy = groundY(pos)
+	if pos.Y - gy > 7 then
+		return
+	end
+	local g = Vector3.new(pos.X, gy + 0.2, pos.Z)
+	ring(g, Vector3.new(0, 1, 0), 2, radius * 2.4, color or Color3.fromRGB(235, 225, 210), 0.35, 0.3, 0.2)
+	dust(g + Vector3.new(0, 0.8, 0), 10, 2.5)
+	shardBurst(g + Vector3.new(0, 0.5, 0), 8, Color3.fromRGB(110, 100, 94), 34, 0.55, 0.9, Enum.Material.Slate, 90, Vector3.new(0, 1.4, 0))
+end
+
 local function hitEffect(kind: string, pos: Vector3, fromPos: Vector3?)
 	local dir = if fromPos then (pos - fromPos) else Vector3.new(0, 0, -1)
 	if dir.Magnitude < 0.1 then
@@ -634,40 +675,59 @@ local function hitEffect(kind: string, pos: Vector3, fromPos: Vector3?)
 	if kind == "palm" or kind == "palm_small" or kind == "light" then
 		local s = if kind == "palm_small" then 0.6 else 1
 		flash(pos, 2.2 * s, GOLD_LIGHT, 0.14)
+		crossFlash(pos, GOLD_LIGHT, 5 * s, 0.14)
 		shardBurst(pos, math.floor(6 * s), GOLD, 26, 0.35, 0.3, nil, 20, dir)
 		ring(pos, dir, 1.5 * s, 6 * s, GOLD_LIGHT, 0.2, 0.15)
 	elseif kind == "palm_heavy" or kind == "gold_heavy" or kind == "gold" then
 		local big = kind ~= "gold"
-		flash(pos, if big then 4 else 3, GOLD, 0.25, 2.6)
-		shardBurst(pos, if big then 16 else 9, GOLD, 45, 0.5, 0.45, nil, 30, dir)
-		ring(pos, dir, 2, if big then 16 else 10, GOLD, 0.3, 0.3)
-		ring(pos, dir, 1, if big then 10 else 6, Color3.new(1, 1, 1), 0.2, 0.15)
-		emit(pos, 18, { color = GOLD, size = 1.2, speed = 30, life = 0.6, light = 1 })
+		flash(pos, if big then 5 else 3, GOLD, 0.25, 2.8)
+		crossFlash(pos, GOLD_LIGHT, if big then 13 else 8, 0.22)
+		impactStreaks(pos, dir, GOLD_LIGHT, if big then 10 else 5, if big then 14 else 9)
+		shardBurst(pos, if big then 18 else 9, GOLD, 48, 0.5, 0.5, nil, 30, dir)
+		ring(pos, dir, 2, if big then 20 else 10, GOLD, 0.32, 0.35)
+		ring(pos, dir, 1, if big then 12 else 6, Color3.new(1, 1, 1), 0.2, 0.15)
+		emit(pos, 22, { color = GOLD, size = 1.2, speed = 34, life = 0.6, light = 1 })
+		if big then
+			groundShock(pos, 7, GOLD_LIGHT)
+		end
 	elseif kind == "staff" or kind == "staff_heavy" then
 		local big = kind == "staff_heavy"
-		flash(pos, if big then 3.5 else 2, Color3.fromRGB(255, 180, 90), 0.18)
-		shardBurst(pos, if big then 12 else 6, Color3.fromRGB(255, 170, 70), 35, 0.4, 0.35, nil, 30, dir)
-		ring(pos, dir, 2, if big then 14 else 7, Color3.fromRGB(255, 200, 120), 0.25, 0.2)
+		flash(pos, if big then 4 else 2, Color3.fromRGB(255, 180, 90), 0.18)
+		crossFlash(pos, Color3.fromRGB(255, 220, 160), if big then 11 else 6, 0.18)
+		shardBurst(pos, if big then 14 else 6, Color3.fromRGB(255, 170, 70), 38, 0.4, 0.35, nil, 30, dir)
+		ring(pos, dir, 2, if big then 16 else 7, Color3.fromRGB(255, 200, 120), 0.25, 0.2)
+		if big then
+			impactStreaks(pos, dir, Color3.fromRGB(255, 220, 160), 8, 12)
+			groundShock(pos, 6)
+		end
 	elseif kind == "slash" or kind == "slash_heavy" then
 		local big = kind == "slash_heavy"
-		slashLine(pos, if big then 12 else 7, Color3.fromRGB(255, 230, 230), 0.22, if big then 0.3 else 0.16)
+		slashLine(pos, if big then 14 else 8, Color3.fromRGB(255, 235, 235), 0.22, if big then 0.34 else 0.18)
+		crossFlash(pos, Color3.fromRGB(255, 200, 200), if big then 10 else 5, 0.16)
 		if big then
-			slashLine(pos, 12, RED, 0.28, 0.24)
+			slashLine(pos, 14, RED, 0.3, 0.26)
+			impactStreaks(pos, dir, Color3.fromRGB(255, 90, 90), 8, 12)
+			groundShock(pos, 6, Color3.fromRGB(255, 120, 120))
 		end
-		shardBurst(pos, if big then 10 else 5, RED, 30, 0.3, 0.3, nil, 25, dir)
-		ashPuff(pos, if big then 12 else 6, 1.2, 12)
+		shardBurst(pos, if big then 12 else 5, RED, 32, 0.3, 0.3, nil, 25, dir)
+		ashPuff(pos, if big then 14 else 6, 1.2, 12)
 	elseif kind == "ash" or kind == "ash_heavy" then
 		local big = kind == "ash_heavy"
-		flash(pos, if big then 4 else 2.4, RED, 0.2)
-		ashPuff(pos, if big then 24 else 12, if big then 3 else 1.8, if big then 20 else 12)
-		slashLine(pos, if big then 14 else 8, Color3.fromRGB(255, 80, 80), 0.25, 0.22)
+		flash(pos, if big then 5 else 2.4, RED, 0.2)
+		crossFlash(pos, Color3.fromRGB(255, 120, 120), if big then 14 else 6, 0.2)
+		ashPuff(pos, if big then 26 else 12, if big then 3 else 1.8, if big then 22 else 12)
+		slashLine(pos, if big then 16 else 8, Color3.fromRGB(255, 80, 80), 0.25, 0.24)
 		if big then
-			ring(pos, dir, 2, 18, RED, 0.3, 0.3)
+			ring(pos, dir, 2, 22, RED, 0.32, 0.35)
+			impactStreaks(pos, dir, Color3.fromRGB(255, 90, 90), 10, 15)
+			groundShock(pos, 8, Color3.fromRGB(255, 110, 110))
 		end
 	elseif kind == "slam" then
 		local g = Vector3.new(pos.X, groundY(pos), pos.Z)
-		VFX.groundCrack(g, 7, "stone")
-		flash(pos, 3, Color3.new(1, 1, 1), 0.15)
+		VFX.groundCrack(g, 8, "stone")
+		flash(pos, 4, Color3.new(1, 1, 1), 0.15)
+		crossFlash(pos, Color3.new(1, 1, 1), 12, 0.2)
+		groundShock(pos, 8)
 	end
 end
 
@@ -717,6 +777,9 @@ handlers.Hit = function(d)
 	local shake = (d.shake :: number?) or 0.12
 	if isLocal(target) or isLocal(attacker) then
 		CameraFX.shake(shake)
+		if shake >= 0.35 then
+			CameraFX.speedLines(0.12 + shake * 0.25, 0.7 + shake * 0.5)
+		end
 		if shake >= 0.5 then
 			CameraFX.impact(math.min(1, shake))
 			CameraFX.fovPunch(6)
@@ -792,12 +855,36 @@ handlers.Knockback = function(d)
 	trail.Parent = torso
 	Sounds.play("knockback_whoosh", { at = torso, random = 0.1 })
 	local dur = (d.duration :: number?) or 0.7
+	if isLocal(model) then
+		CameraFX.speedLines(dur * 0.8, 1.1, color)
+	end
 	task.delay(dur, function()
 		trail.Enabled = false
 		Debris:AddItem(trail, 0.4)
 		Debris:AddItem(a0, 0.4)
 		Debris:AddItem(a1, 0.4)
 	end)
+end
+
+-- 앞대시 돌진 공격
+handlers.DashStrike = function(d)
+	local model = d.model :: Model?
+	local pos = d.pos :: Vector3
+	local dir = (d.dir :: Vector3).Unit
+	local isRen = d.charId == "KanzakiRen"
+	local color = if isRen then Color3.fromRGB(255, 90, 90) else GOLD_LIGHT
+	ring(pos, dir, 2, 16, color, 0.3, 0.3)
+	ring(pos - dir * 1.5, dir, 1.5, 10, Color3.new(1, 1, 1), 0.22, 0.18)
+	impactStreaks(pos, dir, color, 10, 13)
+	groundShock(pos, 6, color)
+	if model then
+		afterimage(model, color, 0.3, 0.3)
+	end
+	local lr = rootOf(player.Character)
+	if isLocal(model) or (lr and (lr.Position - pos).Magnitude < 8) then
+		CameraFX.speedLines(0.25, 1)
+		CameraFX.fovPunch(5)
+	end
 end
 
 handlers.Block = function(d)
@@ -852,6 +939,10 @@ function VFX.dashEffect(model: Model)
 	local cid = model:GetAttribute("CharId")
 	local def = if typeof(cid) == "string" then CharacterDefs.get(cid) else nil
 	local color = if def then def.color else Color3.new(1, 1, 1)
+	if isLocal(model) then
+		CameraFX.speedLines(0.22, 0.75)
+		CameraFX.fovPunch(4)
+	end
 	afterimage(model, color, 0.35, 0.4)
 	task.delay(0.08, function()
 		if model.Parent then
@@ -920,6 +1011,17 @@ end
 handlers.Death = function(d)
 	local pos = d.pos :: Vector3
 	Sounds.play("death", { position = pos })
+	Sounds.play("explosion", { position = pos, volume = 0.6, pitch = 1.2 })
+	flash(pos, 7, Color3.new(1, 1, 1), 0.3, 3)
+	crossFlash(pos, Color3.new(1, 1, 1), 20, 0.3)
+	ring(pos, Vector3.new(0, 1, 0), 3, 30, Color3.new(1, 1, 1), 0.45, 0.4)
+	groundShock(pos, 10)
+	local lr = rootOf(player.Character)
+	if lr and (lr.Position - pos).Magnitude < 60 then
+		CameraFX.impact(1)
+		CameraFX.shake(0.6)
+		CameraFX.speedLines(0.35, 1.2)
+	end
 	emit(pos, 30, { texture = TEX_SMOKE, color = Color3.fromRGB(30, 30, 34), size = 2, size2 = 5, speed = 8, life = 1.4, light = 0, transparency = 0.3 })
 	ring(pos, Vector3.new(0, 1, 0), 2, 14, Color3.fromRGB(200, 60, 60), 0.5, 0.2)
 end
@@ -1232,6 +1334,9 @@ handlers.AwakenStart = function(d)
 	end
 	if isLocal(model) then
 		CameraFX.cutscene(root, if isLin then 1.6 else 1.4)
+		task.delay(1.05, function()
+			CameraFX.speedLines(0.9, 1.4, if isLin then GOLD_LIGHT else Color3.fromRGB(255, 150, 150))
+		end)
 	end
 	local lr = rootOf(player.Character)
 	if lr and (lr.Position - root.Position).Magnitude < 90 then

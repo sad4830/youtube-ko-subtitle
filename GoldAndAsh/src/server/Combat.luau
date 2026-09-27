@@ -12,6 +12,7 @@ local Remotes = require(Shared.Remotes)
 local CharacterDefs = require(Shared.CharacterDefs)
 local Physics = require(Shared.Physics)
 local RigBuilder = require(Shared.RigBuilder)
+local Locale = require(Shared.Locale)
 
 local Combat = {}
 
@@ -217,9 +218,10 @@ function Combat.anim(ent: Entity, name: string?, speed: number?, exceptOwner: bo
 	end
 end
 
-function Combat.notify(ent: Entity, text: string, kind: string?)
+-- key 는 Locale 문자열 키 (클라이언트가 자기 언어로 바꿔 보여 준다)
+function Combat.notify(ent: Entity, key: string, kind: string?, args: { [string]: any }?)
 	if ent.player then
-		Remotes.Notify:FireClient(ent.player, text, kind or "info")
+		Remotes.Notify:FireClient(ent.player, key, kind or "info", args)
 	end
 end
 
@@ -382,7 +384,7 @@ function Combat.addMeter(ent: Entity, amount: number)
 	local before = ent.awakening
 	ent.awakening = math.clamp(ent.awakening + amount, 0, Config.Awakening.Max)
 	if before < Config.Awakening.Max and ent.awakening >= Config.Awakening.Max then
-		Combat.notify(ent, "각성 준비 완료 — [G]", "awaken")
+		Combat.notify(ent, "n.awaken_ready", "awaken")
 		if ent.player then
 			Remotes.FX:FireClient(ent.player, "AwakenReady", {})
 		end
@@ -501,7 +503,7 @@ local function guardBreak(att: Entity, tgt: Entity)
 	tgt.guard = Config.Block.GuardMax * 0.5
 	Combat.stun(tgt, Config.Block.GuardBreakStun, "stunned")
 	Combat.fx("GuardBreak", { model = tgt.model, pos = tgt.root.Position })
-	Combat.notify(tgt, "가드 브레이크!", "warn")
+	Combat.notify(tgt, "n.guard_break", "warn")
 	local _ = att
 end
 
@@ -534,7 +536,7 @@ function Combat.hit(att: Entity, tgt: Entity, info: HitInfo): string
 		if t - tgt.blockStart <= Config.Block.PerfectWindow and info.projectile == nil then
 			Combat.stun(att, Config.Block.ParryStun, "parried")
 			Combat.fx("Parry", { pos = (att.root.Position + tgt.root.Position) / 2 })
-			Combat.notify(tgt, "패리!", "good")
+			Combat.notify(tgt, "n.parry", "good")
 			return "parried"
 		end
 		tgt.guard -= info.damage * Config.Block.GuardDamageScale
@@ -644,6 +646,16 @@ end
 ----------------------------------------------------------------------
 -- 사망
 ----------------------------------------------------------------------
+-- 킬 피드용 이름 ("표시 이름 (캐릭터)") — 두 언어로
+local function feedName(e: Entity): { ko: string, en: string }
+	if e.isDummy then
+		return Locale.both("feed.dummy")
+	end
+	local who = if e.player then { ko = e.player.DisplayName, en = e.player.DisplayName } else Locale.both("feed.bot")
+	local n = CharacterDefs.names(e.def)
+	return { ko = who.ko .. " (" .. n.ko .. ")", en = who.en .. " (" .. n.en .. ")" }
+end
+
 function Combat.onDeath(ent: Entity)
 	if not ent.alive then
 		return
@@ -659,17 +671,14 @@ function Combat.onDeath(ent: Entity)
 	Combat.fx("Death", { model = ent.model, pos = ent.root.Position })
 
 	local killer = ent.lastHitBy
-	local killerName = "?"
+	local killerName: { ko: string, en: string }
 	if killer and now() - ent.lastHitTime < 12 then
 		Combat.addMeter(killer, Config.Awakening.PerKill)
-		local kd = killer.def
-		killerName = (if killer.player then killer.player.DisplayName else "봇") .. " (" .. (if kd then kd.name else "?") .. ")"
+		killerName = feedName(killer)
 	else
-		killerName = "환경"
+		killerName = Locale.both("feed.env")
 	end
-	local vd = ent.def
-	local victimName = (if ent.player then ent.player.DisplayName else "봇") .. " (" .. (if vd then vd.name else "?") .. ")"
-	Remotes.Feed:FireAllClients(killerName, victimName)
+	Remotes.Feed:FireAllClients(killerName, feedName(ent))
 
 	local cb = Combat.onDied
 	if cb then
@@ -925,7 +934,7 @@ local function updateEntity(ent: Entity, dt: number, t: number)
 			ent.ashExpire = t + Config.Ash.Lifetime
 		elseif ent.ash > 0 and t >= ent.ashExpire then
 			ent.ash = 0
-			Combat.notify(ent, "회분이 흩어졌다", "info")
+			Combat.notify(ent, "n.ash_scatter", "info")
 		end
 	end
 

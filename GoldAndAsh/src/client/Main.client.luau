@@ -8,6 +8,7 @@ local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
 local Sounds = require(Shared.Sounds)
 local CharacterDefs = require(Shared.CharacterDefs)
+local Locale = require(Shared.Locale)
 
 local Animator = require(script.Parent.Animator)
 local CameraFX = require(script.Parent.CameraFX)
@@ -98,15 +99,16 @@ Remotes.Ragdoll.OnClientEvent:Connect(function(on: boolean)
 	end
 end)
 
-Remotes.Notify.OnClientEvent:Connect(function(text: string, kind: string?)
-	UI.notify(text, kind)
+-- 서버는 문자열 키 + 인자를 보낸다 → 내 언어로 바꿔서 표시
+Remotes.Notify.OnClientEvent:Connect(function(key: string, kind: string?, args: { [string]: any }?)
+	UI.notify(Locale.t(key, args), kind)
 end)
 
 Remotes.Cooldown.OnClientEvent:Connect(function(key: string, endsAt: number, duration: number)
 	UI.setCooldown(key, endsAt, duration)
 end)
 
-Remotes.Feed.OnClientEvent:Connect(function(killer: string, victim: string)
+Remotes.Feed.OnClientEvent:Connect(function(killer: any, victim: any)
 	UI.feed(killer, victim)
 end)
 
@@ -169,24 +171,7 @@ Remotes.Selected.OnClientEvent:Connect(function(charId: string?)
 	if charId then
 		enterGame(charId)
 	else
-		-- 오류가 나면 화면에 표시 (서버 오류는 ReplicatedStorage.ServerErrors 로 전달된다)
-game:GetService("ScriptContext").Error:Connect(function(message: string, trace: string)
-	UI.showError("클라이언트: " .. message .. "\n" .. trace)
-end)
-task.spawn(function()
-	local v = game:GetService("ReplicatedStorage"):WaitForChild("ServerErrors", 30)
-	if v and v:IsA("StringValue") then
-		local function show()
-			if v.Value ~= "" then
-				UI.showError("서버: " .. v.Value)
-			end
-		end
-		show()
-		v.Changed:Connect(show)
-	end
-end)
-
-enterSelect()
+		enterSelect()
 	end
 end)
 
@@ -227,8 +212,9 @@ if player.Character then
 	task.spawn(onCharacter, player.Character)
 end
 
--- 다른 캐릭터들의 머리 위 체력바 갱신
+-- 다른 캐릭터들의 머리 위 체력바 갱신 + 이름표를 내 언어로
 RunService.Heartbeat:Connect(function()
+	local attrName = if Locale.lang == "en" then "TextEn" else "TextKo"
 	for _, m in workspace:GetChildren() do
 		if m:IsA("Model") and m ~= player.Character then
 			local hum = m:FindFirstChildOfClass("Humanoid")
@@ -240,6 +226,13 @@ RunService.Heartbeat:Connect(function()
 				if fill and fill:IsA("Frame") then
 					fill.Size = UDim2.fromScale(math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1), 1)
 				end
+				local nameLabel = plate:FindFirstChild("NameLabel")
+				if nameLabel and nameLabel:IsA("TextLabel") then
+					local want = nameLabel:GetAttribute(attrName)
+					if typeof(want) == "string" and nameLabel.Text ~= want then
+						nameLabel.Text = want
+					end
+				end
 			end
 		end
 	end
@@ -247,31 +240,14 @@ end)
 
 -- 오류가 나면 화면에 표시 (서버 오류는 ReplicatedStorage.ServerErrors 로 전달된다)
 game:GetService("ScriptContext").Error:Connect(function(message: string, trace: string)
-	UI.showError("클라이언트: " .. message .. "\n" .. trace)
+	UI.showError(Locale.t("error.client") .. message .. "\n" .. trace)
 end)
 task.spawn(function()
 	local v = game:GetService("ReplicatedStorage"):WaitForChild("ServerErrors", 30)
 	if v and v:IsA("StringValue") then
 		local function show()
 			if v.Value ~= "" then
-				UI.showError("서버: " .. v.Value)
-			end
-		end
-		show()
-		v.Changed:Connect(show)
-	end
-end)
-
--- 오류가 나면 화면에 표시 (서버 오류는 ReplicatedStorage.ServerErrors 로 전달된다)
-game:GetService("ScriptContext").Error:Connect(function(message: string, trace: string)
-	UI.showError("클라이언트: " .. message .. "\n" .. trace)
-end)
-task.spawn(function()
-	local v = game:GetService("ReplicatedStorage"):WaitForChild("ServerErrors", 30)
-	if v and v:IsA("StringValue") then
-		local function show()
-			if v.Value ~= "" then
-				UI.showError("서버: " .. v.Value)
+				UI.showError(Locale.t("error.server") .. v.Value)
 			end
 		end
 		show()

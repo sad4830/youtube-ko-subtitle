@@ -3,6 +3,7 @@
 
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
 local CameraFX = {}
@@ -109,5 +110,81 @@ function CameraFX.setVeil(on: boolean)
 		TweenService:Create(blur, info, { Size = 0 }):Play()
 	end
 end
+
+----------------------------------------------------------------------
+-- 집중선(스피드 라인): 화면 가장자리에서 가운데로 모이는 흰 선. 대시·강타·각성 때 번쩍인다.
+----------------------------------------------------------------------
+local linesGui: ScreenGui? = nil
+local lines: { Frame } = {}
+local linesUntil = 0
+local linesStrength = 0
+local linesColor = Color3.new(1, 1, 1)
+local LINE_COUNT = 34
+
+local function ensureLines(): ScreenGui
+	local g = linesGui
+	if g and g.Parent then
+		return g
+	end
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "SpeedLines"
+	gui.IgnoreGuiInset = true
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 5
+	for i = 1, LINE_COUNT do
+		local f = Instance.new("Frame")
+		f.Name = "Line" .. i
+		f.AnchorPoint = Vector2.new(0.5, 0.5)
+		f.BorderSizePixel = 0
+		f.BackgroundColor3 = Color3.new(1, 1, 1)
+		f.BackgroundTransparency = 1
+		f.Parent = gui
+		lines[i] = f
+	end
+	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	linesGui = gui
+	return gui
+end
+
+function CameraFX.speedLines(duration: number, strength: number?, color: Color3?)
+	ensureLines()
+	linesUntil = math.max(linesUntil, os.clock() + duration)
+	linesStrength = math.max(linesStrength, strength or 1)
+	linesColor = color or Color3.new(1, 1, 1)
+end
+
+RunService.RenderStepped:Connect(function()
+	if #lines == 0 then
+		return
+	end
+	local now = os.clock()
+	local active = now < linesUntil
+	if not active then
+		if linesStrength > 0 then
+			linesStrength = 0
+			for _, f in lines do
+				f.BackgroundTransparency = 1
+			end
+		end
+		return
+	end
+	local cam = workspace.CurrentCamera
+	local vp = if cam then cam.ViewportSize else Vector2.new(1280, 720)
+	local diag = vp.Magnitude * 0.5
+	local fade = math.clamp((linesUntil - now) / 0.15, 0, 1)
+	for i, f in lines do
+		-- 매 프레임 조금씩 흔들려서 만화 같은 떨림을 준다
+		local a = (i / LINE_COUNT) * math.pi * 2 + math.random() * 0.18
+		local len = diag * (0.25 + math.random() * 0.35) * linesStrength
+		local r = diag * (0.78 + math.random() * 0.12) - len * 0.5
+		local x = vp.X * 0.5 + math.cos(a) * r
+		local y = vp.Y * 0.5 + math.sin(a) * r
+		f.Position = UDim2.fromOffset(x, y)
+		f.Size = UDim2.fromOffset(len, math.max(1, (2 + math.random() * 3) * linesStrength))
+		f.Rotation = math.deg(a)
+		f.BackgroundColor3 = linesColor
+		f.BackgroundTransparency = 1 - (0.35 + math.random() * 0.4) * fade
+	end
+end)
 
 return CameraFX

@@ -266,7 +266,7 @@ function Lin.onAwakenEnd(ent: Entity, reason: string?)
 	local dur = if reason == "finisher" then 7 else 5
 	ent.noSkillUntil = os.clock() + dur
 	ent.exhaustedUntil = os.clock() + dur
-	Combat.notify(ent, "탈진 — " .. dur .. "초 동안 영력을 쓸 수 없다", "warn")
+	Combat.notify(ent, "n.exhausted", "warn", { n = dur })
 	if ent.alive then
 		Combat.anim(ent, "exhausted")
 		task.delay(dur, function()

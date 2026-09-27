@@ -35,6 +35,7 @@ Players.CharacterAutoLoads = false
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
+local Config = require(Shared.Config)
 
 -- 충돌 그룹: 캐릭터끼리는 서로 통과하고(가강전처럼 몸으로 밀어 날리는 버그 방지),
 -- 부서져 날아가는 파편도 캐릭터와 부딪히지 않는다. 캐릭터와 맵은 정상적으로 충돌한다.
@@ -80,7 +81,7 @@ local function handle(player: Player, action: string, payload: any)
 	elseif action == "SpawnBot" then
 		local charId = if typeof(payload) == "table" and typeof(payload.charId) == "string" then payload.charId else nil
 		if not Bot.spawn(charId) then
-			Remotes.Notify:FireClient(player, "봇은 최대 3명까지 소환할 수 있다", "warn")
+			Remotes.Notify:FireClient(player, "n.bot_limit", "warn", { n = Config.MaxBots })
 		end
 		return
 	elseif action == "ClearBots" then
@@ -104,7 +105,7 @@ Remotes.Action.OnServerEvent:Connect(function(player: Player, action: any, paylo
 		return
 	end
 	if not safe("요청 " .. action, handle, player, action, payload) then
-		Remotes.Notify:FireClient(player, "서버 오류가 났어요 — 화면 아래 빨간 글씨를 캡처해 주세요", "warn")
+		Remotes.Notify:FireClient(player, "n.server_error", "warn")
 	end
 end)
 

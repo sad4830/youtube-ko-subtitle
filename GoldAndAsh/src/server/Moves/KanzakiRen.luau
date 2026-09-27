@@ -27,7 +27,7 @@ local function needAsh(ent: Entity, amount: number): boolean
 	if Combat.useAsh(ent, amount) then
 		return true
 	end
-	Combat.notify(ent, "회분이 부족하다 — 칼로 적이나 주변 물건을 베어 모아라", "warn")
+	Combat.notify(ent, "n.ash_low", "warn")
 	return false
 end
 
@@ -161,7 +161,7 @@ end
 function Ren.AshReturn(ent: Entity, ctx: Ctx): boolean
 	local units = if ent.awakened then 3 else math.min(ent.ash, 3)
 	if units < 1 then
-		Combat.notify(ent, "회분이 없다 — 칼로 적이나 주변 물건을 베어 모아라", "warn")
+		Combat.notify(ent, "n.ash_none", "warn")
 		return false
 	end
 	Combat.useAsh(ent, units)
@@ -270,7 +270,7 @@ function Ren.onAwakenEnd(ent: Entity, reason: string?)
 	local dur = if reason == "finisher" then 4 else 2
 	ent.noSkillUntil = os.clock() + dur
 	ent.exhaustedUntil = os.clock() + dur
-	Combat.notify(ent, if reason == "finisher" then "폐포 손상 — 4초 동안 이능 사용 불가" else "각성 종료", "warn")
+	Combat.notify(ent, if reason == "finisher" then "n.lung_damage" else "n.awaken_end", "warn")
 	if reason == "finisher" then
 		Combat.fx("Cough", { model = ent.model })
 	end

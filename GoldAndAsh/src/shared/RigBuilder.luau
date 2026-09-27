@@ -7,6 +7,8 @@
 --
 -- 애니메이터는 관절의 C0 회전을 보정하므로, 로블록스 기본 R6 관절이든 직접 만든 관절이든 똑같이 움직인다.
 
+local Locale = require(script.Parent.Locale)
+
 local RigBuilder = {}
 
 local rad = math.rad
@@ -164,7 +166,19 @@ local function collider(limb: BasePart)
 	c.Parent = limb
 end
 
-local function nameplate(head: BasePart, displayName: string, color: Color3)
+-- 이름표 글자: 두 언어 버전이면 속성으로 둘 다 저장해 두고, 클라이언트가 자기 언어로 골라 보여 준다
+local function setPlateText(label: TextLabel, text: Locale.Text)
+	if typeof(text) == "table" then
+		label:SetAttribute("TextKo", text.ko)
+		label:SetAttribute("TextEn", text.en)
+	else
+		label:SetAttribute("TextKo", nil)
+		label:SetAttribute("TextEn", nil)
+	end
+	label.Text = Locale.pick(text)
+end
+
+local function nameplate(head: BasePart, displayName: Locale.Text, color: Color3)
 	local old = head:FindFirstChild("Nameplate")
 	if old then
 		old:Destroy()
@@ -176,6 +190,7 @@ local function nameplate(head: BasePart, displayName: string, color: Color3)
 	gui.AlwaysOnTop = false
 	gui.MaxDistance = 90
 	gui.LightInfluence = 0
+	gui.AutoLocalize = false
 	local label = Instance.new("TextLabel")
 	label.Name = "NameLabel"
 	label.BackgroundTransparency = 1
@@ -184,7 +199,7 @@ local function nameplate(head: BasePart, displayName: string, color: Color3)
 	label.TextSize = 15
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextStrokeTransparency = 0.4
-	label.Text = displayName
+	setPlateText(label, displayName)
 	label.Parent = gui
 	local barBack = Instance.new("Frame")
 	barBack.Name = "Bar"
@@ -204,7 +219,7 @@ local function nameplate(head: BasePart, displayName: string, color: Color3)
 end
 
 export type PrepareOptions = {
-	displayName: string?,
+	displayName: Locale.Text?,
 	plateColor: Color3?,
 	collisionGroup: string?, -- 서버에서만 지정 ("Characters")
 }
@@ -277,7 +292,7 @@ function RigBuilder.prepare(model: Model, opts: PrepareOptions?)
 	end
 end
 
-function RigBuilder.setNameplate(model: Model, text: string, color: Color3?)
+function RigBuilder.setNameplate(model: Model, text: Locale.Text, color: Color3?)
 	local head = model:FindFirstChild("Head")
 	local plate = head and head:FindFirstChild("Nameplate")
 	if not plate then
@@ -285,7 +300,7 @@ function RigBuilder.setNameplate(model: Model, text: string, color: Color3?)
 	end
 	local label = plate:FindFirstChild("NameLabel")
 	if label and label:IsA("TextLabel") then
-		label.Text = text
+		setPlateText(label, text)
 	end
 	local bar = plate:FindFirstChild("Bar")
 	local fill = bar and bar:FindFirstChild("Fill")

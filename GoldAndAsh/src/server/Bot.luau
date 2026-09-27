@@ -7,6 +7,7 @@ local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Config = require(Shared.Config)
 local CharacterDefs = require(Shared.CharacterDefs)
 local RigBuilder = require(Shared.RigBuilder)
+local Locale = require(Shared.Locale)
 
 local Combat = require(script.Parent.Combat)
 local Actions = require(script.Parent.Actions)
@@ -205,8 +206,8 @@ function Bot.spawn(charId: string?): Entity?
 		else AvatarService.buildDefault(Color3.fromRGB(236, 232, 222), Color3.fromRGB(112, 78, 46))
 	pending -= 1
 	RigBuilder.equip(model, cid)
-	model.Name = "[봇] " .. (if def then def.name else cid)
-	RigBuilder.setNameplate(model, model.Name, if def then def.color else nil)
+	model.Name = "[Bot] " .. (if def then def.en.name else cid)
+	RigBuilder.setNameplate(model, Locale.both("plate.bot", { char = CharacterDefs.names(def) }), if def then def.color else nil)
 	local hum = model:FindFirstChildOfClass("Humanoid") :: Humanoid
 	if def then
 		hum.MaxHealth = def.maxHealth

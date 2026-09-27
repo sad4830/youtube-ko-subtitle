@@ -10,6 +10,7 @@ local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
 local CharacterDefs = require(Shared.CharacterDefs)
 local RigBuilder = require(Shared.RigBuilder)
+local Locale = require(Shared.Locale)
 
 local Combat = require(script.Parent.Combat)
 local MapService = require(script.Parent.MapService)
@@ -32,8 +33,8 @@ local function clearCharacter(player: Player)
 	end
 end
 
-local function plateText(player: Player, def: CharacterDefs.CharDef): string
-	return def.name .. " · " .. player.DisplayName
+local function plateText(player: Player, def: CharacterDefs.CharDef): Locale.Text
+	return { ko = def.name .. " · " .. player.DisplayName, en = def.en.name .. " · " .. player.DisplayName }
 end
 
 function CharacterService.spawnPlayer(player: Player, charId: string)
@@ -88,7 +89,7 @@ function CharacterService.select(player: Player, payload: any)
 			return
 		end
 		if inCombat(ent) then
-			Combat.notify(ent, "전투 중에는 캐릭터를 바꿀 수 없다 (" .. COMBAT_LOCK .. "초)", "warn")
+			Combat.notify(ent, "n.combat_lock", "warn", { n = COMBAT_LOCK })
 			return
 		end
 		chosen[player] = charId
@@ -100,7 +101,7 @@ function CharacterService.select(player: Player, payload: any)
 	if ent and not ent.alive then
 		-- 죽어 있는 동안 고르면 부활할 때 적용
 		chosen[player] = charId
-		Remotes.Notify:FireClient(player, def.name .. "(으)로 부활합니다", "info")
+		Remotes.Notify:FireClient(player, "n.respawn_as", "info", { char = CharacterDefs.names(def) })
 		return
 	end
 	CharacterService.spawnPlayer(player, charId)
@@ -109,14 +110,18 @@ end
 ----------------------------------------------------------------------
 -- 킬 기록 (리더보드)
 ----------------------------------------------------------------------
+-- 리더보드 항목 이름은 모두에게 같은 글자로 보이므로 두 언어 모두 알아보는 짧은 이름을 쓴다
+local STAT_KILLS = "KO"
+local STAT_STREAK = "Streak"
+
 local function setupStats(player: Player)
 	local stats = Instance.new("Folder")
 	stats.Name = "leaderstats"
 	local kills = Instance.new("IntValue")
-	kills.Name = "처치"
+	kills.Name = STAT_KILLS
 	kills.Parent = stats
 	local streak = Instance.new("IntValue")
-	streak.Name = "연속"
+	streak.Name = STAT_STREAK
 	streak.Parent = stats
 	stats.Parent = player
 end
@@ -131,20 +136,20 @@ local function statOf(player: Player?, name: string): IntValue?
 end
 
 function CharacterService.recordKill(killer: Entity?, victim: Entity)
-	local vs = statOf(victim.player, "연속")
+	local vs = statOf(victim.player, STAT_STREAK)
 	if vs then
 		vs.Value = 0
 	end
 	if killer and killer ~= victim then
-		local k = statOf(killer.player, "처치")
+		local k = statOf(killer.player, STAT_KILLS)
 		if k then
 			k.Value += 1
 		end
-		local s = statOf(killer.player, "연속")
+		local s = statOf(killer.player, STAT_STREAK)
 		if s then
 			s.Value += 1
 			if s.Value >= 3 and killer.player then
-				Remotes.Notify:FireAllClients(killer.player.DisplayName .. " — " .. s.Value .. "연속 처치!", "awaken")
+				Remotes.Notify:FireAllClients("n.streak", "awaken", { player = killer.player.DisplayName, n = s.Value })
 			end
 		end
 	end
@@ -158,8 +163,9 @@ local dummies: { Dummy } = {}
 
 local function spawnDummy(d: Dummy)
 	local model = RigBuilder.buildDummy()
-	model.Name = if d.mode == "block" then "훈련용 허수아비 (막기)" else "훈련용 허수아비"
-	RigBuilder.prepare(model, { displayName = model.Name, collisionGroup = "Characters" })
+	local key = if d.mode == "block" then "plate.dummy_block" else "plate.dummy"
+	model.Name = Locale.t(key, nil, "en")
+	RigBuilder.prepare(model, { displayName = Locale.both(key), collisionGroup = "Characters" })
 	local hum = model:FindFirstChildOfClass("Humanoid") :: Humanoid
 	hum.MaxHealth = 200
 	hum.Health = 200
