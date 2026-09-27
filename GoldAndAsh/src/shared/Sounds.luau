@@ -120,7 +120,7 @@ function Sounds.play(name: string, opts: PlayOptions): Sound?
 	local region = SoundManifest.sprite[name]
 	local id = spriteId()
 	if id ~= 0 and region then
-		sound.SoundId = "rbxassetid://" .. tostring(id)
+		sound.SoundId = string.format("rbxassetid://%d", id)
 		sound.PlaybackRegionsEnabled = true
 		sound.PlaybackRegion = NumberRange.new(region.start, region.start + region.length)
 		sound.Volume = volume
@@ -196,7 +196,7 @@ function Sounds.playMusic(key: string?)
 	end
 	local s = Instance.new("Sound")
 	s.Name = "Music"
-	s.SoundId = "rbxassetid://" .. tostring(id)
+	s.SoundId = string.format("rbxassetid://%d", id)
 	s.Looped = true
 	s.Volume = 0
 	s.Parent = SoundService
