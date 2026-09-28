@@ -926,8 +926,19 @@ local function restoreByHeartbeat(W: World, limit: number?): RestoreInfo
 			if #pl.positions ~= #pl.sizes then
 				bad(info.contract, "Rebuild positions %d ≠ sizes %d", #pl.positions, #pl.sizes)
 			end
-			if #pl.positions > 24 or #pl.positions == 0 then
-				bad(info.contract, "Rebuild 개수 %d (1~24 여야 함)", #pl.positions)
+			if #pl.positions > S.RestorePerTick or #pl.positions == 0 then
+				bad(info.contract, "Rebuild 개수 %d (1~%d 여야 함)", #pl.positions, S.RestorePerTick)
+			end
+			-- 복구된 파트의 CFrame (클라이언트가 그 안에 남은 잔해를 치운다)
+			if type(pl.cframes) ~= "table" or #pl.cframes ~= #pl.positions then
+				bad(info.contract, "Rebuild cframes 가 없거나 개수가 다름")
+			else
+				for k = 1, #pl.cframes do
+					if typeof(pl.cframes[k]) ~= "CFrame" then
+						bad(info.contract, "Rebuild cframes 값이 CFrame 이 아님")
+						break
+					end
+				end
 			end
 			for k = 1, #pl.positions do
 				if typeof(pl.positions[k]) ~= "Vector3" or typeof(pl.sizes[k]) ~= "Vector3" then
@@ -2322,7 +2333,7 @@ runSection("D", function()
 
 	local info = restoreByHeartbeat(W)
 	note("복구: 가상 %.1f초, Rebuild %d번 (한 번에 최대 %d개), 0.5초당 최대 %d개 복구", info.seconds, info.rebuilds, info.maxPerEvent, info.maxPerTick)
-	check("D4", "Rebuild 형식 (positions/sizes, 1~24개)", info.contract.n == 0, describe(info.contract))
+	check("D4", "Rebuild 형식 (positions/sizes/cframes, 1~RestorePerTick개)", info.contract.n == 0, describe(info.contract))
 	check("D5", "0.5초에 RestorePerTick 이하로 복구", info.maxPerTick <= S.RestorePerTick, string.format("최대 %d / %d", info.maxPerTick, S.RestorePerTick))
 	local R = compareToSnapshot(W)
 	check("D6", "Heartbeat 만으로 처음 상태와 완전히 같아짐 (파트·속성·부모·보관 폴더·pieceCount·색인)", R.n == 0, describe(R))
@@ -2361,14 +2372,53 @@ runSection("D", function()
 			end
 		end
 		check("D7", "구멍 바로 앞에 캐릭터가 있으면 그 파트 복구를 미룸", wallDeferred, "")
-		check(
-			"D8",
-			"구멍에서 먼 캐릭터(같은 큰 파트 위)는 복구를 막지 않음",
-			#farDeferred == 0,
-			if #farDeferred > 0
-				then string.format("55~60 스터드 떨어진 캐릭터 때문에 안 돌아옴: %s (원본 상자 전체로 겹침 검사)", table.concat(farDeferred, ", "))
-				else ""
-		)
+		-- (여기서는 국수집 벽 구멍이 뒤 찻집까지 이어져 있어, 벽 앞 캐릭터 때문에 찻집 구멍도 함께 미뤄지는 게 정상 — 이어진 구멍은 한 덩어리)
+		note("캐릭터 1 과 이어진 구멍 덩어리 때문에 함께 미뤄진 것: %s", table.concat(farDeferred, ", "))
+		do
+			-- 먼 캐릭터만 있을 때는 아무것도 막으면 안 된다
+			local W3 = newWorld()
+			local noodle3 = findSites(W3)[1]
+			local teahouse3 = find(W3, "Decor.NorthShopRow.TeahouseBody")
+			local lo3, hi3 = boundsOf(teahouse3)
+			local tc3 = Vector3.new((lo3.X + hi3.X) / 2, 5, hi3.Z + 0.3)
+			runHit(W3, sphereHit({ id = "plaza_floor", label = "광장 바닥", center = Vector3.new(20, 1.3, 20), from = Vector3.new(20, 8, 20), dir = Vector3.new(0, -1, 0) }, 3))
+			runHit(W3, sphereHit(noodle3, 6))
+			runHit(W3, sphereHit({ id = "teahouse", label = "찻집 정면", center = tc3, from = tc3 + Vector3.new(0, 0, 10), dir = Vector3.new(0, 0, -1) }, 4))
+			addCharacter(W3, Vector3.new(-30, 1.3, -30))
+			addCharacter(W3, Vector3.new(tc3.X, hi3.Y, lo3.Z + 10))
+			advance(W3, S.RestoreTime + 15)
+			local far = {}
+			for _, id in scan(W3).missing do
+				table.insert(far, (string.gsub(W3.snap.byId[id].full, "^Workspace%.Map%.", "")))
+			end
+			check(
+				"D8",
+				"구멍에서 먼 캐릭터(같은 큰 파트 위, 55~60 스터드)는 복구를 막지 않음",
+				#far == 0,
+				if #far > 0 then "안 돌아옴: " .. table.concat(far, ", ") else ""
+			)
+		end
+		do
+			-- 벽을 뚫고 뒤 건물까지 이어진 굴: 안쪽(찻집 구멍)에 캐릭터가 있으면 입구인 벽도 복구를 미뤄야 한다 (갇힘 방지)
+			local W4 = newWorld()
+			local noodle4 = findSites(W4)[1]
+			runHit(W4, sphereHit(noodle4, 6))
+			local wall4 = find(W4, "Decor.NoodleShop_LinJi.ShopWallWest")
+			local wlo = boundsOf(wall4)
+			addCharacter(W4, Vector3.new(wlo.X - 6, 3, noodle4.center.Z)) -- 벽 구멍의 여유 상자(+3.5) 밖, 찻집 구멍 안: 이어진 덩어리 규칙으로만 미뤄진다
+			advance(W4, S.RestoreTime + 15)
+			local wallBack = true
+			for _, id in scan(W4).missing do
+				if string.find(W4.snap.byId[id].full, "ShopWallWest", 1, true) then
+					wallBack = false
+				end
+			end
+			check("D10", "이어진 굴 안쪽에 캐릭터가 있으면 입구(벽)도 복구를 미룸", not wallBack, "")
+			table.clear(W4.chars)
+			restoreByHeartbeat(W4)
+			local R4 = compareToSnapshot(W4)
+			check("D11", "굴에서 나온 뒤 전부 복구", R4.n == 0, describe(R4))
+		end
 		note("겹침 조회 %d번", W2.occupancyQueries)
 		table.clear(W2.chars)
 		restoreByHeartbeat(W2)

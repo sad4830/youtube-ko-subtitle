@@ -82,16 +82,20 @@ function Ren.Peel(ent: Entity, ctx: Ctx): boolean
 	end
 	local start = ent.root.Position
 	local dist = 17
+	local finish = start + aim * dist
+	local mid = (start + finish) / 2
+	local lineCF = CFrame.lookAt(mid, finish)
+	-- 돌진하기 전에 길을 먼저 벤다 (구멍과 돌진이 같은 순간 도착해야 벽에 막히지 않고 베어 지나간다).
+	-- 칼날이 지나간 자리의 비생체 물질(벽·사물)은 전부 재가 된다.
+	local cut = Combat.smash(ent, { cf = lineCF, size = Vector3.new(7, 7, dist + 4) }, { from = start, dir = aim, ash = true, force = 1.2 })
 	Combat.push(ent, aim * 100, 0.17)
 	ent.iframeUntil = os.clock() + 0.15
 	if not Combat.sleep(ent, token, 0.14) then
 		return true
 	end
-	local finish = start + aim * dist
 	Combat.fx("SlashLine", { from = start, to = finish, color = "red" })
-	local mid = (start + finish) / 2
-	local hits, region = Combat.box(ent, CFrame.lookAt(mid, finish), Vector3.new(7, 7, dist + 4))
-	local gained = false
+	local hits = Combat.box(ent, lineCF, Vector3.new(7, 7, dist + 4))
+	local gained = cut > 0
 	for _, tgt in hits do
 		local res = Combat.hit(ent, tgt, {
 			damage = 9,
@@ -107,10 +111,6 @@ function Ren.Peel(ent: Entity, ctx: Ctx): boolean
 		if res == "hit" or res == "blocked" then
 			gained = true
 		end
-	end
-	-- 칼날이 지나간 자리의 비생체 물질(벽·사물)은 전부 재가 된다
-	if Combat.smash(ent, region, { from = start, dir = aim, ash = true, force = 1.2 }) > 0 then
-		gained = true
 	end
 	if gained then
 		Combat.addAsh(ent, 2)
@@ -246,7 +246,7 @@ function Ren.onAwaken(ent: Entity)
 		Combat.fx("AshAura", { model = ent.model, on = true })
 		local center = ent.root.Position
 		local hits = Combat.box(ent, CFrame.new(center), Vector3.new(20, 10, 20))
-		Combat.smashSphere(ent, center, 11, { ash = true, force = 1.4 })
+		Combat.smash(ent, { cf = CFrame.new(center + UP * 1.5), size = Vector3.new(22, 12, 22) }, { ash = true, force = 1.4 })
 		for _, tgt in hits do
 			local out = (tgt.root.Position - center) * Vector3.new(1, 0, 1)
 			local dir = if out.Magnitude > 0.1 then out.Unit else ent.root.CFrame.LookVector
@@ -302,6 +302,11 @@ function Ren.Severance(ent: Entity, ctx: Ctx): boolean
 	local token = Combat.beginMove(ent, "Severance", 0.95, 0)
 	local start = ent.root.Position
 	local dist = 28
+	local finish = start + aim * dist
+	local mid = (start + finish) / 2
+	local lineCF = CFrame.lookAt(mid, finish)
+	-- 돌진 전에 길을 먼저 벤다 (벽에 막히지 않고 베어 지나가도록)
+	Combat.smash(ent, { cf = lineCF, size = Vector3.new(8, 8, dist + 4) }, { from = start, dir = aim, ash = true, force = 1.2 })
 	Combat.push(ent, aim * 170, 0.16)
 	ent.iframeUntil = os.clock() + 0.3
 	Combat.anim(ent, "ren_severance")
@@ -309,11 +314,7 @@ function Ren.Severance(ent: Entity, ctx: Ctx): boolean
 	if not Combat.sleep(ent, token, 0.16) then
 		return true
 	end
-	local finish = start + aim * dist
-	local mid = (start + finish) / 2
-	local lineCF = CFrame.lookAt(mid, finish)
-	local hits, region = Combat.box(ent, lineCF, Vector3.new(8, 8, dist + 4))
-	Combat.smash(ent, region, { from = start, dir = aim, ash = true, force = 1.2 })
+	local hits = Combat.box(ent, lineCF, Vector3.new(8, 8, dist + 4))
 	for _, tgt in hits do
 		Combat.stun(tgt, 0.7, "stunned")
 	end

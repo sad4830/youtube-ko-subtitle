@@ -462,20 +462,28 @@ function Combat.box(attacker: Entity?, cf: CFrame, size: Vector3): ({ Entity }, 
 end
 
 -- 판정 영역 안의 건물·사물을 부순다. 부서진 파트 수를 돌려준다.
-function Combat.smash(att: Entity?, region: Region, opts: Destruction.Opts?): number
+-- 공격자가 딛고 선 바닥(다리·발코니·지붕)은 자기 공격으로 꺼지지 않게 floorY 를 넘긴다 (R6: 발바닥 = 몸통 중심 - 3)
+local function attackOpts(att: Entity?, opts: Destruction.Opts?): Destruction.Opts
 	local o: Destruction.Opts = opts or {}
-	if o.from == nil and att then
-		o.from = att.root.Position
+	if att then
+		if o.from == nil then
+			o.from = att.root.Position
+		end
+		if o.floorY == nil then
+			o.floorY = att.root.Position.Y - 3
+		end
 	end
+	return o
+end
+
+function Combat.smash(att: Entity?, region: Region, opts: Destruction.Opts?): number
+	local o = attackOpts(att, opts)
 	return Destruction.destroyBox(region.cf, region.size, o)
 end
 
 -- 구 모양으로 부순다 (폭발·착지 충격 등)
 function Combat.smashSphere(att: Entity?, center: Vector3, radius: number, opts: Destruction.Opts?): number
-	local o: Destruction.Opts = opts or {}
-	if o.from == nil and att then
-		o.from = att.root.Position
-	end
+	local o = attackOpts(att, opts)
 	return Destruction.destroySphere(center, radius, o)
 end
 
@@ -727,6 +735,9 @@ export type Projectile = {
 	groundSkim: boolean,
 	pierce: boolean, -- 부서지는 벽을 뚫고 계속 날아간다
 	smash: number, -- 벽에 맞았을 때 뚫는 구멍 반지름
+	floorY: number, -- 쏜 사람이 딛고 있던 높이 (그 바닥은 베지 않는다)
+	cutFrom: Vector3, -- 관통형: 아직 안 벤 구간의 시작점
+	cutAt: number, -- 관통형: 마지막으로 벤 시각
 }
 
 local projectiles: { Projectile } = {}
@@ -770,6 +781,9 @@ function Combat.projectile(owner: Entity, opts: {
 		groundSkim = opts.groundSkim == true,
 		pierce = opts.pierce == true,
 		smash = opts.smash or math.max(opts.width, opts.height or 4) * 0.55,
+		floorY = owner.root.Position.Y - 3,
+		cutFrom = opts.origin,
+		cutAt = now(),
 	}
 	p.info.projectile = p
 	table.insert(projectiles, p)
@@ -792,6 +806,10 @@ function Combat.redirectProjectile(p: Projectile, newOwner: Entity, newDir: Vect
 	p.traveled = 0
 	p.range = math.max(p.range, 40)
 	p.hitSet = { [newOwner] = true }
+	-- 되돌아가는 참격은 새 주인 기준으로 다시 베기 시작한다 (지나온 길을 거꾸로 베지 않게)
+	p.cutFrom = p.pos
+	p.cutAt = now()
+	p.floorY = newOwner.root.Position.Y - 3
 	Combat.fx("ProjectileRedirect", { id = p.id, pos = p.pos, dir = p.dir, speed = p.speed, range = p.range, kind = "gold" })
 end
 
@@ -828,8 +846,19 @@ local function stepProjectiles(dt: number)
 			local n = wall.Normal
 			if not (p.groundSkim and n.Y > 0.7) then
 				if p.cutProps and Destruction.isDestructible(wall.Instance) then
-					Destruction.destroySphere(wall.Position + p.dir * (p.smash * 0.3), p.smash, { from = p.pos, dir = p.dir, ash = ash, force = 1.3 })
-					if not p.pierce then
+					-- 관통형은 아래에서 지나간 구간을 한꺼번에 베므로 여기선 할 일이 없다.
+					-- 약한 참격: 작은 사물은 그냥 베고 지나가고(아래 propsOnly), 건물 벽이면 구멍만 내고 멈춘다.
+					local inst = wall.Instance :: BasePart
+					local sz = inst.Size
+					local isProp = inst:GetAttribute("Breakable") == true or math.max(sz.X, sz.Y, sz.Z) <= 8
+					if not p.pierce and not isProp then
+						Destruction.destroySphere(wall.Position + p.dir * (p.smash * 0.3), p.smash, {
+							from = p.pos,
+							dir = p.dir,
+							ash = ash,
+							force = 1.3,
+							floorY = p.floorY,
+						})
 						stopAt = wall.Position
 						step = (wall.Position - p.pos).Magnitude
 					end
@@ -861,11 +890,32 @@ local function stepProjectiles(dt: number)
 				end
 			end
 		end
-		-- 지나가는 길의 사물 (관통형은 건물까지 통째로 베어 나간다)
+		-- 지나가는 길의 사물
 		if p.cutProps then
-			-- 한 스텝은 짧으니 조각 크기는 참격 단면에 맞춘다 (안 그러면 벽이 너무 잘게 쪼개진다)
-			local grain = math.clamp(math.min(p.width, p.height) / 3, 1.5, 4)
-			Destruction.destroyBox(cf, region.size, { from = p.pos, dir = p.dir, ash = ash, propsOnly = not p.pierce, force = 1.1, grain = grain })
+			if p.pierce then
+				-- 관통형: 매 프레임 베면 조각·네트워크가 폭주하므로, 지나온 구간을 0.1초마다 한 번에 벤다 (겹침 없이)
+				local endPos = p.pos + p.dir * step
+				local last = stopAt ~= nil or p.traveled + step >= p.range - 0.01
+				if last or now() - p.cutAt >= 0.1 then
+					local len = (endPos - p.cutFrom).Magnitude
+					if len > 0.05 then
+						local m = (p.cutFrom + endPos) / 2
+						Destruction.destroyBox(CFrame.lookAt(m, m + p.dir), Vector3.new(p.width, p.height, len), {
+							from = p.cutFrom,
+							dir = p.dir,
+							ash = ash,
+							force = 1.1,
+							grain = math.clamp(math.min(p.width, p.height) * 0.6, 2, 4),
+							floorY = p.floorY,
+						})
+					end
+					p.cutFrom = endPos
+					p.cutAt = now()
+				end
+			else
+				local grain = math.clamp(math.min(p.width, p.height) / 3, 1.5, 4)
+				Destruction.destroyBox(cf, region.size, { from = p.pos, dir = p.dir, ash = ash, propsOnly = true, force = 1.1, grain = grain, floorY = p.floorY })
+			end
 		end
 		p.pos += p.dir * step
 		p.traveled += step
@@ -964,9 +1014,18 @@ local function bodyCrash(ent: Entity, t: number)
 		table.insert(ignore, m)
 	end
 	wallParams.FilterDescendantsInstances = ignore
-	-- 네트워크 지연만큼 앞을 미리 본다 (벽에 닿기 전에 부숴야 멈추지 않고 뚫고 나간다)
+	-- 앞을 미리 본다: 플레이어 몸은 그 플레이어 컴퓨터가 움직이므로, 서버가 보는 위치는 지연만큼 늦고
+	-- 뚫린 구멍도 지연 뒤에 도착한다 → 왕복 지연(핑)만큼 더 앞을 본다. 벽에 닿기 전에 부숴야 멈추지 않고 뚫고 나간다.
 	local dir = v.Unit
-	local reach = math.clamp(speed * 0.12, 3, 12)
+	local lead = 0.08
+	local plr = ent.player
+	if plr and plr.Parent then
+		local ok, ping = pcall(function()
+			return plr:GetNetworkPing()
+		end)
+		lead += math.clamp(if ok and typeof(ping) == "number" then ping * 2 else 0.2, 0, 0.35)
+	end
+	local reach = math.clamp(speed * lead, 3, 40)
 	local hit = workspace:Raycast(ent.root.Position, dir * reach, wallParams)
 	if not hit then
 		return
@@ -982,10 +1041,17 @@ local function bodyCrash(ent: Entity, t: number)
 			grain = math.max(2.5, radius * 0.6),
 		})
 		if knocked and ent.alive and ent.data.crashed ~= true then
-			-- 첫 충돌만 피해 + 벽꽝 연출
+			-- 첫 충돌만 피해 + 벽꽝 연출 (뚫고 지나가므로 벽 균열은 그리지 않는다).
+			-- 서버가 움직이는 몸(봇·허수아비)은 실제로 닿는 순간에 맞춘다.
 			ent.data.crashed = true
-			Combat.fx("WallSlam", { pos = hit.Position, normal = hit.Normal, model = ent.model })
-			applyDamage(ent.data.wallAttacker :: Entity?, ent, 3)
+			local attacker = ent.data.wallAttacker :: Entity?
+			local pos, normal = hit.Position, hit.Normal
+			task.delay(if plr then 0 else math.min(hit.Distance / speed, 0.4), function()
+				if ent.alive then
+					Combat.fx("WallSlam", { pos = pos, normal = normal, model = ent.model, broke = true })
+					applyDamage(attacker, ent, 3)
+				end
+			end)
 		end
 	elseif
 		knocked

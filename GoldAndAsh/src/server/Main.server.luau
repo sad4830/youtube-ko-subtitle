@@ -40,13 +40,17 @@ local Config = require(Shared.Config)
 -- 충돌 그룹: 캐릭터끼리는 서로 통과하고(가강전처럼 몸으로 밀어 날리는 버그 방지),
 -- 부서져 날아가는 파편도 캐릭터와 부딪히지 않는다. 캐릭터와 맵은 정상적으로 충돌한다.
 safe("충돌 그룹", function()
-	for _, g in { "Characters", "Debris" } do
+	for _, g in { "Characters", "Debris", "DebrisFresh" } do
 		if not PhysicsService:IsCollisionGroupRegistered(g) then
 			PhysicsService:RegisterCollisionGroup(g)
 		end
 	end
 	PhysicsService:CollisionGroupSetCollidable("Characters", "Characters", false)
 	PhysicsService:CollisionGroupSetCollidable("Debris", "Characters", false)
+	-- 막 튀어나온 잔해: 맵하고만 부딪힌다 (겹쳐서 생긴 조각끼리 튕겨 나가지 않게, 잠시 뒤 Debris 로 바뀐다)
+	PhysicsService:CollisionGroupSetCollidable("DebrisFresh", "Characters", false)
+	PhysicsService:CollisionGroupSetCollidable("DebrisFresh", "Debris", false)
+	PhysicsService:CollisionGroupSetCollidable("DebrisFresh", "DebrisFresh", false)
 end)
 
 local MapService = require(script.Parent.MapService)

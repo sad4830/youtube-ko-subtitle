@@ -43,6 +43,7 @@ export type Opts = {
 	grain: number?, -- 가장 작은 조각 크기 (기본: 영역 크기에서 자동)
 	sound: boolean?, -- false 면 소리 없이 (여러 번 연달아 부를 때)
 	maxParts: number?, -- 한 번에 부술 파트 수 상한 (궁극기처럼 큰 파괴에서 늘린다)
+	floorY: number?, -- 공격자가 딛고 선 높이: 윗면이 이 높이 +1 이하인 파트(밟고 있는 다리·발코니·지붕)는 남긴다
 }
 
 -- 부서지는 영역: 상자(cf, half) 또는 구(center, radius)
@@ -492,6 +493,7 @@ local function destroyRegion(R: Region, opts: Opts): number
 	local groups: { Group } = {}
 	local affected = 0
 	local sent = 0
+	local lost = 0 -- 조각으로 못 보낸 부피 (클라이언트가 그만큼 먼지를 더 낸다)
 	local budget = { n = Settings.MaxSplitsPerCall }
 	local maxParts = opts.maxParts or Settings.MaxPartsPerCall
 
@@ -504,6 +506,10 @@ local function destroyRegion(R: Region, opts: Opts): number
 			continue
 		end
 		local sz = part.Size
+		local floorY = opts.floorY
+		if floorY and part.Position.Y + worldHalf(part.CFrame, sz).Y <= floorY + 1 then
+			continue
+		end
 		if opts.propsOnly and math.max(sz.X, sz.Y, sz.Z) > SMALL and part:GetAttribute("Breakable") ~= true then
 			continue
 		end
@@ -533,11 +539,19 @@ local function destroyRegion(R: Region, opts: Opts): number
 		end
 		-- 잔해 목록 (너무 많으면 잘라서 보낸다 — 나머지는 먼지로만 보인다)
 		local room = Settings.MaxDebrisSent - sent
-		if room > 0 then
+		if room <= 0 then
+			for _, r in removed do
+				lost += r.size.X * r.size.Y * r.size.Z
+			end
+		else
 			if #removed > room then
 				local cut = {}
 				for i = 1, room do
 					cut[i] = removed[i]
+				end
+				for i = room + 1, #removed do
+					local rs = removed[i].size
+					lost += rs.X * rs.Y * rs.Z
 				end
 				removed = cut
 			end
@@ -554,7 +568,6 @@ local function destroyRegion(R: Region, opts: Opts): number
 		-- 원래 파트(또는 조각)를 맵에서 뺀다
 		unregister(part)
 		if part == fam.original then
-			templateOf(fam)
 			part.Parent = holding
 			fam.broken = true
 			fam.brokenAt = now
@@ -596,6 +609,7 @@ local function destroyRegion(R: Region, opts: Opts): number
 			ash = opts.ash == true,
 			sound = opts.sound ~= false,
 			groups = groups,
+			lost = lost,
 		})
 	end
 	-- 조각이 한도를 넘으면 오래된 것부터 빨리 복구
@@ -652,34 +666,39 @@ end
 ----------------------------------------------------------------------
 local occupancy = OverlapParams.new()
 occupancy.FilterType = Enum.RaycastFilterType.Include
+-- 서버가 보는 플레이어 위치는 네트워크 지연만큼 늦고, 복구된 벽도 지연 뒤에 도착한다 → 넉넉히 (한쪽 3.5)
+local LATENCY_PAD = Vector3.new(7, 7, 7)
+local HOLE_CELL = 16
 
-local function charactersAt(cf: CFrame, size: Vector3): boolean
+local function characterModels(): { Instance }
 	local chars: { Instance } = {}
 	for _, m in workspace:GetChildren() do
 		if m:IsA("Model") and m:FindFirstChildOfClass("Humanoid") then
 			table.insert(chars, m)
 		end
 	end
+	return chars
+end
+
+local function charactersAt(chars: { Instance }, cf: CFrame, size: Vector3): boolean
 	if #chars == 0 then
 		return false
 	end
 	occupancy.FilterDescendantsInstances = chars
-	return #workspace:GetPartBoundsInBox(cf, size + Vector3.new(0.5, 0.5, 0.5), occupancy) > 0
+	return #workspace:GetPartBoundsInBox(cf, size + LATENCY_PAD, occupancy) > 0
 end
 
-local function restore(f: Family): boolean
-	local o = f.original
-	-- 구멍 자리에 캐릭터가 있으면 미룬다. 원본 전체로 보면 큰 바닥·건물 위 먼 곳에 서 있기만 해도 영영 안 돌아온다
-	local cf, size = o.CFrame, o.Size
+-- 구멍(없앤 부분)의 월드 위치와 크기. 원본 전체로 보면 큰 바닥·건물 위 먼 곳에 서 있기만 해도 영영 안 돌아온다
+local function holeWorld(f: Family): (CFrame, Vector3)
 	local lo, hi = f.holeMin, f.holeMax
 	if lo and hi then
-		cf = o.CFrame * CFrame.new((lo + hi) / 2)
-		size = hi - lo
+		return f.original.CFrame * CFrame.new((lo + hi) / 2), hi - lo
 	end
-	if charactersAt(cf, size) then
-		f.restoreAt = os.clock() + 2
-		return false
-	end
+	return f.original.CFrame, f.original.Size
+end
+
+local function restore(f: Family)
+	local o = f.original
 	f.holeMin = nil
 	f.holeMax = nil
 	for piece in f.pieces do
@@ -697,30 +716,115 @@ local function restore(f: Family): boolean
 	register(o, f.kind)
 	f.broken = false
 	brokenFamilies[f] = nil
-	return true
 end
+
+-- 서로 맞닿은 구멍들은 한 덩어리로 본다: 벽 하나와 뒤 건물을 한 번에 뚫었을 때,
+-- 안쪽 구멍에 사람이 있는데 입구(벽)만 먼저 복구되어 갇히는 일이 없도록 덩어리 전체를 함께 미룬다.
+type Box = { c: Vector3, h: Vector3 }
 
 local function restoreTick()
 	local now = os.clock()
+	local due: { Family } = {}
+	for f in brokenFamilies do
+		if f.restoreAt <= now then
+			table.insert(due, f)
+		end
+	end
+	if #due == 0 then
+		return
+	end
+
+	-- 부서진 가족들의 구멍 AABB 를 격자에 넣는다
+	local boxes: { [Family]: Box } = {}
+	local hgrid: { [number]: { Family } } = {}
+	local pad = Vector3.new(0.5, 0.5, 0.5)
+	for f in brokenFamilies do
+		local cf, size = holeWorld(f)
+		local c, h = cf.Position, worldHalf(cf, size) + pad
+		boxes[f] = { c = c, h = h }
+		for ix = math.floor((c.X - h.X) / HOLE_CELL), math.floor((c.X + h.X) / HOLE_CELL) do
+			for iz = math.floor((c.Z - h.Z) / HOLE_CELL), math.floor((c.Z + h.Z) / HOLE_CELL) do
+				local k = key(ix, iz)
+				local cell = hgrid[k]
+				if not cell then
+					cell = {}
+					hgrid[k] = cell
+				end
+				table.insert(cell, f)
+			end
+		end
+	end
+
+	local chars = characterModels()
+	local visited: { [Family]: boolean } = {}
 	local restoredPos: { Vector3 } = {}
 	local restoredSize: { Vector3 } = {}
+	local restoredCF: { CFrame } = {}
 	local done = 0
-	for f in brokenFamilies do
+	for _, start in due do
 		if done >= Settings.RestorePerTick then
 			break
 		end
-		if f.restoreAt <= now then
-			if restore(f) then
-				done += 1
-				if #restoredPos < 24 then
-					table.insert(restoredPos, f.original.Position)
-					table.insert(restoredSize, f.original.Size)
+		if visited[start] or not brokenFamilies[start] then
+			continue
+		end
+		-- 이어진 덩어리 찾기 (너비 우선)
+		visited[start] = true
+		local comp: { Family } = { start }
+		local i = 1
+		while comp[i] do
+			local g = comp[i]
+			i += 1
+			local b = boxes[g]
+			local seen: { [Family]: boolean } = {}
+			for ix = math.floor((b.c.X - b.h.X) / HOLE_CELL), math.floor((b.c.X + b.h.X) / HOLE_CELL) do
+				for iz = math.floor((b.c.Z - b.h.Z) / HOLE_CELL), math.floor((b.c.Z + b.h.Z) / HOLE_CELL) do
+					local cell = hgrid[key(ix, iz)]
+					if cell then
+						for _, other in cell do
+							if not visited[other] and not seen[other] then
+								seen[other] = true
+								local ob = boxes[other]
+								local d = ob.c - b.c
+								if
+									math.abs(d.X) <= ob.h.X + b.h.X
+									and math.abs(d.Y) <= ob.h.Y + b.h.Y
+									and math.abs(d.Z) <= ob.h.Z + b.h.Z
+								then
+									visited[other] = true
+									table.insert(comp, other)
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		-- 덩어리 어느 구멍에라도 캐릭터가 있으면 전부 미룬다
+		local occupied = false
+		for _, g in comp do
+			local cf, size = holeWorld(g)
+			if charactersAt(chars, cf, size) then
+				occupied = true
+				break
+			end
+		end
+		for _, g in comp do
+			if g.restoreAt <= now then
+				if occupied then
+					g.restoreAt = now + 2
+				elseif done < Settings.RestorePerTick then
+					restore(g)
+					done += 1
+					table.insert(restoredPos, g.original.Position)
+					table.insert(restoredSize, g.original.Size)
+					table.insert(restoredCF, g.original.CFrame)
 				end
 			end
 		end
 	end
 	if #restoredPos > 0 then
-		Remotes.FX:FireAllClients("Rebuild", { positions = restoredPos, sizes = restoredSize })
+		Remotes.FX:FireAllClients("Rebuild", { positions = restoredPos, sizes = restoredSize, cframes = restoredCF })
 	end
 end
 

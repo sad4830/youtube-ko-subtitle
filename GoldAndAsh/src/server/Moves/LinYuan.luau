@@ -165,7 +165,7 @@ function Lin.StaffSpin(ent: Entity, _ctx: Ctx): boolean
 		if i < 3 then
 			Combat.smash(ent, region, { propsOnly = true })
 		else
-			Combat.smashSphere(ent, center, 9.5, { force = 1.4 })
+			Combat.smash(ent, { cf = CFrame.new(center + UP * 1.5), size = Vector3.new(19, 10, 19) }, { force = 1.4 })
 		end
 	end
 	return true
@@ -243,7 +243,7 @@ function Lin.onAwaken(ent: Entity)
 		-- 일어서는 기세로 주변을 밀어낸다
 		local center = ent.root.Position
 		local hits = Combat.box(ent, CFrame.new(center), Vector3.new(22, 10, 22))
-		Combat.smashSphere(ent, center, 12, { force = 1.5 })
+		Combat.smash(ent, { cf = CFrame.new(center + UP * 1.5), size = Vector3.new(24, 12, 24) }, { force = 1.5 })
 		for _, tgt in hits do
 			local out = flatDir(center, tgt.root.Position, ent.root.CFrame.LookVector)
 			Combat.hit(ent, tgt, {
@@ -345,7 +345,7 @@ function Lin.DragonCoil(ent: Entity, _ctx: Ctx): boolean
 			shake = 0.5,
 		})
 	end
-	Combat.smashSphere(ent, center, 15, { force = 1.8 })
+	Combat.smash(ent, { cf = CFrame.new(center + UP * 2), size = Vector3.new(32, 14, 32) }, { force = 1.8 })
 	return true
 end
 
