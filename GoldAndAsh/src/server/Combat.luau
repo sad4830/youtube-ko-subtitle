@@ -14,6 +14,8 @@ local Physics = require(Shared.Physics)
 local RigBuilder = require(Shared.RigBuilder)
 local Locale = require(Shared.Locale)
 
+local Destruction = require(script.Parent.Destruction)
+
 local Combat = {}
 
 export type HitInfo = {
@@ -418,7 +420,10 @@ local overlap = OverlapParams.new()
 overlap.FilterType = Enum.RaycastFilterType.Exclude
 overlap.RespectCanCollide = false
 
-function Combat.box(attacker: Entity?, cf: CFrame, size: Vector3): ({ Entity }, { BasePart })
+-- 판정 상자. 맞은 캐릭터들과, 건물·사물을 부술 때 쓸 영역을 돌려준다.
+export type Region = { cf: CFrame, size: Vector3 }
+
+function Combat.box(attacker: Entity?, cf: CFrame, size: Vector3): ({ Entity }, Region)
 	local exclude: { Instance } = { fxFolder }
 	if attacker then
 		table.insert(exclude, attacker.model)
@@ -427,21 +432,16 @@ function Combat.box(attacker: Entity?, cf: CFrame, size: Vector3): ({ Entity }, 
 	local parts = workspace:GetPartBoundsInBox(cf, size, overlap)
 	local found: { Entity } = {}
 	local seen: { [Model]: boolean } = {}
-	local props: { BasePart } = {}
 	for _, part in parts do
-		if part:GetAttribute("Breakable") == true and part:GetAttribute("Broken") ~= true then
-			table.insert(props, part)
-		else
-			local model = part:FindFirstAncestorOfClass("Model")
-			while model and not entities[model] do
-				model = model:FindFirstAncestorOfClass("Model")
-			end
-			if model and not seen[model] then
-				seen[model] = true
-				local e = entities[model]
-				if e and e.alive then
-					table.insert(found, e)
-				end
+		local model = part:FindFirstAncestorOfClass("Model")
+		while model and not entities[model] do
+			model = model:FindFirstAncestorOfClass("Model")
+		end
+		if model and not seen[model] then
+			seen[model] = true
+			local e = entities[model]
+			if e and e.alive then
+				table.insert(found, e)
 			end
 		end
 	end
@@ -458,11 +458,29 @@ function Combat.box(attacker: Entity?, cf: CFrame, size: Vector3): ({ Entity }, 
 		p.Parent = fxFolder
 		Debris:AddItem(p, 0.25)
 	end
-	return found, props
+	return found, { cf = cf, size = size }
+end
+
+-- 판정 영역 안의 건물·사물을 부순다. 부서진 파트 수를 돌려준다.
+function Combat.smash(att: Entity?, region: Region, opts: Destruction.Opts?): number
+	local o: Destruction.Opts = opts or {}
+	if o.from == nil and att then
+		o.from = att.root.Position
+	end
+	return Destruction.destroyBox(region.cf, region.size, o)
+end
+
+-- 구 모양으로 부순다 (폭발·착지 충격 등)
+function Combat.smashSphere(att: Entity?, center: Vector3, radius: number, opts: Destruction.Opts?): number
+	local o: Destruction.Opts = opts or {}
+	if o.from == nil and att then
+		o.from = att.root.Position
+	end
+	return Destruction.destroySphere(center, radius, o)
 end
 
 -- 캐릭터 앞쪽 상자 판정
-function Combat.front(ent: Entity, forward: number, size: Vector3, dir: Vector3?): ({ Entity }, { BasePart })
+function Combat.front(ent: Entity, forward: number, size: Vector3, dir: Vector3?): ({ Entity }, Region)
 	local look = dir or ent.root.CFrame.LookVector
 	local flat = Vector3.new(look.X, 0, look.Z)
 	if flat.Magnitude < 0.05 then
@@ -573,6 +591,7 @@ function Combat.hit(att: Entity, tgt: Entity, info: HitInfo): string
 		if knock and info.ragdoll and Vector3.new(knock.X, 0, knock.Z).Magnitude > 45 then
 			tgt.data.wallCheckUntil = t + 0.9
 			tgt.data.wallAttacker = att
+			tgt.data.crashed = false
 			local ad = att.def
 			Combat.fx("Knockback", { model = tgt.model, duration = 0.7, color = if ad then ad.color else nil })
 		end
@@ -706,11 +725,12 @@ export type Projectile = {
 	onHit: ((p: Projectile, target: Entity, result: string) -> ())?,
 	cutProps: boolean,
 	groundSkim: boolean,
+	pierce: boolean, -- 부서지는 벽을 뚫고 계속 날아간다
+	smash: number, -- 벽에 맞았을 때 뚫는 구멍 반지름
 }
 
 local projectiles: { Projectile } = {}
 local projectileId = 0
-Combat.MapService = nil :: any
 
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -727,6 +747,8 @@ function Combat.projectile(owner: Entity, opts: {
 	onHit: ((p: Projectile, target: Entity, result: string) -> ())?,
 	cutProps: boolean?,
 	groundSkim: boolean?,
+	pierce: boolean?,
+	smash: number?,
 }): Projectile
 	projectileId += 1
 	local p: Projectile = {
@@ -746,6 +768,8 @@ function Combat.projectile(owner: Entity, opts: {
 		onHit = opts.onHit,
 		cutProps = opts.cutProps ~= false,
 		groundSkim = opts.groundSkim == true,
+		pierce = opts.pierce == true,
+		smash = opts.smash or math.max(opts.width, opts.height or 4) * 0.55,
 	}
 	p.info.projectile = p
 	table.insert(projectiles, p)
@@ -790,7 +814,7 @@ local function stepProjectiles(dt: number)
 			endProjectile(p)
 			continue
 		end
-		-- 벽에 막히면 소멸 (부서지는 소품과 캐릭터는 통과)
+		-- 벽: 부서지는 건물이면 구멍을 뚫고 (관통형은 계속 날아감), 안 부서지는 벽이면 소멸
 		local ignore: { Instance } = { fxFolder }
 		for m in entities do
 			table.insert(ignore, m)
@@ -798,16 +822,26 @@ local function stepProjectiles(dt: number)
 		rayParams.FilterDescendantsInstances = ignore
 		local wall = workspace:Raycast(p.pos, p.dir * step, rayParams)
 		local stopAt: Vector3? = nil
-		if wall and wall.Instance:GetAttribute("Breakable") ~= true and wall.Instance.CanCollide then
+		-- 칸자키 렌의 회분 참격(ash, ash_low)이 닿은 물체는 재가 된다 (린 위안이 되돌려 보낸 참격은 그냥 부순다)
+		local ash = string.sub(p.kind, 1, 3) == "ash" and p.owner.charId == "KanzakiRen"
+		if wall and wall.Instance.CanCollide then
 			local n = wall.Normal
 			if not (p.groundSkim and n.Y > 0.7) then
-				stopAt = wall.Position
-				step = (wall.Position - p.pos).Magnitude
+				if p.cutProps and Destruction.isDestructible(wall.Instance) then
+					Destruction.destroySphere(wall.Position + p.dir * (p.smash * 0.3), p.smash, { from = p.pos, dir = p.dir, ash = ash, force = 1.3 })
+					if not p.pierce then
+						stopAt = wall.Position
+						step = (wall.Position - p.pos).Magnitude
+					end
+				else
+					stopAt = wall.Position
+					step = (wall.Position - p.pos).Magnitude
+				end
 			end
 		end
 		local mid = p.pos + p.dir * (step / 2)
 		local cf = CFrame.lookAt(mid, mid + p.dir)
-		local hits, props = Combat.box(p.owner, cf, Vector3.new(p.width, p.height, math.max(step, 1) + 1.5))
+		local hits, region = Combat.box(p.owner, cf, Vector3.new(p.width, p.height, math.max(step, 1) + 1.5))
 		for _, e in hits do
 			if not p.hitSet[e] and p.alive then
 				p.hitSet[e] = true
@@ -827,10 +861,11 @@ local function stepProjectiles(dt: number)
 				end
 			end
 		end
-		if p.cutProps and Combat.MapService then
-			for _, prop in props do
-				Combat.MapService.breakPart(prop, p.pos, p.dir, p.kind == "ash")
-			end
+		-- 지나가는 길의 사물 (관통형은 건물까지 통째로 베어 나간다)
+		if p.cutProps then
+			-- 한 스텝은 짧으니 조각 크기는 참격 단면에 맞춘다 (안 그러면 벽이 너무 잘게 쪼개진다)
+			local grain = math.clamp(math.min(p.width, p.height) / 3, 1.5, 4)
+			Destruction.destroyBox(cf, region.size, { from = p.pos, dir = p.dir, ash = ash, propsOnly = not p.pierce, force = 1.1, grain = grain })
 		end
 		p.pos += p.dir * step
 		p.traveled += step
@@ -907,9 +942,72 @@ function Combat.changeCharacter(ent: Entity, charId: string)
 	Combat.syncAttributes(ent, true)
 end
 
+-- 날아가는 몸이 건물·사물에 부딪히면 부수고 뚫고 지나간다 (가강전처럼).
+-- 안 부서지는 벽이면 벽꽝(추가 피해 + 튕겨 나옴). 쓰러진 몸(처치 직후)도 부수며 날아간다.
+local function bodyCrash(ent: Entity, t: number)
+	local wallUntil = ent.data.wallCheckUntil
+	local knocked = typeof(wallUntil) == "number" and wallUntil > t
+	if not knocked and not ent.ragdolled then
+		return
+	end
+	local nextCrash = ent.data.nextCrash
+	if typeof(nextCrash) == "number" and t < nextCrash then
+		return
+	end
+	local v = ent.root.AssemblyLinearVelocity
+	local speed = v.Magnitude
+	if speed < Config.Destruction.BodyCrashSpeed then
+		return
+	end
+	local ignore: { Instance } = { fxFolder }
+	for m in entities do
+		table.insert(ignore, m)
+	end
+	wallParams.FilterDescendantsInstances = ignore
+	-- 네트워크 지연만큼 앞을 미리 본다 (벽에 닿기 전에 부숴야 멈추지 않고 뚫고 나간다)
+	local dir = v.Unit
+	local reach = math.clamp(speed * 0.12, 3, 12)
+	local hit = workspace:Raycast(ent.root.Position, dir * reach, wallParams)
+	if not hit then
+		return
+	end
+	if Destruction.isDestructible(hit.Instance) then
+		ent.data.nextCrash = t + 0.05
+		local radius = math.clamp(speed * 0.055, 3, 7)
+		Destruction.destroySphere(hit.Position + dir * (radius * 0.4), radius, {
+			from = ent.root.Position,
+			dir = dir,
+			force = math.clamp(speed / 70, 0.8, 2.2),
+		})
+		if knocked and ent.alive and ent.data.crashed ~= true then
+			-- 첫 충돌만 피해 + 벽꽝 연출
+			ent.data.crashed = true
+			Combat.fx("WallSlam", { pos = hit.Position, normal = hit.Normal, model = ent.model })
+			applyDamage(ent.data.wallAttacker :: Entity?, ent, 3)
+		end
+	elseif
+		knocked
+		and ent.alive
+		and math.abs(hit.Normal.Y) < 0.6
+		and Vector3.new(v.X, 0, v.Z).Magnitude > 30
+		and hit.Distance <= math.clamp(speed * 0.08, 2.5, 6)
+	then
+		-- 안 부서지는 벽: 벽꽝 후 튕겨 나온다
+		ent.data.wallCheckUntil = 0
+		Combat.fx("WallSlam", { pos = hit.Position, normal = hit.Normal, model = ent.model })
+		applyDamage(ent.data.wallAttacker :: Entity?, ent, 3)
+		ent.ragdollUntil = math.max(ent.ragdollUntil, t + 0.5)
+		ent.stunUntil = math.max(ent.stunUntil, ent.ragdollUntil + 0.35)
+		Combat.push(ent, hit.Normal * 10 + Vector3.new(0, 12, 0), 0.1)
+	end
+end
+
 local function updateEntity(ent: Entity, dt: number, t: number)
 	local hum = ent.humanoid
 	if not ent.alive then
+		if ent.ragdolled and ent.model.Parent then
+			bodyCrash(ent, t)
+		end
 		return
 	end
 	if ent.ragdolled and t >= ent.ragdollUntil then
@@ -938,32 +1036,7 @@ local function updateEntity(ent: Entity, dt: number, t: number)
 		end
 	end
 
-	-- 벽꽝: 크게 날아가던 중 벽에 부딪히면 추가 피해 + 파편
-	local wallUntil = ent.data.wallCheckUntil
-	if typeof(wallUntil) == "number" and wallUntil > t then
-		local v = ent.root.AssemblyLinearVelocity
-		local hv = Vector3.new(v.X, 0, v.Z)
-		if hv.Magnitude > 30 then
-			local ignore: { Instance } = { fxFolder }
-			for m in entities do
-				table.insert(ignore, m)
-			end
-			wallParams.FilterDescendantsInstances = ignore
-			local reach = math.clamp(hv.Magnitude * 0.08, 2.5, 6)
-			local hit = workspace:Raycast(ent.root.Position, hv.Unit * reach, wallParams)
-			if hit and math.abs(hit.Normal.Y) < 0.6 then
-				ent.data.wallCheckUntil = 0
-				if hit.Instance:GetAttribute("Breakable") == true and Combat.MapService then
-					Combat.MapService.breakPart(hit.Instance, ent.root.Position, hv.Unit, false)
-				end
-				Combat.fx("WallSlam", { pos = hit.Position, normal = hit.Normal, model = ent.model })
-				applyDamage(ent.data.wallAttacker :: Entity?, ent, 3)
-				ent.ragdollUntil = math.max(ent.ragdollUntil, t + 0.5)
-				ent.stunUntil = math.max(ent.stunUntil, ent.ragdollUntil + 0.35)
-				Combat.push(ent, hit.Normal * 10 + Vector3.new(0, 12, 0), 0.1)
-			end
-		end
-	end
+	bodyCrash(ent, t)
 
 	-- 전투에서 벗어나 있으면 체력이 천천히 찬다
 	local lastDamaged = ent.data.lastDamaged

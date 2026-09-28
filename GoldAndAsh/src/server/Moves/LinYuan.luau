@@ -7,7 +7,6 @@
 
 local Combat = require(script.Parent.Parent.Combat)
 local Actions = require(script.Parent.Parent.Actions)
-local MapService = require(script.Parent.Parent.MapService)
 
 type Entity = Combat.Entity
 type Ctx = { aim: Vector3, slot: number, jump: boolean }
@@ -24,12 +23,6 @@ local function flatDir(from: Vector3, to: Vector3, fallback: Vector3): Vector3
 	return d.Unit
 end
 
-local function breakAll(ent: Entity, props: { BasePart }, dir: Vector3)
-	for _, p in props do
-		MapService.breakPart(p, ent.root.Position, dir, false)
-	end
-end
-
 ----------------------------------------------------------------------
 -- 1. 기형 · 금장
 ----------------------------------------------------------------------
@@ -44,7 +37,7 @@ function Lin.GoldenPalm(ent: Entity, ctx: Ctx): boolean
 	local pos = ent.root.Position
 	Combat.fx("GoldenPalm", { model = ent.model, origin = pos, dir = aim, length = 13 })
 	Combat.push(ent, aim * 28, 0.12)
-	local hits, props = Combat.front(ent, 7, Vector3.new(9, 8, 13), aim)
+	local hits, region = Combat.front(ent, 7, Vector3.new(9, 8, 13), aim)
 	for _, tgt in hits do
 		Combat.hit(ent, tgt, {
 			damage = 12,
@@ -60,7 +53,7 @@ function Lin.GoldenPalm(ent: Entity, ctx: Ctx): boolean
 			melee = true,
 		})
 	end
-	breakAll(ent, props, aim)
+	Combat.smash(ent, region, { dir = aim, force = 1.6 })
 	return true
 end
 
@@ -140,7 +133,7 @@ function Lin.StaffSpin(ent: Entity, _ctx: Ctx): boolean
 		last = at
 		local center = ent.root.Position
 		Combat.fx("StaffRing", { pos = center, radius = 8.5, final = i == 3 })
-		local hits, props = Combat.box(ent, CFrame.new(center), Vector3.new(17, 7, 17))
+		local hits, region = Combat.box(ent, CFrame.new(center), Vector3.new(17, 7, 17))
 		for _, tgt in hits do
 			local out = flatDir(center, tgt.root.Position, ent.root.CFrame.LookVector)
 			if i < 3 then
@@ -168,7 +161,12 @@ function Lin.StaffSpin(ent: Entity, _ctx: Ctx): boolean
 				})
 			end
 		end
-		breakAll(ent, props, ent.root.CFrame.LookVector)
+		-- 앞의 두 번은 작은 사물만, 마지막 회전은 주변 건물까지 쓸어 버린다
+		if i < 3 then
+			Combat.smash(ent, region, { propsOnly = true })
+		else
+			Combat.smashSphere(ent, center, 9.5, { force = 1.4 })
+		end
 	end
 	return true
 end
@@ -187,7 +185,8 @@ function Lin.Kneading(ent: Entity, ctx: Ctx): boolean
 			return true
 		end
 		t += 0.085
-		local hits = Combat.front(ent, 3.8, Vector3.new(7, 6, 7.5), aim)
+		local hits, region = Combat.front(ent, 3.8, Vector3.new(7, 6, 7.5), aim)
+		Combat.smash(ent, region, { dir = aim, propsOnly = true, force = 0.7 })
 		for _, tgt in hits do
 			local res = Combat.hit(ent, tgt, {
 				damage = 1.3,
@@ -206,7 +205,7 @@ function Lin.Kneading(ent: Entity, ctx: Ctx): boolean
 	if not Combat.sleep(ent, token, 1.24 - t) then
 		return true
 	end
-	local hits, props = Combat.front(ent, 4.5, Vector3.new(9, 8, 9), aim)
+	local hits, region = Combat.front(ent, 4.5, Vector3.new(9, 8, 9), aim)
 	Combat.fx("GroundCrack", { pos = ent.root.Position + aim * 5 - UP * 3, radius = 7, color = "gold" })
 	for _, tgt in hits do
 		Combat.hit(ent, tgt, {
@@ -223,7 +222,7 @@ function Lin.Kneading(ent: Entity, ctx: Ctx): boolean
 			melee = true,
 		})
 	end
-	breakAll(ent, props, aim)
+	Combat.smash(ent, region, { dir = aim, force = 1.8 })
 	return true
 end
 
@@ -244,6 +243,7 @@ function Lin.onAwaken(ent: Entity)
 		-- 일어서는 기세로 주변을 밀어낸다
 		local center = ent.root.Position
 		local hits = Combat.box(ent, CFrame.new(center), Vector3.new(22, 10, 22))
+		Combat.smashSphere(ent, center, 12, { force = 1.5 })
 		for _, tgt in hits do
 			local out = flatDir(center, tgt.root.Position, ent.root.CFrame.LookVector)
 			Combat.hit(ent, tgt, {
@@ -297,7 +297,7 @@ function Lin.DragonClaw(ent: Entity, ctx: Ctx): boolean
 	local origin = ent.root.Position
 	Combat.fx("DragonClaw", { model = ent.model, origin = origin, dir = aim, length = 36 })
 	local mid = origin + aim * 19
-	local hits, props = Combat.box(ent, CFrame.lookAt(mid, mid + aim), Vector3.new(8, 9, 36))
+	local hits, region = Combat.box(ent, CFrame.lookAt(mid, mid + aim), Vector3.new(8, 9, 36))
 	for _, tgt in hits do
 		Combat.hit(ent, tgt, {
 			damage = 13,
@@ -311,7 +311,7 @@ function Lin.DragonClaw(ent: Entity, ctx: Ctx): boolean
 			shake = 0.5,
 		})
 	end
-	breakAll(ent, props, aim)
+	Combat.smash(ent, region, { dir = aim, force = 1.7 })
 	return true
 end
 
@@ -330,7 +330,7 @@ function Lin.DragonCoil(ent: Entity, _ctx: Ctx): boolean
 	Combat.anim(ent, nil)
 	local center = ent.root.Position
 	Combat.fx("Shockwave", { pos = center, radius = 16, color = "gold" })
-	local hits, props = Combat.box(ent, CFrame.new(center), Vector3.new(30, 12, 30))
+	local hits = Combat.box(ent, CFrame.new(center), Vector3.new(30, 12, 30))
 	for _, tgt in hits do
 		local out = flatDir(center, tgt.root.Position, ent.root.CFrame.LookVector)
 		Combat.hit(ent, tgt, {
@@ -345,7 +345,7 @@ function Lin.DragonCoil(ent: Entity, _ctx: Ctx): boolean
 			shake = 0.5,
 		})
 	end
-	breakAll(ent, props, ent.root.CFrame.LookVector)
+	Combat.smashSphere(ent, center, 15, { force = 1.8 })
 	return true
 end
 
@@ -358,7 +358,10 @@ function Lin.RisingDragon(ent: Entity, ctx: Ctx): boolean
 	end
 	local pos = ent.root.Position + aim * 4
 	Combat.fx("RisingDragon", { pos = pos, dir = aim })
-	local hits = Combat.front(ent, 4.5, Vector3.new(9, 12, 10), aim)
+	local hits, region = Combat.front(ent, 4.5, Vector3.new(9, 12, 10), aim)
+	-- 솟구치는 용: 앞과 그 위(차양·지붕)를 뚫고 올라간다
+	Combat.smash(ent, region, { dir = UP, force = 1.5 })
+	Combat.smash(ent, { cf = CFrame.new(pos + UP * 20), size = Vector3.new(10, 30, 10) }, { dir = UP, force = 1.4 })
 	local launched: { Entity } = {}
 	for _, tgt in hits do
 		local res = Combat.hit(ent, tgt, {
@@ -408,7 +411,7 @@ function Lin.GoldenReturn(ent: Entity, _ctx: Ctx): boolean
 		return true
 	end
 	local center = ent.root.Position
-	local hits, props = Combat.box(ent, CFrame.new(center), Vector3.new(120, 40, 120))
+	local hits = Combat.box(ent, CFrame.new(center), Vector3.new(120, 40, 120))
 	for _, tgt in hits do
 		local d = (tgt.root.Position - center).Magnitude
 		if d <= 60 then
@@ -428,11 +431,8 @@ function Lin.GoldenReturn(ent: Entity, _ctx: Ctx): boolean
 			})
 		end
 	end
-	for _, p in props do
-		if (p.Position - center).Magnitude <= 60 then
-			MapService.breakPart(p, center, (p.Position - center).Unit, false)
-		end
-	end
+	-- 20m 용이 휩쓸고 간 자리: 반경 60 안의 건물·사물이 전부 무너진다
+	Combat.smashSphere(ent, center, 60, { force = 2.4, maxParts = 1500 })
 	task.delay(0.8, function()
 		Combat.endAwakening(ent, "finisher")
 	end)

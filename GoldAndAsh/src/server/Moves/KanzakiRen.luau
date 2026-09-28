@@ -10,7 +10,6 @@ local RunService = game:GetService("RunService")
 
 local Combat = require(script.Parent.Parent.Combat)
 local Actions = require(script.Parent.Parent.Actions)
-local MapService = require(script.Parent.Parent.MapService)
 
 type Entity = Combat.Entity
 type Ctx = { aim: Vector3, slot: number, jump: boolean }
@@ -91,7 +90,7 @@ function Ren.Peel(ent: Entity, ctx: Ctx): boolean
 	local finish = start + aim * dist
 	Combat.fx("SlashLine", { from = start, to = finish, color = "red" })
 	local mid = (start + finish) / 2
-	local hits, props = Combat.box(ent, CFrame.lookAt(mid, finish), Vector3.new(7, 7, dist + 4))
+	local hits, region = Combat.box(ent, CFrame.lookAt(mid, finish), Vector3.new(7, 7, dist + 4))
 	local gained = false
 	for _, tgt in hits do
 		local res = Combat.hit(ent, tgt, {
@@ -109,10 +108,9 @@ function Ren.Peel(ent: Entity, ctx: Ctx): boolean
 			gained = true
 		end
 	end
-	for _, p in props do
-		if MapService.breakPart(p, start, aim, true) then
-			gained = true
-		end
+	-- 칼날이 지나간 자리의 비생체 물질(벽·사물)은 전부 재가 된다
+	if Combat.smash(ent, region, { from = start, dir = aim, ash = true, force = 1.2 }) > 0 then
+		gained = true
 	end
 	if gained then
 		Combat.addAsh(ent, 2)
@@ -144,6 +142,7 @@ local function fireAsh(ent: Entity, aim: Vector3, units: number, extra: AshExtra
 		height = e.height or 4.5,
 		kind = e.kind or "ash",
 		groundSkim = e.low == true,
+		pierce = units >= 2, -- 회분 2 이상이면 건물을 베어 가르며 계속 날아간다
 		info = {
 			damage = row.damage,
 			stun = 0.85,
@@ -198,6 +197,7 @@ function Ren.SideShave(ent: Entity, ctx: Ctx): boolean
 		height = 2.6,
 		kind = "ash_low",
 		groundSkim = true,
+		pierce = true, -- 지면을 스치며 사물의 밑동을 베어 낸다
 		info = {
 			damage = 7,
 			stun = 1.0,
@@ -246,6 +246,7 @@ function Ren.onAwaken(ent: Entity)
 		Combat.fx("AshAura", { model = ent.model, on = true })
 		local center = ent.root.Position
 		local hits = Combat.box(ent, CFrame.new(center), Vector3.new(20, 10, 20))
+		Combat.smashSphere(ent, center, 11, { ash = true, force = 1.4 })
 		for _, tgt in hits do
 			local out = (tgt.root.Position - center) * Vector3.new(1, 0, 1)
 			local dir = if out.Magnitude > 0.1 then out.Unit else ent.root.CFrame.LookVector
@@ -310,10 +311,9 @@ function Ren.Severance(ent: Entity, ctx: Ctx): boolean
 	end
 	local finish = start + aim * dist
 	local mid = (start + finish) / 2
-	local hits, props = Combat.box(ent, CFrame.lookAt(mid, finish), Vector3.new(8, 8, dist + 4))
-	for _, p in props do
-		MapService.breakPart(p, start, aim, true)
-	end
+	local lineCF = CFrame.lookAt(mid, finish)
+	local hits, region = Combat.box(ent, lineCF, Vector3.new(8, 8, dist + 4))
+	Combat.smash(ent, region, { from = start, dir = aim, ash = true, force = 1.2 })
 	for _, tgt in hits do
 		Combat.stun(tgt, 0.7, "stunned")
 	end
@@ -323,6 +323,8 @@ function Ren.Severance(ent: Entity, ctx: Ctx): boolean
 			return
 		end
 		Combat.fx("Shockwave", { pos = mid, radius = 8, color = "ash" })
+		-- 절단선이 한 박자 늦게 터지며 더 넓게 무너뜨린다
+		Combat.smash(ent, { cf = lineCF, size = Vector3.new(12, 12, dist + 4) }, { from = mid, dir = UP, ash = true, force = 1.6 })
 		for _, tgt in hits do
 			if tgt.alive then
 				Combat.hit(ent, tgt, {
@@ -376,7 +378,7 @@ function Ren.MaxOutput(ent: Entity, ctx: Ctx): boolean
 	local length = 125
 	Combat.fx("MaxOutput", { model = ent.model, origin = origin, dir = aim, length = length, width = 16 })
 	local mid = origin + aim * (length / 2 + 2)
-	local hits, props = Combat.box(ent, CFrame.lookAt(mid, mid + aim), Vector3.new(16, 14, length))
+	local hits = Combat.box(ent, CFrame.lookAt(mid, mid + aim), Vector3.new(16, 14, length))
 	for _, tgt in hits do
 		Combat.hit(ent, tgt, {
 			damage = 30,
@@ -392,9 +394,9 @@ function Ren.MaxOutput(ent: Entity, ctx: Ctx): boolean
 			shake = 1,
 		})
 	end
-	for _, p in props do
-		MapService.breakPart(p, origin, aim, true)
-	end
+	-- 거대한 발도 참격: 앞쪽 일직선의 건물이 통째로 재가 되어 무너진다
+	local cutMid = mid + UP * 10
+	Combat.smash(ent, { cf = CFrame.lookAt(cutMid, cutMid + aim), size = Vector3.new(18, 34, length) }, { from = origin, dir = aim, ash = true, force = 2.2, maxParts = 1200 })
 	task.delay(0.9, function()
 		Combat.fx("SealReset", { model = ent.model })
 		Combat.endAwakening(ent, "finisher")

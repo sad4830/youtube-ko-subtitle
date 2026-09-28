@@ -85,8 +85,16 @@ local Config = {
 		PerSec = 2.5,
 	},
 
-	-- 부서지는 소품
-	PropRespawn = 22,
+	-- 지형 파괴 (건물·사물 전부)
+	Destruction = {
+		RestoreTime = 35, -- 마지막으로 부서진 뒤 이 시간이 지나면 원래대로
+		MaxPieces = 4000, -- 맵에 동시에 남아 있을 수 있는 쪼개진 조각 수 (넘으면 오래된 것부터 복구)
+		MaxSplitsPerCall = 900, -- 한 번의 파괴에서 쪼개기 횟수 상한
+		MaxPartsPerCall = 400, -- 한 번의 파괴에서 부술 파트 수 상한
+		MaxDebrisSent = 700, -- 클라이언트에 보내는 잔해 조각 수 상한
+		RestorePerTick = 40, -- 0.5초마다 복구하는 파트 수
+		BodyCrashSpeed = 42, -- 날아가는 몸이 이 속도 이상이면 부딪힌 건물이 부서진다
+	},
 
 	-- 봇
 	Bot = {

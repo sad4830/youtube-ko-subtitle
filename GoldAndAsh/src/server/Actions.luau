@@ -6,7 +6,6 @@ local Config = require(Shared.Config)
 local Remotes = require(Shared.Remotes)
 
 local Combat = require(script.Parent.Combat)
-local MapService = require(script.Parent.MapService)
 
 type Entity = Combat.Entity
 
@@ -101,7 +100,7 @@ function Actions.m1(ent: Entity, payload: any)
 			mod.onM1Swing(ent, n, finisher, aim)
 		end
 		local range = Config.M1.Range + (if ent.awakened and cid == "LinYuan" then 4.5 else 0)
-		local hits, props = Combat.front(ent, range / 2 + 0.2, Vector3.new(Config.M1.Width, 6, range), aim)
+		local hits, region = Combat.front(ent, range / 2 + 0.2, Vector3.new(Config.M1.Width, 6, range), aim)
 		local blade = cid == "KanzakiRen"
 		for _, tgt in hits do
 			local info: Combat.HitInfo
@@ -167,13 +166,9 @@ function Actions.m1(ent: Entity, payload: any)
 				end
 			end
 		end
-		local cutAny = false
-		for _, prop in props do
-			if MapService.breakPart(prop, ent.root.Position, aim, blade) then
-				cutAny = true
-			end
-		end
-		if cutAny and blade then
+		-- 평타는 작은 사물만, 4타(마무리)는 벽·건물도 부순다. 칸자키 렌의 칼에 닿은 것은 재가 된다.
+		local cut = Combat.smash(ent, region, { dir = aim, ash = blade, propsOnly = not finisher, force = if finisher then 1.2 else 0.8 })
+		if cut > 0 and blade then
 			Combat.addAsh(ent, Config.Ash.PerPropCut)
 		end
 	end)
@@ -309,6 +304,8 @@ function Actions.dashStrike(ent: Entity, target: Entity, aim: Vector3)
 		ent.m1Ready = os.clock() + 0.3
 	end
 	Combat.fx("DashStrike", { model = ent.model, pos = target.root.Position, dir = aim, charId = ent.charId })
+	local _, region = Combat.front(ent, 3, Vector3.new(7, 7, 8), aim)
+	Combat.smash(ent, region, { dir = aim, ash = blade, propsOnly = true })
 end
 
 ----------------------------------------------------------------------

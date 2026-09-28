@@ -60,7 +60,6 @@ local Bot = require(script.Parent.Bot)
 Combat.onError = report
 
 safe("맵", MapService.init)
-Combat.MapService = MapService
 safe("전투", Combat.start)
 safe("캐릭터", CharacterService.init)
 safe("봇", Bot.init)
