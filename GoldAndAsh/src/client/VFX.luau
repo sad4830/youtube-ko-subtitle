@@ -5,7 +5,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local Debris = game:GetService("Debris")
 local PhysicsService = game:GetService("PhysicsService")
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
@@ -37,6 +36,14 @@ local rng = Random.new()
 ----------------------------------------------------------------------
 -- 기본 도구
 ----------------------------------------------------------------------
+-- t 초 뒤에 지운다. Debris 서비스는 대기열이 1000개를 넘으면 오래된 것부터 바로 지워 버려서
+-- (잔해가 쏟아지면 다른 잔해·소리·넉백까지 일찍 끊긴다) 여기서는 쓰지 않는다. 두 번 지워도 괜찮다.
+local function destroyLater(inst: Instance, t: number)
+	task.delay(t, function()
+		inst:Destroy()
+	end)
+end
+
 local function newPart(size: Vector3, cf: CFrame, color: Color3, material: Enum.Material?, transparency: number?): Part
 	local p = Instance.new("Part")
 	p.Anchored = true
@@ -73,7 +80,7 @@ local function fadeOut(p: BasePart, time: number, grow: Vector3?)
 		props.Size = grow
 	end
 	tween(p, time, props)
-	Debris:AddItem(p, time + 0.05)
+	destroyLater(p, time + 0.05)
 end
 
 -- 둥근 고리 (원기둥을 납작하게 눕힘)
@@ -84,7 +91,7 @@ local function ring(pos: Vector3, normal: Vector3, diameter: number, endDiameter
 	local p = newPart(Vector3.new(th, diameter, diameter), cf, color, Enum.Material.Neon, transparency or 0.1)
 	p.Shape = Enum.PartType.Cylinder
 	tween(p, time, { Size = Vector3.new(th * 0.3, endDiameter, endDiameter), Transparency = 1 })
-	Debris:AddItem(p, time + 0.05)
+	destroyLater(p, time + 0.05)
 end
 
 -- 파티클 한 번 뿜기
@@ -135,7 +142,7 @@ local function emit(pos: Vector3, count: number, props: {
 	pe.Enabled = false
 	pe.Parent = att
 	pe:Emit(count)
-	Debris:AddItem(holder, life + 0.3)
+	destroyLater(holder, life + 0.3)
 end
 
 -- 날아가는 파편 (간단한 자체 물리)
@@ -181,7 +188,7 @@ local function slashLine(pos: Vector3, length: number, color: Color3, time: numb
 	task.delay(time * 0.35, function()
 		tween(p, time * 0.65, { Size = Vector3.new(0.02, 0.02, length * 1.15), Transparency = 1 })
 	end)
-	Debris:AddItem(p, time + 0.1)
+	destroyLater(p, time + 0.1)
 end
 
 local function highlightFlash(model: Model, color: Color3)
@@ -193,7 +200,7 @@ local function highlightFlash(model: Model, color: Color3)
 	h.DepthMode = Enum.HighlightDepthMode.Occluded
 	h.Parent = model
 	tween(h, 0.22, { FillTransparency = 1, OutlineTransparency = 1 })
-	Debris:AddItem(h, 0.3)
+	destroyLater(h, 0.3)
 end
 
 local function afterimage(model: Model, color: Color3, time: number, transparency: number?)
@@ -480,7 +487,7 @@ local function stopAshAura(model: Model)
 	end
 	ashAuras[model] = nil
 	a.emitter.Enabled = false
-	Debris:AddItem(a.emitter.Parent :: Instance, 2)
+	destroyLater(a.emitter.Parent :: Instance, 2)
 	a.light:Destroy()
 	for _, s in a.seals do
 		s.Transparency = 0.85
@@ -558,7 +565,7 @@ local function projectileEnd(id: number, pos: Vector3?)
 		fadeOut(e.part, 0.15)
 	end
 	vis.emitter.Enabled = false
-	Debris:AddItem(vis.holder, 1)
+	destroyLater(vis.holder, 1)
 	ashPuff(pos or vis.pos, 10, 2, 8)
 end
 
@@ -602,7 +609,7 @@ local function ashVeil(pos: Vector3, radius: number, duration: number)
 			pe.Enabled = false
 		end
 		for _, h in holders do
-			Debris:AddItem(h, 3.5)
+			destroyLater(h, 3.5)
 		end
 	end)
 end
@@ -636,7 +643,7 @@ local function crossFlash(pos: Vector3, color: Color3, size: number, time: numbe
 		local cf = face * CFrame.Angles(0, 0, spin + i * math.pi / 2)
 		local beam = newPart(Vector3.new(size * 0.06, size, 0.05), cf, color, Enum.Material.Neon, 0)
 		tween(beam, t, { Size = Vector3.new(0.02, size * 1.6, 0.02), Transparency = 1 }, Enum.EasingStyle.Quart)
-		Debris:AddItem(beam, t + 0.05)
+		destroyLater(beam, t + 0.05)
 	end
 	local core = newPart(Vector3.new(size * 0.18, size * 0.18, 0.05), face * CFrame.Angles(0, 0, math.pi / 4 + spin), Color3.new(1, 1, 1), Enum.Material.Neon, 0)
 	fadeOut(core, t * 0.8, Vector3.new(size * 0.3, size * 0.3, 0.02))
@@ -651,7 +658,7 @@ local function impactStreaks(pos: Vector3, dir: Vector3, color: Color3, count: n
 		local streak = newPart(Vector3.new(0.12, 0.12, l * 0.3), CFrame.lookAt(start, start + d), color, Enum.Material.Neon, 0)
 		local endPos = start + d * l
 		tween(streak, 0.16, { CFrame = CFrame.lookAt(endPos, endPos + d), Size = Vector3.new(0.04, 0.04, l), Transparency = 1 }, Enum.EasingStyle.Quart)
-		Debris:AddItem(streak, 0.2)
+		destroyLater(streak, 0.2)
 	end
 end
 
@@ -744,7 +751,7 @@ function VFX.groundCrack(pos: Vector3, radius: number, style: string?)
 		tween(rock, 0.12, { CFrame = rock.CFrame + Vector3.new(0, s * 0.9, 0) })
 		task.delay(1.8, function()
 			tween(rock, 0.6, { CFrame = rock.CFrame - Vector3.new(0, s * 1.2, 0), Transparency = 1 })
-			Debris:AddItem(rock, 0.7)
+			destroyLater(rock, 0.7)
 		end)
 	end
 	ring(pos + Vector3.new(0, 0.2, 0), Vector3.new(0, 1, 0), 2, radius * 2.6, if style == "gold" then GOLD else Color3.fromRGB(220, 210, 200), 0.35, 0.2)
@@ -1072,7 +1079,7 @@ local function makeRubbleRoom(n: number)
 		local p = liveRubble[i]
 		p.Anchored = true
 		tween(p, 0.25, { Transparency = 1, Size = p.Size * 0.3 })
-		Debris:AddItem(p, 0.3)
+		destroyLater(p, 0.3)
 	end
 	table.move(liveRubble, over + 1, j, 1)
 	for i = j, j - over + 1, -1 do
@@ -1092,7 +1099,7 @@ local function retireRubble(p: BasePart)
 	else
 		tween(p, t, { Size = p.Size * 0.2, Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 	end
-	Debris:AddItem(p, t + 0.05)
+	destroyLater(p, t + 0.05)
 end
 
 local function launchRubble(c: Chunk, g: ShatterGroup, ctx: ShatterCtx, useGroup: boolean): BasePart
@@ -1153,7 +1160,7 @@ local function launchRubble(c: Chunk, g: ShatterGroup, ctx: ShatterCtx, useGroup
 		life = rng:NextNumber(10, 14)
 	end
 	task.delay(life, retireRubble, p)
-	Debris:AddItem(p, life + 1.5)
+	destroyLater(p, life + 1.5)
 	return p
 end
 
@@ -1407,7 +1414,7 @@ local function shatterAsh(ctx: ShatterCtx, groups: { ShatterGroup }, total: numb
 		local hold = 0.1 + math.clamp(((c.cf.Position - ctx.from).Magnitude - d0) / span, 0, 1) * 0.35 + rng:NextNumber(0, 0.08)
 		local dur = rng:NextNumber(0.5, 1.1)
 		task.delay(hold, crumbleGhost, p, dur)
-		Debris:AddItem(p, hold + dur + 0.15)
+		destroyLater(p, hold + dur + 0.15)
 	end
 	local overflow = math.max(0, total - madeVol)
 
@@ -1576,9 +1583,9 @@ handlers.Knockback = function(d)
 	end
 	task.delay(dur, function()
 		trail.Enabled = false
-		Debris:AddItem(trail, 0.4)
-		Debris:AddItem(a0, 0.4)
-		Debris:AddItem(a1, 0.4)
+		destroyLater(trail, 0.4)
+		destroyLater(a0, 0.4)
+		destroyLater(a1, 0.4)
 	end)
 end
 
@@ -1706,7 +1713,7 @@ handlers.Damage = function(d)
 	gui.Parent = folder
 	tween(gui, 0.8, { StudsOffsetWorldSpace = gui.StudsOffsetWorldSpace + Vector3.new(0, 2.5, 0) })
 	tween(label, 0.8, { TextTransparency = 1, TextStrokeTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	Debris:AddItem(gui, 0.85)
+	destroyLater(gui, 0.85)
 end
 
 handlers.Combo = function(d)
@@ -1780,7 +1787,7 @@ handlers.PropAsh = function(d)
 	-- 물체 모양 그대로 검게 변했다가 가루로 무너진다
 	local ghost = newPart(size, CFrame.new(pos), ASH, Enum.Material.SmoothPlastic, 0)
 	tween(ghost, 0.5, { Size = Vector3.new(size.X * 1.05, 0.1, size.Z * 1.05), CFrame = CFrame.new(pos - Vector3.new(0, size.Y / 2, 0)), Transparency = 0.6 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	Debris:AddItem(ghost, 0.55)
+	destroyLater(ghost, 0.55)
 	ashPuff(pos, 16, math.max(1.5, size.Magnitude * 0.25), 6)
 	Sounds.play("ren_ash_gain", { position = pos, random = 0.08 })
 end
@@ -1941,7 +1948,7 @@ handlers.ChiCharge = function(d)
 		task.delay((d.duration :: number?) or 0.4, function()
 			pe.Enabled = false
 			tween(light, 0.3, { Brightness = 0 })
-			Debris:AddItem(att, 0.8)
+			destroyLater(att, 0.8)
 		end)
 	end
 end
@@ -2432,7 +2439,7 @@ handlers.MaxOutput = function(d)
 				fadeOut(e.part, 0.3)
 			end
 			pe.Enabled = false
-			Debris:AddItem(holder, 1.5)
+			destroyLater(holder, 1.5)
 		end
 	end)
 	-- 절단선 전체를 따라 재가 터진다

@@ -6,8 +6,6 @@
 --   · 수평 이동: LinearVelocity 를 "평면(Plane)" 모드 + 유한한 힘으로만 건다 → 중력이 살아 있고 벽에 막힌다
 --   · 수직 성분: 한 번만 속도를 넣는다(발사) → 자연스러운 포물선
 
-local Debris = game:GetService("Debris")
-
 local Physics = {}
 
 Physics.MaxForce = 90000
@@ -46,7 +44,13 @@ function Physics.push(root: BasePart, vel: Vector3, duration: number)
 		lv.ForceLimitMode = Enum.ForceLimitMode.Magnitude
 		lv.MaxForce = Physics.MaxForce
 		lv.Parent = root
-		Debris:AddItem(lv, duration)
+		-- Debris 대기열은 1000개가 넘으면 오래된 것부터 바로 지운다. 잔해가 쏟아질 때
+		-- 넉백이 일찍 끊기지 않게 직접 시간을 잰다. (그 사이 새 push/stop 으로 이미 지워졌으면 그대로 둔다)
+		task.delay(duration, function()
+			if lv.Parent then
+				lv:Destroy()
+			end
+		end)
 	end
 	if math.abs(vel.Y) > 0.5 then
 		local cur = root.AssemblyLinearVelocity

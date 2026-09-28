@@ -75,6 +75,12 @@ function CameraFX.shake(amount: number)
 	trauma = math.clamp(trauma + amount, 0, 1)
 end
 
+-- 더하지 않고 "최소 이만큼"만 보장한다. 지형 파괴처럼 매 프레임 이어서 오는 흔들림이
+-- 쌓여서 최대치로 붙지 않고, 가장 센 것 하나의 세기로 유지된다.
+function CameraFX.shakeAtLeast(amount: number)
+	trauma = math.max(trauma, math.clamp(amount, 0, 1))
+end
+
 function CameraFX.fovPunch(amount: number)
 	fovTarget += amount
 end
