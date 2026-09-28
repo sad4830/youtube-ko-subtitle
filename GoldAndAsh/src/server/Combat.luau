@@ -972,12 +972,14 @@ local function bodyCrash(ent: Entity, t: number)
 		return
 	end
 	if Destruction.isDestructible(hit.Instance) then
-		ent.data.nextCrash = t + 0.05
+		-- 초당 8번까지만 (벽 하나 뚫을 때마다 조각이 생기므로 복제 부담을 줄인다)
+		ent.data.nextCrash = t + 0.12
 		local radius = math.clamp(speed * 0.055, 3, 7)
 		Destruction.destroySphere(hit.Position + dir * (radius * 0.4), radius, {
 			from = ent.root.Position,
 			dir = dir,
 			force = math.clamp(speed / 70, 0.8, 2.2),
+			grain = math.max(2.5, radius * 0.6),
 		})
 		if knocked and ent.alive and ent.data.crashed ~= true then
 			-- 첫 충돌만 피해 + 벽꽝 연출

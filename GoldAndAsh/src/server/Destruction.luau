@@ -28,6 +28,9 @@ local Settings = Config.Destruction
 local CELL = 12 -- 색인 격자 한 칸 (스터드)
 local ARENA = 190 -- 이 밖(스카이라인 배경)은 색인하지 않는다
 local FLOOR_TOP = 1.05 -- 윗면이 이 높이 이하인 파트는 바닥으로 보고 부수지 않는다
+local FLOOR_SLAB_TOP = 1.6 -- 윗면이 이 높이 이하이고
+local FLOOR_SLAB_THICK = 1.6 -- 두께가 이 이하이고
+local FLOOR_SLAB_WIDE = 4 -- 가로·세로가 둘 다 이 이상인 판도 바닥 (광장 바닥·원판 장식·정자 마루처럼 살짝 올라온 바닥)
 local SMALL = 8 -- propsOnly(평타 등)일 때 부술 수 있는 최대 크기
 local WHOLE_BELOW = 1.6 -- 이보다 작은 파트는 쪼개지 않고 통째로
 
@@ -64,6 +67,9 @@ type Family = {
 	broken: boolean,
 	restoreAt: number,
 	brokenAt: number,
+	primaryOf: Model?, -- 이 파트가 PrimaryPart 인 모델 (로블록스는 파트가 모델 밖으로 나가면 PrimaryPart 를 비운다)
+	holeMin: Vector3?, -- 없앤 부분(구멍)의 범위, 원본 기준 좌표
+	holeMax: Vector3?,
 }
 
 local registered: { [BasePart]: Kind } = {} -- 지금 맵에 있는 파괴 가능한 파트 (원본 또는 조각)
@@ -375,8 +381,13 @@ local function classify(p: BasePart, map: Instance): boolean
 	end
 	local h = worldHalf(p.CFrame, p.Size)
 	local pos = p.Position
-	if pos.Y + h.Y <= FLOOR_TOP then
+	local top = pos.Y + h.Y
+	if top <= FLOOR_TOP then
 		return false -- 바닥 / 땅속 (도로, 보도, 운하 벽…)
+	end
+	if top <= FLOOR_SLAB_TOP and h.Y * 2 <= FLOOR_SLAB_THICK and math.min(h.X, h.Z) * 2 >= FLOOR_SLAB_WIDE then
+		-- 살짝 올라온 얇은 바닥. 광장 바닥은 눕힌 원판 원기둥이라 두께 축으로만 쪼개져서 스치기만 해도 통째로 사라진다
+		return false
 	end
 	if math.abs(pos.X) > ARENA or math.abs(pos.Z) > ARENA then
 		return false
@@ -405,15 +416,23 @@ local function familyFor(p: BasePart, kind: Kind): Family
 	if f then
 		return f
 	end
+	local parent = p.Parent :: Instance
+	local primaryOf: Model? = nil
+	if parent:IsA("Model") and parent.PrimaryPart == p then
+		primaryOf = parent
+	end
 	local fam: Family = {
 		original = p,
-		parent = p.Parent :: Instance,
+		parent = parent,
+		primaryOf = primaryOf,
 		kind = kind,
 		template = nil,
 		pieces = {},
 		broken = false,
 		restoreAt = 0,
 		brokenAt = 0,
+		holeMin = nil,
+		holeMax = nil,
 	}
 	familyOf[p] = fam
 	return fam
@@ -462,8 +481,12 @@ local function destroyRegion(R: Region, opts: Opts): number
 	local qHalf = if R.sphere then Vector3.new(R.radius, R.radius, R.radius) else worldHalf(R.cf, R.half * 2)
 	local candidates = query(R.center, qHalf)
 	-- 가까운 것부터 (상한에 걸려도 중심부가 먼저 부서지게)
+	local dist: { [BasePart]: number } = {}
+	for _, p in candidates do
+		dist[p] = (p.Position - R.center).Magnitude
+	end
 	table.sort(candidates, function(a, b)
-		return (a.Position - R.center).Magnitude < (b.Position - R.center).Magnitude
+		return dist[a] < dist[b]
 	end)
 
 	local groups: { Group } = {}
@@ -499,6 +522,15 @@ local function destroyRegion(R: Region, opts: Opts): number
 		affected += 1
 
 		local fam = familyOf[part] or familyFor(part, kind)
+		-- 구멍 범위를 원본 기준 좌표로 모아 둔다 (조각은 원본과 같은 회전). 복구할 때 이 안에 캐릭터가 있는지만 본다
+		local ocf = fam.original.CFrame
+		for _, r in removed do
+			local c = ocf:PointToObjectSpace(r.cf.Position)
+			local lo, hi = c - r.size / 2, c + r.size / 2
+			local hMin, hMax = fam.holeMin, fam.holeMax
+			fam.holeMin = if hMin then hMin:Min(lo) else lo
+			fam.holeMax = if hMax then hMax:Max(hi) else hi
+		end
 		-- 잔해 목록 (너무 많으면 잘라서 보낸다 — 나머지는 먼지로만 보인다)
 		local room = Settings.MaxDebrisSent - sent
 		if room > 0 then
@@ -584,8 +616,11 @@ local function destroyRegion(R: Region, opts: Opts): number
 			for _ in f.pieces do
 				n += 1
 			end
-			f.restoreAt = 0
-			over -= math.max(n, 1)
+			-- 조각 없이 통째로 사라진 가족은 복구해도 조각 수가 줄지 않는다 (궁극기 직후엔 이런 가족이 수백 개)
+			if n > 0 then
+				f.restoreAt = 0
+				over -= n
+			end
 		end
 	end
 	return affected
@@ -634,10 +669,19 @@ end
 
 local function restore(f: Family): boolean
 	local o = f.original
-	if charactersAt(o.CFrame, o.Size) then
+	-- 구멍 자리에 캐릭터가 있으면 미룬다. 원본 전체로 보면 큰 바닥·건물 위 먼 곳에 서 있기만 해도 영영 안 돌아온다
+	local cf, size = o.CFrame, o.Size
+	local lo, hi = f.holeMin, f.holeMax
+	if lo and hi then
+		cf = o.CFrame * CFrame.new((lo + hi) / 2)
+		size = hi - lo
+	end
+	if charactersAt(cf, size) then
 		f.restoreAt = os.clock() + 2
 		return false
 	end
+	f.holeMin = nil
+	f.holeMax = nil
 	for piece in f.pieces do
 		unregister(piece)
 		familyOf[piece] = nil
@@ -646,6 +690,10 @@ local function restore(f: Family): boolean
 	end
 	table.clear(f.pieces)
 	o.Parent = f.parent
+	local model = f.primaryOf
+	if model and model.PrimaryPart == nil then
+		model.PrimaryPart = o
+	end
 	register(o, f.kind)
 	f.broken = false
 	brokenFamilies[f] = nil
