@@ -115,7 +115,8 @@ GoldAndAsh/
    ├─ gen_sounds.py             ← 사운드 합성기 (다시 돌리면 같은 결과)
    ├─ upload_sounds.py          ← Open Cloud 업로더
    ├─ build_place.luau          ← 맵을 구워 넣어 .rbxl 만들기 (Lune)
-   └─ preview_map.luau          ← 맵 검증 (Lune)
+   ├─ preview_map.luau          ← 맵 검증 (Lune)
+   └─ test_destruction.luau     ← 지형 파괴 검사 67가지 (실제 맵으로: 분류·기하·복구·예산·갇힘 방지) `lune run tools/test_destruction.luau`
 ```
 
 ### 가강전 느낌을 위해 넣은 것

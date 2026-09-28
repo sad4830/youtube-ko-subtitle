@@ -762,22 +762,30 @@ end
 ----------------------------------------------------------------------
 -- 지형 파괴: 잔해·재·복구 (서버 Destruction 이 보내는 "Shatter" / "Rebuild")
 --  · 서버는 없앤 부피(조각마다 월드 CFrame·크기)만 보낸다. 날아가는 잔해는 각 클라이언트가 로컬 물리로 만든다.
---  · 조각이 덩어리 크기보다 크면 가장 긴 축을 무작위 비율로 잘라 나눈다 (격자처럼 보이지 않게).
---  · 한 번에 만드는 덩어리 수와 동시에 살아 있는 잔해 수에 상한이 있다. 넘치는 부피는 먼지로 대신 보여준다.
+--  · 조각이 덩어리 크기보다 크면 가장 긴 축을 무작위 비율로 자른다 (격자처럼 보이지 않게).
+--  · 한 번에 만드는 덩어리 수, 초당 만드는 수, 동시에 살아 있는 수에 상한이 있다. 넘치는 부피는 먼지로 대신 보여준다.
+--  · 관통 참격처럼 매 프레임 파괴가 이어져도 먼지·소리·흔들림이 쌓여 폭주하지 않게 한다.
 --  · 네트워크로 온 값이라 전부 typeof 로 확인하고, 이상한 값은 버리거나 기본값으로 바꾼다.
 ----------------------------------------------------------------------
 local RUBBLE_EVENT_CAP = 140 -- 한 번의 파괴에서 만드는 잔해 덩어리 상한
-local GHOST_EVENT_CAP = 110 -- 한 번의 파괴에서 만드는 "재가 되는 조각" 상한
-local RUBBLE_LIVE_CAP = 380 -- 동시에 살아 있는 잔해 상한 (넘으면 오래된 것부터 없앤다)
+local GHOST_EVENT_CAP = 400 -- 한 번의 파괴에서 만드는 "재가 되는 조각" 상한 (고정·충돌 없음이라 싸다)
+local RUBBLE_LIVE_CAP = 380 -- 동시에 살아 있는 잔해 상한 (넘으면 멈춘 것·오래된 것부터 없앤다)
+local GHOST_LIVE_CAP = 900 -- 동시에 살아 있는 재 조각 상한 (잔해와 따로 센다 → 큰 재 절단이 잔해를 밀어내지 않는다)
+local RUBBLE_PER_SEC, RUBBLE_BURST = 400, 200 -- 초당 새로 만드는 잔해 수 / 한꺼번에 쓸 수 있는 양
+local GHOST_PER_SEC, GHOST_BURST = 900, 450 -- 초당 새로 만드는 재 조각 수 / 한꺼번에 쓸 수 있는 양
+local FX_PER_SEC, FX_BURST = 36, 14 -- 초당 덧붙이는 먼지·파편 연출 수 (중심 먼지 한 번은 늘 나온다)
 local LEAF_LIMIT = 1600 -- 쪼개기 계산에서 만드는 후보 조각 상한 (인스턴스가 아니라 표라서 가볍다)
 local PIECE_LIMIT = 900 -- 한 이벤트에서 읽는 조각 수 상한
 local CHUNK_MAX = 5.5 -- 아주 큰 파괴에서 덩어리가 커질 수 있는 최대 변 길이
 local SHAKE_RANGE = 120 -- 이보다 먼 카메라는 흔들지 않는다
+local FRESH_TIME = 0.15 -- 막 생긴 잔해끼리는 이 시간 동안 서로 부딪히지 않는다 (겹친 채 생겨서 튕겨 나가지 않게)
+local MOVING_SPEED = 4 -- 이보다 빠르면 "아직 날아가는 중"
+local REBUILD_BOX_LIMIT = 64 -- Rebuild 한 번에 검사하는 복구 파트 수 상한
 local DUST_GREY = Color3.fromRGB(160, 148, 134)
 -- 무겁게: 잘 튀지 않고(탄성 낮음, 가중치 높게) 금방 멈춘다
 local RUBBLE_PHYS = PhysicalProperties.new(2.4, 0.8, 0.04, 1, 50)
 
-type ShatterPiece = { cf: CFrame, size: Vector3 }
+type ShatterPiece = { cf: CFrame, size: Vector3, vol: number }
 type ShatterGroup = {
 	color: Color3,
 	material: Enum.Material,
@@ -794,13 +802,50 @@ type ShatterCtx = {
 	dir: Vector3,
 	force: number,
 	sound: boolean,
+	lost: number, -- 서버가 조각으로 보내지 않은 부피 (먼지 크기에만 더한다)
+	ground: number?, -- 중심 아래 바닥 높이 (못 찾으면 nil)
 }
+type RestoredBox = { cf: CFrame, half: Vector3, center: Vector3, reach: number }
 
 local SHATTER_SHAPES: { [string]: boolean } = { Block = true, Cylinder = true, Wedge = true, Ball = true }
 
-local liveRubble: { BasePart } = {} -- 만든 순서대로 (앞쪽이 오래된 것)
+local liveRubble: { BasePart } = {} -- 날아가는 잔해, 만든 순서대로 (앞쪽이 오래된 것)
+local liveGhosts: { BasePart } = {} -- 재가 되는 조각, 만든 순서대로 (잔해와 따로 센다)
 local lastSoundAt: { [string]: number } = {}
-local debrisGroupOk = false
+local lastFovPunchAt = 0
+local groupOk: { [string]: boolean } = {}
+
+-- 초당 개수 제한 (토큰 버킷): 초당 rate 개씩 차오르고 burst 개까지 모인다
+type Bucket = { tokens: number, at: number, rate: number, burst: number }
+
+local function newBucket(rate: number, burst: number): Bucket
+	return { tokens = burst, at = os.clock(), rate = rate, burst = burst }
+end
+
+-- 지금 쓸 수 있는 개수 (채우기만 하고 빼지는 않는다)
+local function bucketAvail(b: Bucket): number
+	local now = os.clock()
+	b.tokens = math.min(b.burst, b.tokens + math.max(0, now - b.at) * b.rate)
+	b.at = now
+	return math.floor(b.tokens)
+end
+
+local function bucketTake(b: Bucket, n: number)
+	b.tokens = math.max(0, b.tokens - n)
+end
+
+local rubbleBudget = newBucket(RUBBLE_PER_SEC, RUBBLE_BURST)
+local ghostBudget = newBucket(GHOST_PER_SEC, GHOST_BURST)
+local fxBudget = newBucket(FX_PER_SEC, FX_BURST)
+
+-- 덧붙이는 연출 하나를 할 여유가 있으면 하나 쓰고 true
+local function fxToken(): boolean
+	if bucketAvail(fxBudget) >= 1 then
+		bucketTake(fxBudget, 1)
+		return true
+	end
+	return false
+end
 
 local function finiteNum(v: any): number?
 	if typeof(v) == "number" and v == v and v > -math.huge and v < math.huge then
@@ -829,7 +874,7 @@ local function shapeVolume(shape: string, s: Vector3): number
 	return s.X * s.Y * s.Z
 end
 
--- 서버가 보낸 groups 를 검사해서 읽는다. 전체 부피도 함께 돌려준다.
+-- 서버가 보낸 groups 를 검사해서 읽는다. 받은 조각의 전체 부피도 함께 돌려준다.
 local function parseShatterGroups(raw: any): ({ ShatterGroup }, number)
 	local out: { ShatterGroup } = {}
 	local total = 0
@@ -870,9 +915,10 @@ local function parseShatterGroups(raw: any): ({ ShatterGroup }, number)
 				continue
 			end
 			local size = Vector3.new(math.clamp(s.X, 0.05, 512), math.clamp(s.Y, 0.05, 512), math.clamp(s.Z, 0.05, 512))
+			local vol = shapeVolume(shape, size)
 			read += 1
-			table.insert(grp.pieces, { cf = cf, size = size })
-			grp.volume += shapeVolume(shape, size)
+			table.insert(grp.pieces, { cf = cf, size = size, vol = vol })
+			grp.volume += vol
 		end
 		if #grp.pieces > 0 then
 			table.insert(out, grp)
@@ -925,19 +971,26 @@ local function cutPiece(
 		return
 	end
 	local f = rng:NextNumber(0.36, 0.64)
+	local cfA, sizeA, cfB, sizeB
 	if xOnly or m == sx then
 		local a, b = sx * f, sx * (1 - f)
-		cutPiece(cf * CFrame.new(-sx / 2 + a / 2, 0, 0), Vector3.new(a, sy, sz), C, xOnly, leafShape, mode, base, baseSize, g, out, budget)
-		cutPiece(cf * CFrame.new(sx / 2 - b / 2, 0, 0), Vector3.new(b, sy, sz), C, xOnly, leafShape, mode, base, baseSize, g, out, budget)
+		cfA, sizeA = cf * CFrame.new(-sx / 2 + a / 2, 0, 0), Vector3.new(a, sy, sz)
+		cfB, sizeB = cf * CFrame.new(sx / 2 - b / 2, 0, 0), Vector3.new(b, sy, sz)
 	elseif m == sy then
 		local a, b = sy * f, sy * (1 - f)
-		cutPiece(cf * CFrame.new(0, -sy / 2 + a / 2, 0), Vector3.new(sx, a, sz), C, xOnly, leafShape, mode, base, baseSize, g, out, budget)
-		cutPiece(cf * CFrame.new(0, sy / 2 - b / 2, 0), Vector3.new(sx, b, sz), C, xOnly, leafShape, mode, base, baseSize, g, out, budget)
+		cfA, sizeA = cf * CFrame.new(0, -sy / 2 + a / 2, 0), Vector3.new(sx, a, sz)
+		cfB, sizeB = cf * CFrame.new(0, sy / 2 - b / 2, 0), Vector3.new(sx, b, sz)
 	else
 		local a, b = sz * f, sz * (1 - f)
-		cutPiece(cf * CFrame.new(0, 0, -sz / 2 + a / 2), Vector3.new(sx, sy, a), C, xOnly, leafShape, mode, base, baseSize, g, out, budget)
-		cutPiece(cf * CFrame.new(0, 0, sz / 2 - b / 2), Vector3.new(sx, sy, b), C, xOnly, leafShape, mode, base, baseSize, g, out, budget)
+		cfA, sizeA = cf * CFrame.new(0, 0, -sz / 2 + a / 2), Vector3.new(sx, sy, a)
+		cfB, sizeB = cf * CFrame.new(0, 0, sz / 2 - b / 2), Vector3.new(sx, sy, b)
 	end
+	-- 예산이 도중에 떨어져도 늘 같은 쪽 끝만 남지 않게, 어느 쪽 반을 먼저 자를지 무작위로
+	if rng:NextNumber() < 0.5 then
+		cfA, sizeA, cfB, sizeB = cfB, sizeB, cfA, sizeA
+	end
+	cutPiece(cfA, sizeA, C, xOnly, leafShape, mode, base, baseSize, g, out, budget)
+	cutPiece(cfB, sizeB, C, xOnly, leafShape, mode, base, baseSize, g, out, budget)
 end
 
 -- exact: 재가 되는 조각처럼 제자리에 모양 그대로 보여야 할 때 (모양을 상자로 바꾸지 않는다)
@@ -970,25 +1023,24 @@ local function splitPiece(cf: CFrame, size: Vector3, shape: string, C: number, e
 	end
 end
 
--- 덩어리 수가 상한 근처가 되도록 덩어리 크기를 키워 가며 쪼갠다
+-- 덩어리 수가 상한 근처가 되도록 덩어리 크기를 키워 가며 쪼갠다.
+-- 후보 조각 예산(LEAF_LIMIT)은 조각마다 부피에 비례해 나눠 준다 (최소 1). 하나를 같이 쓰면 서버가 보낸
+-- 순서(가까운 것부터)대로 다 써 버려서, 큰 파괴의 바깥쪽 건물에는 잔해가 하나도 생기지 않는다.
+-- total: 받은 조각들의 부피 합 (parseShatterGroups 가 돌려준 값)
+-- 재 조각(exact)은 상한 안에 다 들어가야 구멍이 빈틈없이 덮이므로 여유(1.3배)를 두지 않는다.
 local function buildChunks(groups: { ShatterGroup }, total: number, cap: number, exact: boolean, lo: number, hi: number): { Chunk }
-	local C = math.clamp((total / (0.42 * cap)) ^ (1 / 3), lo, hi)
+	local C = math.clamp((total / (0.42 * math.max(cap, 1))) ^ (1 / 3), lo, hi)
+	local per = LEAF_LIMIT / math.max(total, 1e-6)
+	local slack = if exact then 1 else 1.3
 	local out: { Chunk } = {}
 	for _ = 1, 4 do
 		out = {}
-		local budget = { n = LEAF_LIMIT }
 		for gi, g in groups do
 			for _, p in g.pieces do
-				splitPiece(p.cf, p.size, g.shape, C, exact, gi, out, budget)
-				if budget.n <= 0 then
-					break
-				end
-			end
-			if budget.n <= 0 then
-				break
+				splitPiece(p.cf, p.size, g.shape, C, exact, gi, out, { n = math.max(1, math.floor(p.vol * per)) })
 			end
 		end
-		if (#out <= cap * 1.3 and budget.n > 0) or C >= hi then
+		if #out <= cap * slack or C >= hi then
 			break
 		end
 		C = math.min(C * 1.35, hi)
@@ -1019,6 +1071,85 @@ local function pickChunks(chunks: { Chunk }, cap: number): ({ Chunk }, { Chunk }
 	return keep, rest
 end
 
+-- 받은 조각 전체에서 부피에 비례해 무작위로 n 곳을 고른다 (넘친 부피를 먼지로 보여줄 자리).
+-- 덩어리가 된 것만 보면 안쪽에만 몰리므로, 바깥쪽 조각도 제 부피만큼 뽑히게 전체에서 고른다.
+-- outer 가 있으면 그 점에서 먼 쪽(가장 먼 조각 거리의 70% 밖) 조각 중에서만 고른다.
+local function pieceSpots(groups: { ShatterGroup }, n: number, outer: Vector3?): { ShatterPiece }
+	local spots: { ShatterPiece } = {}
+	if n <= 0 then
+		return spots
+	end
+	local minD = -1
+	if outer then
+		local dmax = 0
+		for _, g in groups do
+			for _, p in g.pieces do
+				dmax = math.max(dmax, (p.cf.Position - outer).Magnitude)
+			end
+		end
+		minD = dmax * 0.7
+	end
+	local function eligible(p: ShatterPiece): boolean
+		return minD < 0 or (p.cf.Position - (outer :: Vector3)).Magnitude >= minD
+	end
+	local total = 0
+	for _, g in groups do
+		for _, p in g.pieces do
+			if eligible(p) then
+				total += p.vol
+			end
+		end
+	end
+	if total <= 0 then
+		return spots
+	end
+	local targets: { number } = {}
+	for i = 1, n do
+		targets[i] = rng:NextNumber(0, total)
+	end
+	table.sort(targets)
+	local acc, ti = 0, 1
+	local last: ShatterPiece? = nil
+	for _, g in groups do
+		for _, p in g.pieces do
+			if not eligible(p) then
+				continue
+			end
+			acc += p.vol
+			last = p
+			while ti <= n and targets[ti] <= acc do
+				spots[ti] = p
+				ti += 1
+			end
+		end
+	end
+	-- 부동소수 오차로 남은 몫은 마지막 조각에
+	if last then
+		while ti <= n do
+			spots[ti] = last
+			ti += 1
+		end
+	end
+	return spots
+end
+
+-- 조각 안의 무작위 한 점 (큰 조각 하나가 여러 번 뽑혀도 먼지가 한곳에 겹치지 않게)
+local function pointIn(p: ShatterPiece): Vector3
+	local s = p.size
+	return p.cf:PointToWorldSpace(Vector3.new(rng:NextNumber(-0.4, 0.4) * s.X, rng:NextNumber(-0.4, 0.4) * s.Y, rng:NextNumber(-0.4, 0.4) * s.Z))
+end
+
+-- 넘친 부피(overflow)를 먼지로 보여줄 자리 n 곳. 서버가 조각으로 보내지 못한 부피(ctx.lost)는 서버가 가까운
+-- 조각부터 보내고 남은 것이라 바깥쪽에 있다 → 그 몫은 받은 조각 중 바깥쪽에서 먼저 고르고, 나머지는 전체에서 고른다.
+local function overflowSpots(ctx: ShatterCtx, groups: { ShatterGroup }, overflow: number, n: number): { ShatterPiece }
+	local nLost = if overflow > 0 then math.clamp(math.round(n * ctx.lost / overflow), 0, n) else 0
+	local spots = pieceSpots(groups, nLost, ctx.center)
+	for _, p in pieceSpots(groups, n - nLost, nil) do
+		table.insert(spots, p)
+	end
+	return spots
+end
+
 local function newChunkPart(shape: string): BasePart
 	if shape == "Wedge" then
 		return Instance.new("WedgePart")
@@ -1047,53 +1178,96 @@ local function jitterSize(shape: string, s: Vector3): Vector3
 	return Vector3.new(k(s.X), k(s.Y), k(s.Z))
 end
 
-local function debrisGroupReady(): boolean
-	if not debrisGroupOk then
+-- 서버가 만든 충돌 그룹이 있는지 (Debris: 캐릭터와 안 부딪힘, DebrisFresh: 맵과만 부딪힘)
+local function groupReady(name: string): boolean
+	if not groupOk[name] then
 		local ok, res = pcall(function()
-			return PhysicsService:IsCollisionGroupRegistered("Debris")
+			return PhysicsService:IsCollisionGroupRegistered(name)
 		end)
-		debrisGroupOk = ok and res == true
+		groupOk[name] = ok and res == true
 	end
-	return debrisGroupOk
+	return groupOk[name] == true
 end
 
--- 사라진 잔해를 목록에서 빼고, n 개가 들어갈 자리가 없으면 오래된 것부터 없앤다
-local function makeRubbleRoom(n: number)
+local function isEvicted(p: BasePart): boolean
+	return p:GetAttribute("Evicted") == true
+end
+
+-- 자리를 비우려고 없애는 조각: 멈춰 있으면 제자리에서 줄어들고, 아직 날아가는 중이면 공중에 세우지 않고 그대로 옅어진다.
+-- 표시해 두면 나중에 예약된 무너짐(crumbleGhost)·수명 끝(retireRubble)이 이 조각을 다시 건드리지 않는다.
+local function evictPart(p: BasePart)
+	p:SetAttribute("Evicted", true)
+	if p.Anchored or p.AssemblyLinearVelocity.Magnitude < MOVING_SPEED then
+		p.Anchored = true
+		tween(p, 0.25, { Transparency = 1, Size = p.Size * 0.3 })
+	else
+		tween(p, 0.25, { Transparency = 1 })
+	end
+	destroyLater(p, 0.3)
+end
+
+-- 사라진 조각을 목록에서 빼고, n 개가 들어갈 자리가 없으면 멈춘 것 중 오래된 것부터,
+-- 그래도 모자라면 날아가는 것 중 오래된 것부터 없앤다
+local function makeRoom(list: { BasePart }, cap: number, n: number)
 	local j = 0
-	local count = #liveRubble
+	local count = #list
 	for i = 1, count do
-		local p = liveRubble[i]
+		local p = list[i]
 		if p.Parent then
 			j += 1
-			liveRubble[j] = p
+			list[j] = p
 		end
 	end
 	for i = count, j + 1, -1 do
-		liveRubble[i] = nil
+		list[i] = nil
 	end
-	local over = math.min(j + n - RUBBLE_LIVE_CAP, j)
+	local over = math.min(j + n - cap, j)
 	if over <= 0 then
 		return
 	end
-	for i = 1, over do
-		local p = liveRubble[i]
-		p.Anchored = true
-		tween(p, 0.25, { Transparency = 1, Size = p.Size * 0.3 })
-		destroyLater(p, 0.3)
+	local victim: { [number]: boolean } = {}
+	local picked = 0
+	for i = 1, j do
+		if picked >= over then
+			break
+		end
+		local p = list[i]
+		if p.Anchored or p.AssemblyLinearVelocity.Magnitude < MOVING_SPEED then
+			victim[i] = true
+			picked += 1
+		end
 	end
-	table.move(liveRubble, over + 1, j, 1)
-	for i = j, j - over + 1, -1 do
-		liveRubble[i] = nil
+	for i = 1, j do
+		if picked >= over then
+			break
+		end
+		if not victim[i] then
+			victim[i] = true
+			picked += 1
+		end
+	end
+	local k = 0
+	for i = 1, j do
+		local p = list[i]
+		if victim[i] then
+			evictPart(p)
+		else
+			k += 1
+			list[k] = p
+		end
+	end
+	for i = j, k + 1, -1 do
+		list[i] = nil
 	end
 end
 
 -- 수명이 다한 잔해: 멈춰 있으면 땅속으로 가라앉듯, 굴러가는 중이면 그대로 줄어들며 사라진다
 local function retireRubble(p: BasePart)
-	if not p.Parent then
+	if not p.Parent or isEvicted(p) then
 		return
 	end
 	local t = rng:NextNumber(0.5, 0.85)
-	if p.AssemblyLinearVelocity.Magnitude < 4 then
+	if p.AssemblyLinearVelocity.Magnitude < MOVING_SPEED then
 		p.Anchored = true
 		tween(p, t, { Size = p.Size * 0.2, CFrame = p.CFrame - Vector3.new(0, p.Size.Y * 0.35, 0), Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 	else
@@ -1102,7 +1276,8 @@ local function retireRubble(p: BasePart)
 	destroyLater(p, t + 0.05)
 end
 
-local function launchRubble(c: Chunk, g: ShatterGroup, ctx: ShatterCtx, useGroup: boolean): BasePart
+-- group: 처음 넣을 충돌 그룹 (nil 이면 기본). fresh 면 잠깐 뒤 "Debris" 로 바꾼다.
+local function launchRubble(c: Chunk, g: ShatterGroup, ctx: ShatterCtx, group: string?, fresh: boolean): BasePart
 	local p = newChunkPart(c.shape)
 	local size = jitterSize(c.shape, c.size)
 	local maxDim = math.max(size.X, size.Y, size.Z)
@@ -1112,8 +1287,8 @@ local function launchRubble(c: Chunk, g: ShatterGroup, ctx: ShatterCtx, useGroup
 	p.CanTouch = false
 	p.CastShadow = maxDim > 2
 	p.Massless = false
-	if useGroup then
-		p.CollisionGroup = "Debris"
+	if group then
+		p.CollisionGroup = group
 	end
 	p.CustomPhysicalProperties = RUBBLE_PHYS
 	p.Material = g.material
@@ -1124,6 +1299,14 @@ local function launchRubble(c: Chunk, g: ShatterGroup, ctx: ShatterCtx, useGroup
 	p.Size = size
 	p.CFrame = c.cf
 	p.Parent = folder
+	if fresh then
+		-- 이웃 덩어리와 겹친 채 생겨도 첫 프레임에 서로 밀어내며 튀지 않게, 잠깐은 맵하고만 부딪힌다
+		task.delay(FRESH_TIME, function()
+			if p.Parent then
+				p.CollisionGroup = "Debris"
+			end
+		end)
+	end
 
 	-- 방향: 힘이 들어온 곳에서 멀어지는 쪽 (없으면 밀어낸 방향 → 중심에서 바깥 → 위) + 주된 방향 섞기
 	local pos = c.cf.Position
@@ -1164,7 +1347,7 @@ local function launchRubble(c: Chunk, g: ShatterGroup, ctx: ShatterCtx, useGroup
 	return p
 end
 
--- 같은 소리를 0.05초 안에 또 틀지 않는다
+-- 같은 소리를 0.05초 안에 또 틀지 않는다 (한 프레임에 파괴가 여러 번 와도 이름마다 한 번)
 local function playDestructionSound(name: string, pos: Vector3, volume: number, pitch: number)
 	local now = os.clock()
 	local last = lastSoundAt[name]
@@ -1175,7 +1358,8 @@ local function playDestructionSound(name: string, pos: Vector3, volume: number, 
 	Sounds.play(name, { position = pos, volume = volume, pitch = pitch, random = 0.06 })
 end
 
--- 카메라와의 거리에 따라 줄어드는 흔들림
+-- 카메라와의 거리에 따라 줄어드는 흔들림.
+-- 더하지 않고 "최소 이만큼"으로 건다: 매 프레임 이어지는 파괴도 가장 센 한 번의 세기로 유지될 뿐 쌓이지 않는다.
 local function shakeFrom(pos: Vector3, amount: number): number
 	local cam = workspace.CurrentCamera
 	if not cam then
@@ -1183,7 +1367,7 @@ local function shakeFrom(pos: Vector3, amount: number): number
 	end
 	local dist = (cam.CFrame.Position - pos).Magnitude
 	if dist < SHAKE_RANGE then
-		CameraFX.shake(amount * (1 - dist / SHAKE_RANGE))
+		CameraFX.shakeAtLeast(amount * (1 - dist / SHAKE_RANGE))
 	end
 	return dist
 end
@@ -1220,6 +1404,25 @@ local function groundBelow(pos: Vector3, depth: number): number?
 	return if hit then hit.Position.Y else nil
 end
 
+-- 파괴 중심의 XZ 에서 높이 y 로 뿜을 자리. 땅속에서 뿜어 안 보이는 일이 없게 바닥 + lift 이상으로 올리고,
+-- 바닥을 못 찾으면 중심보다 maxDrop 넘게 내려가지 않게만 한다.
+local function liftCenter(ctx: ShatterCtx, y: number, lift: number, maxDrop: number): Vector3
+	local c = ctx.center
+	local gy = ctx.ground
+	local yy = if gy then math.max(y, gy + lift) else math.max(y, c.Y - maxDrop)
+	return Vector3.new(c.X, yy, c.Z)
+end
+
+-- 다른 XZ (조각 자리) 에서도 같은 일: pos 와 중심 중 높은 곳부터 아래로 바닥을 찾아 바닥 + lift 이상으로
+local function aboveGround(pos: Vector3, center: Vector3, lift: number): Vector3
+	local top = math.max(pos.Y, center.Y)
+	local gy = groundBelow(Vector3.new(pos.X, top, pos.Z), top - pos.Y + 30)
+	if gy and pos.Y < gy + lift then
+		return Vector3.new(pos.X, gy + lift, pos.Z)
+	end
+	return pos
+end
+
 -- 크기 등급: 1 작음, 2 중간, 3 큼
 local function shatterTier(radius: number, total: number): number
 	if radius >= 12 or total >= 400 then
@@ -1231,22 +1434,32 @@ local function shatterTier(radius: number, total: number): number
 end
 
 -- 일반 파괴: 제자리에서 덩어리로 쪼개져 날아가는 잔해 + 흙먼지
-local function shatterRubble(ctx: ShatterCtx, groups: { ShatterGroup }, total: number)
+-- got: 받은 조각의 부피 합. 먼지·흔들림·소리는 서버가 조각으로 안 보낸 부피(ctx.lost)까지 더한 크기로 정한다.
+local function shatterRubble(ctx: ShatterCtx, groups: { ShatterGroup }, got: number)
 	local center, radius = ctx.center, ctx.radius
+	local total = got + ctx.lost
 	local cam = workspace.CurrentCamera
 	local camDist = if cam then (cam.CFrame.Position - center).Magnitude else 0
-	local cap = RUBBLE_EVENT_CAP
+	local want = RUBBLE_EVENT_CAP
 	if camDist > 260 then
-		cap = math.floor(cap * 0.5) -- 멀리서 난 파괴는 덩어리를 덜 만든다
+		want = math.floor(want * 0.5) -- 멀리서 난 파괴는 덩어리를 덜 만든다
 	end
-	-- 덩어리 크기: 작은 파괴는 1~2 스터드, 벽 한 면은 3~4 스터드, 건물째 날아가면 최대 5.5 스터드
-	local lo = math.clamp(total ^ (1 / 3) * 0.55, 1.2, 3.6)
-	local keep, rest = pickChunks(buildChunks(groups, total, cap, false, lo, CHUNK_MAX), cap)
-	makeRubbleRoom(#keep)
-	local useGroup = debrisGroupReady()
+	-- 초당 예산: 매 프레임 파괴가 이어지면 덩어리를 줄이고, 다 쓰면 그 부피는 먼지로만 보여준다
+	local cap = math.min(want, bucketAvail(rubbleBudget))
+	local keep: { Chunk } = {}
+	if cap > 0 then
+		-- 덩어리 크기: 작은 파괴는 1~2 스터드, 벽 한 면은 3~4 스터드, 건물째 날아가면 최대 5.5 스터드
+		local lo = math.clamp(got ^ (1 / 3) * 0.55, 1.2, 3.6)
+		keep = pickChunks(buildChunks(groups, got, cap, false, lo, CHUNK_MAX), cap)
+	end
+	bucketTake(rubbleBudget, #keep)
+	makeRoom(liveRubble, RUBBLE_LIVE_CAP, #keep)
+	local useGroup = groupReady("Debris")
+	local fresh = useGroup and groupReady("DebrisFresh")
+	local group: string? = if fresh then "DebrisFresh" elseif useGroup then "Debris" else nil
 	local madeVol = 0
 	for _, c in keep do
-		table.insert(liveRubble, launchRubble(c, groups[c.g], ctx, useGroup))
+		table.insert(liveRubble, launchRubble(c, groups[c.g], ctx, group, fresh))
 		madeVol += c.vol
 	end
 	local overflow = math.max(0, total - madeVol)
@@ -1256,9 +1469,12 @@ local function shatterRubble(ctx: ShatterCtx, groups: { ShatterGroup }, total: n
 	local dustLight = dustColor:Lerp(Color3.new(1, 1, 1), 0.3)
 	local forceK = math.sqrt(math.clamp(ctx.force, 0.6, 2.5))
 	local tier = shatterTier(radius, total)
+	local mid = liftCenter(ctx, center.Y, 1, 0)
 
-	-- 중심에서 뭉게뭉게 퍼지는 먼지 (넘친 부피만큼 더 짙게)
-	emit(center, math.clamp(math.floor(6 + radius * 1.1 + overflow ^ (1 / 3) * 1.5), 6, 42), {
+	-- 중심에서 뭉게뭉게 퍼지는 먼지 (넘친 부피만큼 더 짙게). 이것만은 늘 나온다.
+	-- 파괴가 매 프레임 이어져 연출 예산이 바닥났으면 입자 수를 반으로 (구름이 겹쳐 쌓이기만 한다)
+	local busy = if bucketAvail(fxBudget) < 1 then 0.5 else 1
+	emit(mid, math.clamp(math.floor((6 + radius * 1.1 + overflow ^ (1 / 3) * 1.5) * busy), 4, 42), {
 		texture = TEX_SMOKE,
 		color = dustColor,
 		color2 = dustLight,
@@ -1274,59 +1490,72 @@ local function shatterRubble(ctx: ShatterCtx, groups: { ShatterGroup }, total: n
 		rot = 40,
 	})
 	-- 사방으로 튀었다가 떨어지는 부스러기 가루
-	emit(center, math.clamp(math.floor(8 + radius * 1.2), 8, 30), {
-		texture = TEX_SMOKE,
-		color = dustColor:Lerp(Color3.new(0, 0, 0), 0.45),
-		size = 0.45,
-		size2 = 0.3,
-		speed = math.clamp(28 + radius * 1.5, 28, 70) * forceK,
-		life = 1.1,
-		spread = 180,
-		light = 0,
-		transparency = 0,
-		drag = 0.6,
-		accel = Vector3.new(0, -110, 0),
-		rot = 360,
-	})
+	if fxToken() then
+		emit(mid, math.clamp(math.floor(8 + radius * 1.2), 8, 30), {
+			texture = TEX_SMOKE,
+			color = dustColor:Lerp(Color3.new(0, 0, 0), 0.45),
+			size = 0.45,
+			size2 = 0.3,
+			speed = math.clamp(28 + radius * 1.5, 28, 70) * forceK,
+			life = 1.1,
+			spread = 180,
+			light = 0,
+			transparency = 0,
+			drag = 0.6,
+			accel = Vector3.new(0, -110, 0),
+			rot = 360,
+		})
+	end
 	-- 작은 파편
-	local bias = if ctx.dir.Magnitude > 0.5 then ctx.dir * 0.8 + Vector3.new(0, 0.6, 0) else Vector3.new(0, 0.7, 0)
-	shardBurst(
-		center,
-		math.clamp(math.floor(3 + radius * 0.5), 4, 8),
-		main.color,
-		45 * forceK,
-		math.clamp(radius * 0.08, 0.35, 0.9),
-		0.9,
-		main.material,
-		110,
-		bias
-	)
+	if fxToken() then
+		local bias = if ctx.dir.Magnitude > 0.5 then ctx.dir * 0.8 + Vector3.new(0, 0.6, 0) else Vector3.new(0, 0.7, 0)
+		shardBurst(
+			mid,
+			math.clamp(math.floor(3 + radius * 0.5), 4, 8),
+			main.color,
+			45 * forceK,
+			math.clamp(radius * 0.08, 0.35, 0.9),
+			0.9,
+			main.material,
+			110,
+			bias
+		)
+	end
 	-- 큰 파괴: 바닥을 따라 퍼지는 충격 고리 + 낮게 깔리는 흙먼지
 	if radius >= 12 then
-		local gy = groundBelow(center, radius + 4)
-		if gy then
+		local gy = ctx.ground
+		if gy and center.Y - gy <= radius + 4 and fxToken() then
 			local g = Vector3.new(center.X, gy, center.Z)
 			ring(g + Vector3.new(0, 0.3, 0), Vector3.yAxis, radius * 0.5, radius * 2.6, dustLight, 0.5, 0.45, 0.35)
 			dust(g + Vector3.new(0, 1.2, 0), math.clamp(math.floor(radius * 0.8), 10, 24), math.clamp(radius * 0.3, 3, 7), dustColor)
 		end
-	else
-		-- 작은·중간 파괴: 부서진 자리 아래쪽에서 확 솟는 흙먼지
-		dust(center - Vector3.new(0, radius * 0.4, 0), math.clamp(math.floor(4 + radius * 1.2), 5, 14), math.clamp(radius * 0.4, 1.5, 4.5), dustColor)
+	elseif fxToken() then
+		-- 작은·중간 파괴: 부서진 자리 아래쪽에서 확 솟는 흙먼지 (바닥 위에서)
+		dust(liftCenter(ctx, center.Y - radius * 0.4, 1, 3), math.clamp(math.floor(4 + radius * 1.2), 5, 14), math.clamp(radius * 0.4, 1.5, 4.5), dustColor)
 	end
-	-- 덩어리로 못 만든 부피는 그 자리에서 먼지로
+	-- 덩어리로 못 만든 부피는 그 자리에서 먼지로. 자리는 받은 조각 전체에서 부피 비례로 뽑는다 (큰 파괴의 바깥쪽도 먼지가 인다)
 	if overflow > 1 then
-		for _ = 1, math.min(2, 1 + math.floor(overflow / 400)) do
-			local pos = if #rest > 0 then rest[rng:NextInteger(1, #rest)].cf.Position else center + rng:NextUnitVector() * radius * 0.5
-			dust(pos, math.clamp(math.floor(overflow ^ (1 / 3) * 1.6), 5, 18), math.clamp(overflow ^ (1 / 3) * 0.45, 2.5, 7), dustColor)
+		local n = math.min(5, 1 + math.floor(overflow / 500))
+		local cnt = math.clamp(math.floor(overflow ^ (1 / 3) * 1.6), 5, 18)
+		local size = math.clamp(overflow ^ (1 / 3) * 0.45, 2.5, 7)
+		for _, p in overflowSpots(ctx, groups, overflow, n) do
+			if not fxToken() then
+				break
+			end
+			dust(aboveGround(pointIn(p), center, 1), cnt, size, dustColor)
 		end
 	end
 
-	-- 카메라 흔들림
+	-- 카메라 흔들림 (쌓이지 않게 최소값으로), 가까운 큰 파괴는 FOV 도 살짝 (0.15초에 한 번까지)
 	local sizeScore = math.clamp(math.max(radius, total ^ (1 / 3) * 1.3), 0, 40)
 	local amount = math.min(math.clamp(0.05 + sizeScore * 0.022, 0.05, 0.75) * math.clamp(0.75 + ctx.force * 0.25, 0.75, 1.5), 0.85)
 	local dist = shakeFrom(center, amount)
 	if radius >= 14 and dist < 45 then
-		CameraFX.fovPunch(2)
+		local now = os.clock()
+		if now - lastFovPunchAt > 0.15 then
+			lastFovPunchAt = now
+			CameraFX.fovPunch(2)
+		end
 	end
 
 	-- 소리
@@ -1343,8 +1572,7 @@ local function shatterRubble(ctx: ShatterCtx, groups: { ShatterGroup }, total: n
 		end
 		-- 잔해가 바닥에 쏟아지는 소리
 		if tier >= 2 and #keep >= 8 then
-			local gy = groundBelow(center, radius + 20) or center.Y
-			local landAt = Vector3.new(center.X, gy, center.Z)
+			local landAt = Vector3.new(center.X, ctx.ground or center.Y, center.Z)
 			task.delay(rng:NextNumber(0.4, 0.65), function()
 				playDestructionSound("land_heavy", landAt, 0.55 * vk, rng:NextNumber(0.75, 0.95))
 			end)
@@ -1354,7 +1582,7 @@ end
 
 -- 칸자키 렌: 잘린 부분이 제자리에서 새까맣게 변했다가 아래로 무너지며 재가 된다
 local function crumbleGhost(p: BasePart, dur: number)
-	if not p.Parent then
+	if not p.Parent or isEvicted(p) then
 		return
 	end
 	local cf = p.CFrame
@@ -1379,11 +1607,18 @@ local function crumbleGhost(p: BasePart, dur: number)
 	tween(p, dur, { Size = newSize, CFrame = cf - Vector3.new(0, h * 0.5, 0), Transparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 end
 
-local function shatterAsh(ctx: ShatterCtx, groups: { ShatterGroup }, total: number)
+local function shatterAsh(ctx: ShatterCtx, groups: { ShatterGroup }, got: number)
 	local center, radius = ctx.center, ctx.radius
-	local lo = math.clamp(total ^ (1 / 3) * 0.6, 2, 6)
-	local keep, rest = pickChunks(buildChunks(groups, total, GHOST_EVENT_CAP, true, lo, 10), GHOST_EVENT_CAP)
-	makeRubbleRoom(#keep)
+	local total = got + ctx.lost
+	-- 재 조각은 고정·충돌 없음이라 싸다: 잔해보다 넉넉한 별도 예산과 별도 상한을 쓴다
+	local cap = math.min(GHOST_EVENT_CAP, bucketAvail(ghostBudget))
+	local keep: { Chunk } = {}
+	if cap > 0 then
+		local lo = math.clamp(got ^ (1 / 3) * 0.6, 2, 6)
+		keep = pickChunks(buildChunks(groups, got, cap, true, lo, 10), cap)
+	end
+	bucketTake(ghostBudget, #keep)
+	makeRoom(liveGhosts, GHOST_LIVE_CAP, #keep)
 	-- 칼이 들어온 쪽에서부터 차례로 무너진다
 	local d0 = math.huge
 	for _, c in keep do
@@ -1408,7 +1643,7 @@ local function shatterAsh(ctx: ShatterCtx, groups: { ShatterGroup }, total: numb
 		p.Size = c.size + grow
 		p.CFrame = c.cf
 		p.Parent = folder
-		table.insert(liveRubble, p)
+		table.insert(liveGhosts, p)
 		madeVol += c.vol
 		tween(p, 0.08, { Color = ASH, Transparency = 0 })
 		local hold = 0.1 + math.clamp(((c.cf.Position - ctx.from).Magnitude - d0) / span, 0, 1) * 0.35 + rng:NextNumber(0, 0.08)
@@ -1417,50 +1652,73 @@ local function shatterAsh(ctx: ShatterCtx, groups: { ShatterGroup }, total: numb
 		destroyLater(p, hold + dur + 0.15)
 	end
 	local overflow = math.max(0, total - madeVol)
+	local mid = liftCenter(ctx, center.Y, 1, 0)
 
-	-- 검은 재 폭발 (붉은 불티 포함)
-	ashPuff(center, math.clamp(math.floor(8 + radius * 1.1 + overflow ^ (1 / 3) * 1.2), 8, 36), math.clamp(radius * 0.32, 1.6, 6), math.clamp(radius * 1.1, 6, 22))
-	-- 무너지는 순간 조각 자리에서 재가 한 번 더 인다
-	if #keep > 0 or #rest > 0 then
-		local src = if #keep > 0 then keep else rest
-		local spots: { Chunk } = {}
-		for i = 1, math.min(2, #src) do
-			spots[i] = src[rng:NextInteger(1, #src)]
+	-- 검은 재 폭발 (붉은 불티 포함). 이것만은 늘 나온다. 매 프레임 이어지는 중이면 입자 수를 반으로.
+	local busy = if bucketAvail(fxBudget) < 1 then 0.5 else 1
+	ashPuff(mid, math.clamp(math.floor((8 + radius * 1.1 + overflow ^ (1 / 3) * 1.2) * busy), 5, 36), math.clamp(radius * 0.32, 1.6, 6), math.clamp(radius * 1.1, 6, 22))
+	-- 무너지는 순간 조각 자리에서 재가 한 번 더 인다 (+ 재 조각으로 못 만든 부피가 크면 받은 조각 전체에서 부피 비례로 몇 곳 더)
+	local puffs: { { pos: Vector3, size: number } } = {}
+	if fxToken() then
+		if #keep > 0 then
+			for _ = 1, math.min(2, #keep) do
+				local c = keep[rng:NextInteger(1, #keep)]
+				table.insert(puffs, { pos = c.cf.Position, size = math.clamp(c.size.Magnitude * 0.3, 1.2, 4) })
+			end
+		else
+			for _, p in pieceSpots(groups, 2, nil) do
+				table.insert(puffs, { pos = pointIn(p), size = math.clamp(p.size.Magnitude * 0.3, 1.2, 4) })
+			end
 		end
+	end
+	if overflow > 200 then
+		local size = math.clamp(overflow ^ (1 / 3) * 0.3, 2, 5)
+		for _, p in overflowSpots(ctx, groups, overflow, math.min(4, math.ceil(overflow / 800))) do
+			if not fxToken() then
+				break
+			end
+			table.insert(puffs, { pos = pointIn(p), size = size })
+		end
+	end
+	if #puffs > 0 then
 		task.delay(0.3, function()
-			for _, c in spots do
-				ashPuff(c.cf.Position, 8, math.clamp(c.size.Magnitude * 0.3, 1.2, 4), 6)
+			for _, pf in puffs do
+				ashPuff(aboveGround(pf.pos, center, 1), 8, pf.size, 6)
 			end
 		end)
 	end
-	-- 아래로 가라앉는 재 구름
-	emit(center - Vector3.new(0, radius * 0.3, 0), math.clamp(math.floor(radius * 1.2), 6, 22), {
-		texture = TEX_SMOKE,
-		color = ASH,
-		color2 = ASH_GREY,
-		size = math.clamp(radius * 0.4, 2, 8),
-		size2 = math.clamp(radius * 0.9, 4, 16),
-		speed = math.clamp(radius * 0.6, 3, 12),
-		life = 2,
-		spread = 180,
-		light = 0,
-		transparency = 0.25,
-		drag = 2.5,
-		accel = Vector3.new(0, -3, 0),
-		rot = 30,
-	})
+	-- 아래로 가라앉는 재 구름 (긴 상자 영역이면 반지름이 커서 땅속에서 뿜어졌다 → 바닥 위 2 스터드 이상)
+	if fxToken() then
+		emit(liftCenter(ctx, center.Y - radius * 0.3, 2, 4), math.clamp(math.floor(radius * 1.2), 6, 22), {
+			texture = TEX_SMOKE,
+			color = ASH,
+			color2 = ASH_GREY,
+			size = math.clamp(radius * 0.4, 2, 8),
+			size2 = math.clamp(radius * 0.9, 4, 16),
+			speed = math.clamp(radius * 0.6, 3, 12),
+			life = 2,
+			spread = 180,
+			light = 0,
+			transparency = 0.25,
+			drag = 2.5,
+			accel = Vector3.new(0, -3, 0),
+			rot = 30,
+		})
+	end
 	-- 팔랑이며 떨어지는 검은 재 조각
-	shardBurst(
-		center + Vector3.new(0, radius * 0.3, 0),
-		math.clamp(math.floor(4 + radius * 0.35), 4, 10),
-		ASH,
-		12,
-		math.clamp(radius * 0.05, 0.3, 0.7),
-		1.8,
-		Enum.Material.SmoothPlastic,
-		14,
-		Vector3.new(0, 0.9, 0)
-	)
+	if fxToken() then
+		shardBurst(
+			center + Vector3.new(0, radius * 0.3, 0),
+			math.clamp(math.floor(4 + radius * 0.35), 4, 10),
+			ASH,
+			12,
+			math.clamp(radius * 0.05, 0.3, 0.7),
+			1.8,
+			Enum.Material.SmoothPlastic,
+			14,
+			Vector3.new(0, 0.9, 0)
+		)
+	end
 
 	local sizeScore = math.clamp(math.max(radius, total ^ (1 / 3) * 1.3), 0, 40)
 	shakeFrom(center, math.clamp(0.05 + sizeScore * 0.022, 0.05, 0.75) * 0.5)
@@ -1470,6 +1728,51 @@ local function shatterAsh(ctx: ShatterCtx, groups: { ShatterGroup }, total: numb
 		playDestructionSound("ren_ash_gain", center, if big then 1.2 else 0.9, rng:NextNumber(0.85, 1.05))
 		if big then
 			playDestructionSound("ren_ash_wave", center, 0.9, rng:NextNumber(0.7, 0.85))
+		end
+	end
+end
+
+-- 복구된 파트 자리 안에 남아 있는 로컬 잔해·재 조각을 지운다.
+-- (조각이 너무 많아 서버가 일찍 복구하면, 아직 살아 있는 잔해가 다시 생긴 벽 속에 박혀 튕겨 나간다)
+-- cframes / sizes: 같은 순서의 목록. 둘 중 하나라도 없으면 아무것도 안 한다.
+local function clearRestored(cframes: any, sizes: any)
+	if typeof(cframes) ~= "table" or typeof(sizes) ~= "table" then
+		return
+	end
+	local boxes: { RestoredBox } = {}
+	for i, raw in cframes do
+		if #boxes >= REBUILD_BOX_LIMIT then
+			break
+		end
+		if typeof(raw) ~= "CFrame" then
+			continue
+		end
+		local cf = raw :: CFrame
+		local s = finiteVec(sizes[i])
+		if not s or not finiteVec(cf.Position) then
+			continue
+		end
+		local half = Vector3.new(math.abs(s.X), math.abs(s.Y), math.abs(s.Z)) / 2 + Vector3.new(0.5, 0.5, 0.5)
+		table.insert(boxes, { cf = cf, half = half, center = cf.Position, reach = half.Magnitude })
+	end
+	if #boxes == 0 then
+		return
+	end
+	for _, list in { liveRubble, liveGhosts } do
+		for _, p in list do
+			if not p.Parent then
+				continue
+			end
+			local pos = p.Position
+			for _, b in boxes do
+				if (pos - b.center).Magnitude <= b.reach then
+					local rel = b.cf:PointToObjectSpace(pos)
+					if math.abs(rel.X) <= b.half.X and math.abs(rel.Y) <= b.half.Y and math.abs(rel.Z) <= b.half.Z then
+						p:Destroy()
+						break
+					end
+				end
+			end
 		end
 	end
 end
@@ -1517,27 +1820,34 @@ end
 
 -- 벽꽝: 벽에 금이 가며 파편이 튀고 먼지가 인다
 handlers.WallSlam = function(d)
-	local pos = d.pos :: Vector3
-	local normal = (d.normal :: Vector3).Unit
-	local up = if math.abs(normal.Y) > 0.9 then Vector3.new(1, 0, 0) else Vector3.new(0, 1, 0)
-	local right = normal:Cross(up).Unit
-	local wallUp = right:Cross(normal).Unit
-	local base = CFrame.fromMatrix(pos, right, wallUp, -normal)
-	-- 금 간 벽면 (방사형 균열 + 튀어나온 돌)
-	for i = 1, 9 do
-		local a = (i / 9) * math.pi * 2 + rng:NextNumber(-0.25, 0.25)
-		local len = rng:NextNumber(2.5, 5)
-		local dir = right * math.cos(a) + wallUp * math.sin(a)
-		local mid = pos + dir * (len / 2) + normal * 0.08
-		local crack = newPart(Vector3.new(0.18, 0.12, len), CFrame.lookAt(mid, mid + dir), Color3.fromRGB(30, 26, 24), Enum.Material.Slate, 0)
-		task.delay(2, function()
-			fadeOut(crack, 0.8)
-		end)
-		local s = rng:NextNumber(0.7, 1.4)
-		local rock = newPart(Vector3.new(s, s * 0.7, s), base * CFrame.new(math.cos(a) * len * 0.45, math.sin(a) * len * 0.45, -0.3) * CFrame.Angles(rng:NextNumber(-1, 1), rng:NextNumber(-1, 1), 0), Color3.fromRGB(110, 100, 94), Enum.Material.Slate, 0)
-		task.delay(1.6, function()
-			fadeOut(rock, 0.8)
-		end)
+	local pos = finiteVec(d.pos)
+	if not pos then
+		return
+	end
+	local rawNormal = finiteVec(d.normal)
+	local normal = if rawNormal and rawNormal.Magnitude > 0.01 then rawNormal.Unit else Vector3.yAxis
+	-- broke: 몸이 벽을 뚫고 지나갔다. 그 자리 벽면은 방금 부서져 없으니 금·돌은 그리지 않는다 (구멍 속에 떠 있게 된다)
+	if d.broke ~= true then
+		local up = if math.abs(normal.Y) > 0.9 then Vector3.new(1, 0, 0) else Vector3.new(0, 1, 0)
+		local right = normal:Cross(up).Unit
+		local wallUp = right:Cross(normal).Unit
+		local base = CFrame.fromMatrix(pos, right, wallUp, -normal)
+		-- 금 간 벽면 (방사형 균열 + 튀어나온 돌)
+		for i = 1, 9 do
+			local a = (i / 9) * math.pi * 2 + rng:NextNumber(-0.25, 0.25)
+			local len = rng:NextNumber(2.5, 5)
+			local dir = right * math.cos(a) + wallUp * math.sin(a)
+			local mid = pos + dir * (len / 2) + normal * 0.08
+			local crack = newPart(Vector3.new(0.18, 0.12, len), CFrame.lookAt(mid, mid + dir), Color3.fromRGB(30, 26, 24), Enum.Material.Slate, 0)
+			task.delay(2, function()
+				fadeOut(crack, 0.8)
+			end)
+			local s = rng:NextNumber(0.7, 1.4)
+			local rock = newPart(Vector3.new(s, s * 0.7, s), base * CFrame.new(math.cos(a) * len * 0.45, math.sin(a) * len * 0.45, -0.3) * CFrame.Angles(rng:NextNumber(-1, 1), rng:NextNumber(-1, 1), 0), Color3.fromRGB(110, 100, 94), Enum.Material.Slate, 0)
+			task.delay(1.6, function()
+				fadeOut(rock, 0.8)
+			end)
+		end
 	end
 	shardBurst(pos + normal * 0.5, 12, Color3.fromRGB(120, 110, 100), 30, 0.6, 0.8, Enum.Material.Slate, 70, normal)
 	dust(pos + normal * 1.5, 12, 3)
@@ -1811,32 +2121,38 @@ handlers.Shatter = function(d)
 		dir = if dir.Magnitude > 0.01 then dir.Unit else Vector3.zero,
 		force = math.clamp(finiteNum(d.force) or 1, 0.2, 5),
 		sound = d.sound ~= false,
+		-- 조각 수 상한 때문에 서버가 조각으로 보내지 않은 부피 (없으면 0)
+		lost = math.clamp(finiteNum(d.lost) or 0, 0, 1e6),
+		ground = groundBelow(center, radius + 20),
 	}
 	local ash = d.ash == true
-	local groups, total = parseShatterGroups(d.groups)
+	local groups, got = parseShatterGroups(d.groups)
 	if #groups == 0 then
-		-- 조각 목록이 잘려서 안 왔으면 먼지(재)만
+		-- 조각 목록이 잘려서 안 왔으면 먼지(재)만. 서버가 알려 준 없앤 부피가 크면 그만큼 키운다
+		local s = math.max(radius, ctx.lost ^ (1 / 3) * 0.8)
+		local mid = liftCenter(ctx, center.Y, 1, 0)
 		if ash then
-			ashPuff(center, 12, math.clamp(radius * 0.3, 1.5, 5), 10)
+			ashPuff(mid, 12, math.clamp(s * 0.3, 1.5, 5), 10)
 		else
-			dust(center, math.clamp(math.floor(radius * 1.2), 6, 20), math.clamp(radius * 0.4, 2, 7))
+			dust(mid, math.clamp(math.floor(s * 1.2), 6, 20), math.clamp(s * 0.4, 2, 7))
 		end
 		return
 	end
 	if ash then
-		shatterAsh(ctx, groups, total)
+		shatterAsh(ctx, groups, got)
 	else
-		shatterRubble(ctx, groups, total)
+		shatterRubble(ctx, groups, got)
 	end
 end
 
--- 복구된 파트 자리에 부드러운 금빛 반짝임
+-- 복구된 파트 자리에 부드러운 금빛 반짝임 (+ 그 자리에 남은 로컬 잔해 정리)
 handlers.Rebuild = function(d)
+	local sizes = d.sizes
+	clearRestored(d.cframes, sizes)
 	local positions = d.positions
 	if typeof(positions) ~= "table" then
 		return
 	end
-	local sizes = d.sizes
 	local cam = workspace.CurrentCamera
 	local shown = 0
 	for i, raw in positions do
