@@ -4,8 +4,6 @@ import com.jujutsukaisen.JujutsuKaisen;
 import com.jujutsukaisen.network.C2SKeyAction;
 import com.jujutsukaisen.network.ModNetwork;
 import com.jujutsukaisen.client.render.CharacterPlayerRenderer;
-import com.jujutsukaisen.sorcery.JJK;
-import com.jujutsukaisen.sorcery.SorcererData;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.util.Mth;
@@ -14,6 +12,7 @@ import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -41,8 +40,11 @@ public final class ClientForgeEvents {
         }
     }
 
-    /** Players who became a character (or are mid-cast) are drawn by the character renderer. */
-    @SubscribeEvent
+    /**
+     * Players who became a character are drawn by the character renderer. Highest priority, so listeners that
+     * do not receive canceled events only ever see that renderer's balanced Pre/Post pair.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void renderPlayer(RenderPlayerEvent.Pre event) {
         if (event.getRenderer() instanceof CharacterPlayerRenderer) return;
         if (!(event.getEntity() instanceof AbstractClientPlayer player)) return;
@@ -53,13 +55,11 @@ public final class ClientForgeEvents {
         renderer.render(player, yaw, event.getPartialTick(), event.getPoseStack(), event.getMultiBufferSource(), event.getPackedLight());
     }
 
-    /** First-person bare hands in the character's skin. */
+    /** First-person bare hands in the character's skin (and in a neutral pose while casting). */
     @SubscribeEvent
     public static void renderArm(RenderArmEvent event) {
         AbstractClientPlayer player = event.getPlayer();
-        SorcererData data = JJK.get(player);
-        if (data == null || !data.hasAppearance()) return;
-        CharacterPlayerRenderer renderer = CharacterRenderers.forCharacter(data.getTechnique());
+        CharacterPlayerRenderer renderer = CharacterRenderers.pickHand(player);
         if (renderer == null) return;
         event.setCanceled(true);
         renderer.renderCharacterHand(event.getPoseStack(), event.getMultiBufferSource(), event.getPackedLight(), player, event.getArm());

@@ -93,17 +93,22 @@ public final class ClientShot {
                 shot(mc, "09_player_gojo_purple");
                 server(mc, ClientShot::checkInfinity);
             }
-            case 560 -> server(mc, ClientShot::stagePlayerHakari);
-            case 600 -> shot(mc, "10_player_hakari_domain");
-            case 610 -> server(mc, ClientShot::stagePlayerSukuna);
-            case 632 -> shot(mc, "11_player_sukuna_world_slash");
-            case 640 -> {
+            // Each check runs well after the wind-up ends (Purple 36, World Slash 45 ticks) and before the next
+            // stage changes technique, which would cancel a cast still winding up.
+            case 590 -> server(mc, s -> verifyExecuted(s, Ability.HOLLOW_PURPLE));
+            case 595 -> server(mc, ClientShot::stagePlayerHakari);
+            case 635 -> shot(mc, "10_player_hakari_domain");
+            case 640 -> server(mc, s -> verifyExecuted(s, Ability.DOMAIN_IDLE_DEATH_GAMBLE));
+            case 645 -> server(mc, ClientShot::stagePlayerSukuna);
+            case 667 -> shot(mc, "11_player_sukuna_world_slash");
+            case 715 -> server(mc, s -> verifyExecuted(s, Ability.WORLD_SLASH));
+            case 720 -> {
                 mc.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
                 server(mc, ClientShot::stagePlayerFirstPerson);
             }
-            case 660 -> shot(mc, "12_first_person_gojo_hand");
-            case 670 -> server(mc, ClientShot::playerSummary);
-            case 690 -> mc.stop();
+            case 740 -> shot(mc, "12_first_person_gojo_hand");
+            case 750 -> server(mc, ClientShot::playerSummary);
+            case 770 -> mc.stop();
             default -> {
             }
         }
@@ -248,15 +253,28 @@ public final class ClientShot {
 
     private static int playerFailures;
 
+    /** Starts a cast through the same path as the key. Whether it actually ran is checked by {@link #verifyExecuted}. */
     private static void cast(ServerPlayer player, SorcererData data, Ability ability) {
+        com.jujutsukaisen.sorcery.AbilityHandler.playerExecuted.remove(ability);
         boolean ok = com.jujutsukaisen.sorcery.AbilityHandler.tryUse(player, data, ability);
         if (!ok) playerFailures++;
-        JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: {} cast {} -> {}", data.getTechnique(), ability, ok ? "OK" : "REFUSED");
+        JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: {} cast {} -> {}", data.getTechnique(), ability, ok ? "started" : "REFUSED");
+    }
+
+    private static void verifyExecuted(ServerPlayer player, Ability ability) {
+        SorcererData data = JJK.get(player);
+        boolean ran = com.jujutsukaisen.sorcery.AbilityHandler.playerExecuted.contains(ability);
+        if (!ran) playerFailures++;
+        JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: {} executed={} (still casting: {})", ability, ran,
+                data == null ? null : data.getCasting());
     }
 
     private static void stagePlayerGojo(ServerPlayer player) {
         clear(player);
         ServerLevel level = player.serverLevel();
+        // Survival, so the player's health after the arrow test actually means something.
+        player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        player.setHealth(player.getMaxHealth());
         SorcererData data = become(player, Technique.LIMITLESS);
         data.setInfinityEnabled(true);
         look(player, origin.add(0, 1.62, 0), origin.add(0, 4.5, 6)); // aim Purple at the sky, not the stage
@@ -271,7 +289,7 @@ public final class ClientShot {
     private static void checkInfinity(ServerPlayer player) {
         boolean frozen = testArrow != null && testArrow.isAlive()
                 && testArrow.getTags().contains(com.jujutsukaisen.sorcery.SorcererLogic.FROZEN_TAG);
-        if (!frozen) playerFailures++;
+        if (!frozen || player.getHealth() < player.getMaxHealth()) playerFailures++;
         JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: Infinity held the arrow={} distance={} playerHealth={}/{}", frozen,
                 testArrow == null ? -1 : String.format("%.2f", testArrow.distanceTo(player)), player.getHealth(), player.getMaxHealth());
     }

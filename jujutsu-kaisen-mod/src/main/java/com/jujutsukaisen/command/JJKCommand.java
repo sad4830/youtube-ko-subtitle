@@ -11,18 +11,17 @@ import com.jujutsukaisen.sorcery.Technique;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.function.BiConsumer;
 
@@ -36,35 +35,13 @@ public final class JJKCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("jjk")
                 .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("technique")
-                        .then(Commands.argument("targets", EntityArgument.players())
-                                .then(Commands.argument("technique", StringArgumentType.word())
-                                        .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
-                                                Arrays.stream(Technique.values()).map(Technique::id), builder))
-                                        .executes(ctx -> {
-                                            Technique technique = Technique.byId(StringArgumentType.getString(ctx, "technique"));
-                                            return apply(ctx, (player, data) -> {
-                                                data.setTechnique(technique);
-                                                data.setCursedEnergy(data.getMaxCursedEnergy());
-                                            }, "command.jujutsukaisen.technique", technique.displayName());
-                                        }))))
+                .then(Commands.literal("technique").then(techniqueTargets()))
                 .then(Commands.literal("become")
                         .then(Commands.argument("targets", EntityArgument.players())
-                                .then(Commands.argument("character", StringArgumentType.word())
-                                        .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
-                                                new String[]{"satoru_gojo", "kinji_hakari", "ryomen_sukuna", "none"}, builder))
-                                        .executes(ctx -> {
-                                            String character = StringArgumentType.getString(ctx, "character");
-                                            Technique technique = Technique.ofCharacter(character);
-                                            Technique result = technique == null ? Technique.NONE : technique;
-                                            return apply(ctx, (player, data) -> {
-                                                data.setTechnique(result);
-                                                data.setAppearance(technique != null);
-                                                if (result == Technique.SHRINE && data.getFingers() == 0) data.setFingers(1);
-                                                data.setCursedEnergy(data.getMaxCursedEnergy());
-                                            }, "command.jujutsukaisen.become", technique == null ? Component.translatable("technique.jujutsukaisen.none")
-                                                    : Component.translatable("entity.jujutsukaisen." + character));
-                                        }))))
+                                .then(become("satoru_gojo"))
+                                .then(become("kinji_hakari"))
+                                .then(become("ryomen_sukuna"))
+                                .then(become("none"))))
                 .then(Commands.literal("energy")
                         .then(Commands.argument("targets", EntityArgument.players())
                                 .then(Commands.argument("amount", FloatArgumentType.floatArg(0))
@@ -105,6 +82,32 @@ public final class JJKCommand {
                         .executes(ctx -> info(ctx.getSource(), ctx.getSource().getPlayerOrException()))
                         .then(Commands.argument("target", EntityArgument.player())
                                 .executes(ctx -> info(ctx.getSource(), EntityArgument.getPlayer(ctx, "target"))))));
+    }
+
+    /** {@code /jjk technique <targets> <id>}, one literal per technique so a typo cannot wipe it. */
+    private static RequiredArgumentBuilder<CommandSourceStack, ?> techniqueTargets() {
+        RequiredArgumentBuilder<CommandSourceStack, ?> targets = Commands.argument("targets", EntityArgument.players());
+        for (Technique technique : Technique.values()) {
+            targets.then(Commands.literal(technique.id()).executes(ctx -> apply(ctx, (player, data) -> {
+                data.setTechnique(technique);
+                data.setCursedEnergy(data.getMaxCursedEnergy());
+            }, "command.jujutsukaisen.technique", technique.displayName())));
+        }
+        return targets;
+    }
+
+    /** One literal per character, so a typo is a syntax error instead of silently taking the technique away. */
+    private static LiteralArgumentBuilder<CommandSourceStack> become(String character) {
+        Technique technique = Technique.ofCharacter(character);
+        Technique result = technique == null ? Technique.NONE : technique;
+        Component name = technique == null ? Component.translatable("technique.jujutsukaisen.none")
+                : Component.translatable("entity.jujutsukaisen." + character);
+        return Commands.literal(character).executes(ctx -> apply(ctx, (player, data) -> {
+            data.setTechnique(result);
+            data.setAppearance(technique != null);
+            if (result == Technique.SHRINE && data.getFingers() == 0) data.setFingers(1);
+            data.setCursedEnergy(data.getMaxCursedEnergy());
+        }, "command.jujutsukaisen.become", name));
     }
 
     private static int apply(CommandContext<CommandSourceStack> ctx, BiConsumer<ServerPlayer, SorcererData> action,

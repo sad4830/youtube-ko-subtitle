@@ -40,6 +40,12 @@ public class SukunaModel extends SorcererModel<SukunaEntity> {
                 PartPose.offset(5.0f, 7.5f, 1.0f));
         root.getChild("head").addOrReplaceChild("mask", CubeListBuilder.create()
                 .texOffs(64, 16).addBox(-4.6f, -7.2f, -4.9f, 3, 4, 1), PartPose.ZERO);
+        // PlayerModel's cape and ears map the cape (64x32) and skin (64x64) textures assuming a 64-pixel-wide
+        // layer. This layer is 128 wide, so halve their U scale to keep player capes and ears drawn correctly.
+        root.addOrReplaceChild("ear", CubeListBuilder.create().texOffs(24, 0)
+                .addBox(-3.0f, -6.0f, -1.0f, 6.0f, 6.0f, 1.0f, CubeDeformation.NONE, 0.5f, 1.0f), PartPose.ZERO);
+        root.addOrReplaceChild("cloak", CubeListBuilder.create().texOffs(0, 0)
+                .addBox(-5.0f, 0.0f, -1.0f, 10.0f, 16.0f, 1.0f, CubeDeformation.NONE, 0.5f, 0.5f), PartPose.ZERO);
         return LayerDefinition.create(mesh, 128, 64);
     }
 

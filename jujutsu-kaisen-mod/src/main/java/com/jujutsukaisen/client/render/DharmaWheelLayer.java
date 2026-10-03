@@ -23,7 +23,8 @@ import java.util.WeakHashMap;
 /** Whoever bears the Dharma Wheel carries it above their head, as Sukuna did in Shinjuku. */
 public class DharmaWheelLayer extends RenderLayer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> {
     private final ModelPart wheel;
-    private final Map<UUID, float[]> angles = new WeakHashMap<>();
+    /** Shared by every renderer's copy of this layer: a player switches renderers when casting or changing look. */
+    private static final Map<UUID, float[]> angles = new WeakHashMap<>();
 
     public DharmaWheelLayer(RenderLayerParent<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> parent, EntityModelSet models) {
         super(parent);

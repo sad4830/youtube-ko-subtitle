@@ -25,6 +25,8 @@ public final class AbilityHandler {
 
     /** Casts started by the character entities' own AI (read by the CI smoke test). */
     public static int aiCasts;
+    /** Abilities that players ran all the way to execution (read by the CI client test). */
+    public static final java.util.Set<Ability> playerExecuted = java.util.EnumSet.noneOf(Ability.class);
 
     /** Attempts to use an ability. Returns true if it started (or executed). */
     public static boolean tryUse(LivingEntity caster, SorcererData data, Ability ability) {
@@ -177,6 +179,7 @@ public final class AbilityHandler {
         if (ability.technique() == Technique.IDLE_DEATH_GAMBLE && !ability.isDomain()) {
             DomainManager.onGambleIndicator(caster, ability);
         }
+        if (caster instanceof Player) playerExecuted.add(ability);
     }
 
     private static void fail(LivingEntity caster, String key, Object... args) {

@@ -70,6 +70,9 @@ public class SorcererData {
     }
 
     public void setTechnique(Technique technique) {
+        // The look belongs to the technique's owner: a new technique (or none) drops it, and callers that
+        // grant a look (imprints, /jjk become) set it again afterwards.
+        if (technique != this.technique) this.appearance = false;
         this.technique = technique;
         this.selected = 0;
         this.casting = null;
