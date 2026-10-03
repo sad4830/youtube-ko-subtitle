@@ -1,0 +1,19 @@
+# Gradle / ForgeGradle
+.gradle/
+build/
+out/
+run/
+run-data/
+logs/
+*.log
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+bin/
