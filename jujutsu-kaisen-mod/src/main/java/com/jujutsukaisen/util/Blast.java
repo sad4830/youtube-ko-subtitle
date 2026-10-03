@@ -11,7 +11,9 @@ import net.minecraft.world.level.block.BaseFireBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
 
 /** Controlled block destruction for techniques (no drops, no vanilla explosion side effects). */
 public final class Blast {
@@ -23,7 +25,7 @@ public final class Blast {
      *
      * @return number of blocks removed
      */
-    public static int carveSphere(Level level, Vec3 center, double radius, float maxHardness, int limit, boolean particles) {
+    public static int carveSphere(Level level, @Nullable Entity breaker, Vec3 center, double radius, float maxHardness, int limit, boolean particles) {
         if (!(level instanceof ServerLevel server)) return 0;
         int removed = 0;
         int r = (int) Math.ceil(radius);
@@ -40,6 +42,7 @@ public final class Blast {
                     float allowed = (float) (maxHardness * (1.0 - 0.5 * dist / radius));
                     if (!JJK.isDestructible(level, pos, state, allowed)) continue;
                     if (dist > radius - 1 && random.nextFloat() < 0.35f) continue; // ragged edge
+                    if (!JJK.mayBreak(level, pos, state, breaker)) continue;
                     level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
                     removed++;
                     if (particles && random.nextInt(4) == 0) {
@@ -53,9 +56,10 @@ public final class Blast {
     }
 
     /** Removes one block if allowed. */
-    public static boolean cut(Level level, BlockPos pos, float maxHardness, boolean particles) {
+    public static boolean cut(Level level, @Nullable Entity breaker, BlockPos pos, float maxHardness, boolean particles) {
         BlockState state = level.getBlockState(pos);
         if (!JJK.isDestructible(level, pos, state, maxHardness)) return false;
+        if (!JJK.mayBreak(level, pos, state, breaker)) return false;
         level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
         if (particles && level instanceof ServerLevel server) {
             server.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, state),
@@ -65,12 +69,13 @@ public final class Blast {
     }
 
     /** Lights fires on exposed top surfaces around a point. */
-    public static void scatterFire(Level level, Vec3 center, double radius, int attempts) {
+    public static void scatterFire(Level level, @Nullable Entity breaker, Vec3 center, double radius, int attempts) {
         RandomSource random = level.random;
         for (int i = 0; i < attempts; i++) {
             BlockPos pos = BlockPos.containing(center.add((random.nextDouble() * 2 - 1) * radius,
                     (random.nextDouble() * 2 - 1) * radius * 0.5, (random.nextDouble() * 2 - 1) * radius));
-            if (level.isEmptyBlock(pos) && level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), net.minecraft.core.Direction.UP)) {
+            if (level.isEmptyBlock(pos) && level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), net.minecraft.core.Direction.UP)
+                    && !(breaker instanceof net.minecraft.server.level.ServerPlayer player && !level.mayInteract(player, pos))) {
                 level.setBlock(pos, BaseFireBlock.getState(level, pos), Block.UPDATE_ALL);
             }
         }

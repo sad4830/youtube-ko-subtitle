@@ -27,7 +27,7 @@ public enum Ability {
     /** 「竈」開 — divine flame arrow; only after Dismantle and Cleave have both landed. */
     FUGA(Technique.SHRINE, 320, 300, 22, CastPose.BOW),
     /** 세계를 가르는 참격 — Dismantle aimed at space itself; needs the chant. */
-    WORLD_SLASH(Technique.SHRINE, 900, 1200, 45, CastPose.HAND_SIGN),
+    WORLD_SLASH(Technique.SHRINE, 720, 1200, 45, CastPose.HAND_SIGN),
 
     // ── Private Pure Love Train (사철순애열차) ─────────────────────────────────
     /** 보류 구슬 — reserve balls; an offensive indicator. */

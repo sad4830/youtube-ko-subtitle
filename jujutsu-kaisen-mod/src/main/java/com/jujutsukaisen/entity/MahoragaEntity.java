@@ -230,11 +230,19 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
             dissolve();
             return;
         }
-        LivingEntity ownerTarget = owner instanceof Mob mob ? mob.getTarget() : owner.getLastHurtMob();
-        if (owner.getLastHurtByMob() != null && owner.getLastHurtByMob().isAlive() && !isOwnedBy(owner.getLastHurtByMob())) {
-            ownerTarget = owner.getLastHurtByMob();
+        // Like a tamed wolf: defend the owner, or join the owner's fight — only recent ones.
+        LivingEntity ownerTarget = null;
+        if (owner instanceof Mob mob) {
+            ownerTarget = mob.getTarget();
+        } else {
+            LivingEntity attacker = owner.getLastHurtByMob();
+            LivingEntity victim = owner.getLastHurtMob();
+            if (attacker != null && owner.tickCount - owner.getLastHurtByMobTimestamp() < 100) ownerTarget = attacker;
+            else if (victim != null && owner.tickCount - owner.getLastHurtMobTimestamp() < 100) ownerTarget = victim;
         }
-        if (ownerTarget != null && ownerTarget.isAlive() && ownerTarget != this && getTarget() != ownerTarget && JJK.canHit(this, ownerTarget)) {
+        LivingEntity current = getTarget();
+        boolean idle = current == null || !current.isAlive();
+        if (idle && ownerTarget != null && ownerTarget.isAlive() && ownerTarget != this && JJK.canHit(this, ownerTarget)) {
             setTarget(ownerTarget);
         }
         if (getTarget() == null && distanceToSqr(owner) > 10 * 10) {
@@ -311,21 +319,24 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
-        if (!level().isClientSide && source.getEntity() instanceof Player player && ritual && !participants.contains(player.getUUID())) {
-            participants.add(player.getUUID());
-            outsideHelp = true;
-        }
-        if (!level().isClientSide && ritual && source.getEntity() instanceof LivingEntity attacker && !(attacker instanceof Player)) {
-            outsideHelp = true;
-        }
-        if (!level().isClientSide && amount > 0 && !source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
-            amount = Adaptation.onHurt(this, data, source, amount);
-            if (amount <= 0.01f) {
-                Fx.sound(this, SoundEvents.ANVIL_PLACE, 0.8f, 1.6f);
-                return false;
+        if (isOwnedBy(source.getEntity())) return false;
+        if (!level().isClientSide && ritual) {
+            if (source.getEntity() instanceof Player player && !participants.contains(player.getUUID())) {
+                participants.add(player.getUUID());
+                outsideHelp = true;
+            } else if (source.getEntity() instanceof LivingEntity attacker && !(attacker instanceof Player)) {
+                outsideHelp = true;
             }
         }
-        if (isOwnedBy(source.getEntity())) return false;
+        // Fully adapted phenomena no longer reach it at all (the reduction itself happens in LivingHurtEvent).
+        if (!level().isClientSide && !source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)
+                && data.getAdaptation(Adaptation.keyFor(source)) >= Adaptation.MAX) {
+            if (tickCount % 5 == 0) {
+                Fx.sound(this, SoundEvents.ANVIL_PLACE, 0.8f, 1.6f);
+                Fx.burst(level(), ParticleTypes.ENCHANTED_HIT, getBoundingBox().getCenter(), 8, 0.6, 0.1);
+            }
+            return false;
+        }
         return super.hurt(source, amount);
     }
 

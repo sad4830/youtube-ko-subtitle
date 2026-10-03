@@ -78,8 +78,8 @@ public class FugaEntity extends JJKProjectile {
         }
 
         if (JJK.canGrief(owner, false)) {
-            Blast.carveSphere(level(), center, empowered ? 4.0 : 2.8, 6f, 600, true);
-            Blast.scatterFire(level(), center, radius, empowered ? 60 : 30);
+            Blast.carveSphere(level(), owner, center, empowered ? 4.0 : 2.8, 6f, 600, true);
+            Blast.scatterFire(level(), owner, center, radius, empowered ? 60 : 30);
         }
         Fx.burst(level(), ParticleTypes.FLAME, center, 200, radius * 0.4, 0.25);
         Fx.burst(level(), ParticleTypes.LAVA, center, 40, radius * 0.3, 0.2);

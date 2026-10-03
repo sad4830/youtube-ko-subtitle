@@ -63,11 +63,14 @@ public final class DomainManager {
         return DOMAINS.computeIfAbsent(level.dimension(), k -> new ArrayList<>());
     }
 
+    /** The caster's open domain in any dimension (one caster, one domain). */
     @Nullable
     public static ActiveDomain find(LivingEntity caster) {
         if (caster.level().isClientSide) return null;
-        for (ActiveDomain domain : in(caster.level())) {
-            if (!domain.closed && domain.casterId().equals(caster.getUUID())) return domain;
+        for (List<ActiveDomain> list : DOMAINS.values()) {
+            for (ActiveDomain domain : list) {
+                if (!domain.closed && domain.casterId().equals(caster.getUUID())) return domain;
+            }
         }
         return null;
     }
@@ -102,6 +105,7 @@ public final class DomainManager {
         if (caster instanceof SorcererEntity sorcerer) duration = (int) (duration * sorcerer.domainDurationMultiplier());
         if (type == DomainType.IDLE_DEATH_GAMBLE) duration *= 2;
         Vec3 center = caster.position();
+        data.setPseudoStreak(0);
         ActiveDomain domain = new ActiveDomain(type, caster.getUUID(), level.dimension(), center, type.radius(), duration);
 
         // The call: 영역전개 + name.
@@ -219,10 +223,19 @@ public final class DomainManager {
         }
     }
 
+    /** The caster if it is still in the domain's dimension. */
     @Nullable
     private static LivingEntity casterOf(ServerLevel level, ActiveDomain domain) {
         Entity entity = level.getEntity(domain.casterId());
         return entity instanceof LivingEntity living ? living : null;
+    }
+
+    /** The caster wherever it is (another dimension, or a player still online). */
+    @Nullable
+    private static LivingEntity casterAnywhere(ServerLevel level, ActiveDomain domain) {
+        LivingEntity here = casterOf(level, domain);
+        if (here != null) return here;
+        return level.getServer().getPlayerList().getPlayer(domain.casterId());
     }
 
     private static List<LivingEntity> victims(ServerLevel level, ActiveDomain domain, LivingEntity caster) {
@@ -289,7 +302,7 @@ public final class DomainManager {
                 if (dx * dx + dy * dy + dz * dz > r * r) continue;
                 pos.set(domain.center().x + dx, domain.center().y - 2 + dy, domain.center().z + dz);
                 if (pos.closerToCenterThan(caster.position(), 2.5)) continue;
-                Blast.cut(level, pos, 50f, random.nextInt(6) == 0);
+                Blast.cut(level, caster, pos, 50f, random.nextInt(6) == 0);
             }
         }
 
@@ -407,16 +420,19 @@ public final class DomainManager {
     /** Starts the 4:11 jackpot round for any sorcerer (also used by {@code /jjk jackpot}). */
     public static void grantJackpot(LivingEntity caster, SorcererData data) {
         if (!(caster.level() instanceof ServerLevel level)) return;
-        data.setJackpot(SorcererData.JACKPOT_TICKS);
+        data.setPseudoStreak(0);
+        // A jackpot during a jackpot round does not restart the song: the round still ends on time.
+        int round = data.isJackpot() ? data.getJackpot() : SorcererData.JACKPOT_TICKS;
+        data.setJackpot(round);
         data.setJackpotCount(data.getJackpotCount() + 1);
         // Odd jackpot → increased probability (확변) for the next expansion; even → time-shortening (시단).
         data.setProbabilityUp(data.getJackpotCount() % 2 == 1);
         data.setBurnout(0);
         caster.removeEffect(ModEffects.TECHNIQUE_BURNOUT.get());
-        caster.addEffect(new MobEffectInstance(ModEffects.JACKPOT.get(), SorcererData.JACKPOT_TICKS, 0, false, true, true));
-        caster.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, SorcererData.JACKPOT_TICKS, 1, false, false, true));
-        caster.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SPEED, SorcererData.JACKPOT_TICKS, 1, false, false, true));
-        caster.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, SorcererData.JACKPOT_TICKS, 0, false, false, true));
+        caster.addEffect(new MobEffectInstance(ModEffects.JACKPOT.get(), round, 0, false, true, true));
+        caster.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, round, 1, false, false, true));
+        caster.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SPEED, round, 1, false, false, true));
+        caster.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, round, 0, false, false, true));
         caster.setHealth(caster.getMaxHealth());
 
         Vec3 c = caster.position().add(0, 1, 0);
@@ -447,9 +463,10 @@ public final class DomainManager {
         Fx.sound(level, domain.center(), SoundEvents.GLASS_BREAK, 2.5f, 0.6f);
         Fx.sphere(level, ParticleTypes.CLOUD, domain.center(), Math.min(domain.radius(), 12), 60);
 
-        LivingEntity caster = casterOf(level, domain);
+        LivingEntity caster = casterAnywhere(level, domain);
         SorcererData data = JJK.get(caster);
         if (caster == null || data == null || reason == CloseReason.SHUTDOWN) return;
+        data.setPseudoStreak(0);
         if (domain.type() == DomainType.MALEVOLENT_SHRINE) data.setLastShrineDomain(level.getGameTime());
         if (reason == CloseReason.CLASH_LOST) {
             Fx.title(level, domain.center(), domain.radius() + 16, Component.empty(),
@@ -472,8 +489,9 @@ public final class DomainManager {
     /** Closes the caster's own domain (pressing the domain key again). */
     public static boolean cancel(LivingEntity caster) {
         ActiveDomain domain = find(caster);
-        if (domain == null || !(caster.level() instanceof ServerLevel level)) return false;
-        close(level, domain, CloseReason.CANCELLED);
+        if (domain == null || !(caster.level() instanceof ServerLevel here)) return false;
+        ServerLevel level = here.getServer().getLevel(domain.dimension());
+        close(level != null ? level : here, domain, CloseReason.CANCELLED);
         return true;
     }
 

@@ -87,7 +87,10 @@ public final class IdleDeathGamble {
      */
     public static void pseudoConsecutive(LivingEntity caster, SorcererData data) {
         Indicator color = rollIndicator(caster, data);
-        data.setPseudoStreak(data.getPseudoStreak() + 1);
+        // The streak only counts as consecutive notices inside Hakari's own domain.
+        com.jujutsukaisen.domain.ActiveDomain domain = com.jujutsukaisen.domain.DomainManager.find(caster);
+        boolean inOwnGamble = domain != null && domain.type() == com.jujutsukaisen.domain.DomainType.IDLE_DEATH_GAMBLE;
+        data.setPseudoStreak(inOwnGamble ? data.getPseudoStreak() + 1 : 0);
         float best = data.bestRecentHealth();
         if (best > caster.getHealth()) caster.setHealth(Math.min(caster.getMaxHealth(), best));
         List<MobEffectInstance> harmful = new ArrayList<>();

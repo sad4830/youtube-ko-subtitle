@@ -23,6 +23,8 @@ import net.minecraft.world.phys.Vec3;
 /** Per-tick upkeep shared by players and the character entities (server side). */
 public final class SorcererLogic {
     public static final String FROZEN_TAG = "jujutsukaisen.infinity_frozen";
+    private static final String DROPPED_TAG = "jujutsukaisen.infinity_dropped";
+    private static final String FROZEN_AT = "jujutsukaisen.frozen_at";
 
     private SorcererLogic() {
     }
@@ -145,12 +147,23 @@ public final class SorcererLogic {
             double dist = toBody.length();
             Vec3 velocity = projectile.getDeltaMovement();
             boolean frozen = projectile.getTags().contains(FROZEN_TAG);
+            if (projectile.getTags().contains(DROPPED_TAG)) continue;
+            if (frozen && entity.level().getGameTime() - projectile.getPersistentData().getLong(FROZEN_AT) > 100) {
+                // Held for five seconds at the edge of Infinity, it finally falls.
+                projectile.removeTag(FROZEN_TAG);
+                projectile.addTag(DROPPED_TAG);
+                projectile.setNoGravity(false);
+                projectile.setDeltaMovement(Vec3.ZERO);
+                projectile.hurtMarked = true;
+                continue;
+            }
             if (dist < 3.2 && (velocity.dot(toBody) > 0 || frozen)) {
                 // The closer it gets, the slower it moves: it never arrives.
                 double factor = Math.max(0.0, Math.min(1.0, (dist - 0.9) / 2.3));
                 projectile.setDeltaMovement(velocity.scale(0.25 + 0.35 * factor));
                 if (!frozen) {
                     projectile.addTag(FROZEN_TAG);
+                    projectile.getPersistentData().putLong(FROZEN_AT, entity.level().getGameTime());
                     projectile.setNoGravity(true);
                     if (entity.level() instanceof ServerLevel server) {
                         server.sendParticles(Fx.BLUE_SMALL, projectile.getX(), projectile.getY(), projectile.getZ(), 6, 0.15, 0.15, 0.15, 0.0);

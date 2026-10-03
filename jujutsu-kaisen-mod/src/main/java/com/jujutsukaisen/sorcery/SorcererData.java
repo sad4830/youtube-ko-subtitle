@@ -170,6 +170,7 @@ public class SorcererData {
             if (cooldowns[i] > 0) {
                 cooldowns[i]--;
                 any = true;
+                if (cooldowns[i] == 0) markDirty();
             }
         }
         if (any && cooldownSyncPulse++ % 10 == 0) markDirty();

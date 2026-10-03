@@ -98,7 +98,7 @@ public class BlueEntity extends JJKProjectile {
                 Vec3 offset = new Vec3(random.nextGaussian(), random.nextGaussian(), random.nextGaussian()).normalize().scale(1.5 + random.nextDouble() * 2.0);
                 BlockPos pos = BlockPos.containing(center.add(offset));
                 BlockState state = level().getBlockState(pos);
-                if (Blast.cut(level(), pos, 3.0f, false)) {
+                if (Blast.cut(level(), owner, pos, 3.0f, false)) {
                     Vec3 p = Vec3.atCenterOf(pos);
                     Vec3 v = center.subtract(p).scale(0.2);
                     server.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, state), p.x, p.y, p.z, 0, v.x, v.y, v.z, 1.0);

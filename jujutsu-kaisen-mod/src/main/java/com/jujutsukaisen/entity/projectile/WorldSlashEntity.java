@@ -102,7 +102,7 @@ public class WorldSlashEntity extends JJKProjectile implements InfinityPiercing 
             for (double back = 0; back < speed; back += 0.8) {
                 Vec3 point = now.subtract(forward.scale(back));
                 for (double s = -HALF_WIDTH; s <= HALF_WIDTH; s += 0.8) {
-                    Blast.cut(level(), BlockPos.containing(point.add(axis.scale(s))), 60f, false);
+                    Blast.cut(level(), owner, BlockPos.containing(point.add(axis.scale(s))), 60f, false);
                 }
             }
         }

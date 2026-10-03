@@ -73,7 +73,7 @@ public class RedEntity extends JJKProjectile {
             living.hurtMarked = true;
         }
 
-        if (JJK.canGrief(owner, false)) Blast.carveSphere(level(), center, 3.2, 3.5f, 400, true);
+        if (JJK.canGrief(owner, false)) Blast.carveSphere(level(), owner, center, 3.2, 3.5f, 400, true);
         Fx.burst(level(), Fx.RED, center, 120, 1.6, 0.4);
         Fx.burst(level(), ParticleTypes.EXPLOSION_EMITTER, center, 1, 0, 0);
         Fx.burst(level(), ParticleTypes.FLASH, center, 1, 0, 0);

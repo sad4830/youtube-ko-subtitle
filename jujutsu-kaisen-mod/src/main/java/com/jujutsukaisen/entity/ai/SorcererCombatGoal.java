@@ -60,7 +60,10 @@ public class SorcererCombatGoal extends Goal {
 
         double range = mob.preferredRange();
         boolean seen = mob.getSensing().hasLineOfSight(target);
-        if (distSqr > range * range || !seen) {
+        double reach = mob.getBbWidth() * 2.0 * mob.getBbWidth() * 2.0 + target.getBbWidth() + 1.2;
+        // Close in until the target is inside melee reach, not just inside the preferred range.
+        double stopSqr = Math.min(range * range, reach * 0.9);
+        if (distSqr > stopSqr || !seen) {
             if (--repath <= 0) {
                 mob.getNavigation().moveTo(target, mob.chaseSpeed());
                 repath = 4 + mob.getRandom().nextInt(6);
@@ -69,7 +72,6 @@ public class SorcererCombatGoal extends Goal {
             mob.getNavigation().stop();
         }
 
-        double reach = mob.getBbWidth() * 2.0 * mob.getBbWidth() * 2.0 + target.getBbWidth() + 1.2;
         if (distSqr <= reach && seen && mob.meleeReady()) {
             mob.swing(InteractionHand.MAIN_HAND);
             mob.doHurtTarget(target);

@@ -69,11 +69,14 @@ public final class Adaptation {
         String key = keyFor(source);
         int level = data.getAdaptation(key);
         float reduced = amount * (1f - resist(entity, level));
-        if (level >= MAX && entity instanceof MahoragaEntity) {
-            Fx.burst(entity.level(), ParticleTypes.ENCHANTED_HIT, entity.getBoundingBox().getCenter(), 8, 0.6, 0.1);
-        }
-        expose(entity, data, key, reduced);
+        expose(entity, data, key, 0f);
         return reduced;
+    }
+
+    /** Records damage that actually landed, so the next turn of the wheel can heal exactly that. */
+    public static void onDamaged(SorcererData data, DamageSource source, float finalAmount) {
+        String key = keyFor(source);
+        if (finalAmount > 0 && data.getAdaptation(key) < MAX) data.addAdaptDamage(key, finalAmount);
     }
 
     /** Registers exposure to a phenomenon; the wheel starts (or speeds up) turning. */
@@ -81,7 +84,7 @@ public final class Adaptation {
         int level = data.getAdaptation(key);
         int cap = INFINITY.equals(key) ? SPACE_CUT : MAX;
         if (level >= cap) return;
-        data.addAdaptDamage(key, damage);
+        if (damage > 0) data.addAdaptDamage(key, damage);
         if (data.getPendingAdapt().isEmpty()) {
             data.setPendingAdapt(key, turnDelay(entity));
         } else if (data.getPendingAdapt().equals(key)) {

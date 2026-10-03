@@ -32,6 +32,7 @@ import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
+import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
@@ -83,7 +84,14 @@ public final class CommonEvents {
 
     @SubscribeEvent
     public static void changedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        // Leaving the domain's dimension collapses it, and the technique still burns out.
+        DomainManager.cancel(event.getEntity());
         resync(event.getEntity());
+    }
+
+    @SubscribeEvent
+    public static void logout(PlayerEvent.PlayerLoggedOutEvent event) {
+        DomainManager.cancel(event.getEntity());
     }
 
     private static void resync(Player player) {
@@ -179,17 +187,30 @@ public final class CommonEvents {
                     && (source.is(DamageTypes.PLAYER_ATTACK) || source.is(DamageTypes.MOB_ATTACK))) {
                 amount *= MahoragaEntity.exterminationBonus(target);
             }
-            if (attacker instanceof MahoragaEntity mahoraga && SorcererLogic.hasInfinity(target)
-                    && mahoraga.getSorcererData().getAdaptation(Adaptation.INFINITY) >= Adaptation.SPACE_CUT) {
-                amount *= 1.5f; // the slash aimed at space itself
+            if (attacker instanceof MahoragaEntity mahoraga && SorcererLogic.hasInfinity(target)) {
+                SorcererData md = mahoraga.getSorcererData();
+                int infinity = md.getAdaptation(Adaptation.INFINITY);
+                if (infinity >= Adaptation.SPACE_CUT) {
+                    amount *= 1.5f; // the slash aimed at space itself
+                } else if (infinity >= Adaptation.MAX) {
+                    Adaptation.expose(mahoraga, md, Adaptation.INFINITY, 0f); // keeps turning: one more step
+                }
             }
         }
 
-        if (!(target instanceof MahoragaEntity) && Adaptation.bearsWheel(target)) {
+        if (Adaptation.bearsWheel(target)) {
             SorcererData data = JJK.get(target);
             if (data != null) amount = Adaptation.onHurt(target, data, source, amount);
         }
         event.setAmount(amount);
+    }
+
+    @SubscribeEvent
+    public static void livingDamage(LivingDamageEvent event) {
+        LivingEntity target = event.getEntity();
+        if (target.level().isClientSide || !Adaptation.bearsWheel(target)) return;
+        SorcererData data = JJK.get(target);
+        if (data != null) Adaptation.onDamaged(data, event.getSource(), event.getAmount());
     }
 
     @SubscribeEvent
@@ -213,7 +234,7 @@ public final class CommonEvents {
             event.setCanceled(true);
             return;
         }
-        BlackFlash.markStrike(player);
+        if (!player.level().isClientSide) BlackFlash.markStrike(player);
     }
 
     @SubscribeEvent

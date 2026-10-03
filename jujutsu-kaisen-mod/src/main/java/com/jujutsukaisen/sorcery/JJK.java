@@ -11,7 +11,6 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -80,7 +79,20 @@ public final class JJK {
         boolean config = domain ? JJKConfig.DOMAIN_BLOCK_DESTRUCTION.get() : JJKConfig.TECHNIQUE_BLOCK_DESTRUCTION.get();
         if (!config) return false;
         if (caster instanceof Player) return true;
-        return caster.level().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        return net.minecraftforge.event.ForgeEventFactory.getMobGriefingEvent(caster.level(), caster);
+    }
+
+    /**
+     * Whether {@code breaker} may destroy this block: spawn protection and claim/protection mods
+     * (via {@link net.minecraftforge.event.level.BlockEvent.BreakEvent}) are respected for players.
+     */
+    public static boolean mayBreak(Level level, BlockPos pos, BlockState state, @Nullable Entity breaker) {
+        if (breaker instanceof net.minecraft.server.level.ServerPlayer player) {
+            if (!level.mayInteract(player, pos)) return false;
+            return !net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
+                    new net.minecraftforge.event.level.BlockEvent.BreakEvent(level, pos, state, player));
+        }
+        return true;
     }
 
     /** Blocks a technique may erase: no bedrock-likes, no barriers, no containers. */
@@ -101,6 +113,8 @@ public final class JJK {
         if (caster instanceof MahoragaEntity a && other instanceof MahoragaEntity b
                 && a.getOwnerUUID() != null && a.getOwnerUUID().equals(b.getOwnerUUID())) return true;
         if (caster instanceof SorcererEntity a && other instanceof SorcererEntity b) return a.isFriendlyWith(b);
+        // Never hit your own tamed animals.
+        if (other instanceof net.minecraft.world.entity.OwnableEntity pet && caster.getUUID().equals(pet.getOwnerUUID())) return true;
         return false;
     }
 

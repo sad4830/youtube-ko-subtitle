@@ -106,10 +106,10 @@ public class DismantleEntity extends JJKProjectile {
         // Cut through soft matter along the path; hard matter stops the slash.
         BlockPos pos = BlockPos.containing(now);
         if (!level().getBlockState(pos).isAir()) {
-            boolean cut = blocksLeft > 0 && JJK.canGrief(owner, false) && Blast.cut(level(), pos, 3.0f, true);
+            boolean cut = blocksLeft > 0 && JJK.canGrief(owner, false) && Blast.cut(level(), owner, pos, 3.0f, true);
             if (cut) {
                 blocksLeft--;
-                Blast.cut(level(), pos.above(), 3.0f, false);
+                Blast.cut(level(), owner, pos.above(), 3.0f, false);
             } else if (level().getBlockState(pos).blocksMotion()) {
                 Fx.burst(level(), ParticleTypes.CRIT, now, 10, 0.2, 0.2);
                 Fx.sound(level(), now, SoundEvents.ANVIL_PLACE, 0.5f, 1.8f);

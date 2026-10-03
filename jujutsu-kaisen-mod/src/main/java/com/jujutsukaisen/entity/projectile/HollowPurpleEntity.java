@@ -16,8 +16,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.boss.EnderDragonPart;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -88,8 +86,8 @@ public class HollowPurpleEntity extends JJKProjectile {
                     living.hurt(ModDamageTypes.source(level(), ModDamageTypes.HOLLOW_PURPLE, this, owner), 60.0f);
                     Fx.burst(level(), Fx.PURPLE, living.getBoundingBox().getCenter(), 40, 0.6, 0.2);
                 }
-            } else if (!(entity instanceof Player) && !(entity instanceof EnderDragonPart) && !(entity instanceof JJKProjectile && entity.getType() == getType())) {
-                entity.discard();
+            } else if (entity instanceof net.minecraft.world.entity.projectile.Projectile && !(entity instanceof HollowPurpleEntity)) {
+                entity.discard(); // imaginary mass erases whatever is flying at it
             }
         }
 
@@ -105,6 +103,7 @@ public class HollowPurpleEntity extends JJKProjectile {
                         BlockState state = level().getBlockState(pos);
                         if (state.isAir() || state.hasBlockEntity() || state.is(ModTags.TECHNIQUE_IMMUNE)) continue;
                         if (state.getDestroySpeed(level(), pos) < 0) continue;
+                        if (!JJK.mayBreak(level(), pos, state, owner)) continue;
                         level().setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
                     }
                 }
