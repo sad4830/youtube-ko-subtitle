@@ -118,15 +118,62 @@ public final class ClientShot {
                 server(mc, ClientShot::stagePlayerFirstPerson);
             }
             case 740 -> shot(mc, "12_first_person_gojo_hand");
-            // Sorcerer data must survive a dimension change and a death respawn (both revive the player's caps).
-            case 750 -> server(mc, ClientShot::toNether);
-            case 760 -> server(mc, ClientShot::backFromNether);
-            case 770 -> server(mc, ClientShot::respawn);
-            case 785 -> checkClientSync(mc);
-            case 790 -> server(mc, ClientShot::playerSummary);
-            case 810 -> mc.stop();
             default -> {
+                if (ticks >= 750) persistenceSteps(mc);
             }
+        }
+    }
+
+    /** Server steps done so far in {@link #persistenceSteps} (written on the server thread). */
+    private static volatile int serverStep;
+    private static int waitingSince;
+
+    /**
+     * Sorcerer data must survive a dimension change and a death respawn (both revive the player's caps), and the
+     * respawned client must get it. Each step waits for the previous one to finish on the server, which can fall
+     * well behind the client while it generates nether chunks.
+     */
+    private static void persistenceSteps(Minecraft mc) {
+        if (ticks == 750) {
+            waitingSince = ticks;
+            server(mc, p -> {
+                toNether(p);
+                serverStep = 1;
+            });
+            return;
+        }
+        if (ticks > 3000) { // hard stop: never hang the CI job
+            JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: FAIL (persistence steps timed out at step {})", serverStep);
+            mc.stop();
+            return;
+        }
+        int step = serverStep;
+        if (step == 1 && ticks - waitingSince > 10) {
+            waitingSince = ticks;
+            serverStep = -1;
+            server(mc, p -> {
+                backFromNether(p);
+                serverStep = 2;
+            });
+        } else if (step == 2 && ticks - waitingSince > 10) {
+            waitingSince = ticks;
+            serverStep = -2;
+            server(mc, p -> {
+                respawn(p);
+                serverStep = 3;
+            });
+        } else if (step == 3) {
+            waitingSince = ticks;
+            serverStep = -3;
+        } else if (step == -3 && ticks - waitingSince > 20) { // the respawn and its sync packet have arrived
+            checkClientSync(mc);
+            serverStep = -4;
+            server(mc, p -> {
+                playerSummary(p);
+                serverStep = 4;
+            });
+        } else if (step == 4) {
+            mc.stop();
         }
     }
 
