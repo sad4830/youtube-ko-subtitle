@@ -62,8 +62,8 @@ add(f'item.{M}.ten_shadows_talisman', 'Ten Shadows Talisman', '십종영법술 �
 add(f'item.{M}.ten_shadows_talisman.desc1', '"With this treasure, I summon..."', '「후루베 유라유라」')
 add(f'item.{M}.ten_shadows_talisman.desc2', 'Starts the taming ritual: Mahoraga attacks everyone involved, the summoner included.',
     '조복의 의식을 시작한다 — 마허라는 소환자를 포함해 의식에 끌려온 모두를 공격한다.')
-add(f'item.{M}.ten_shadows_talisman.desc3', 'Defeat it alone, by your own hand, to tame it. Tamed: summon for 400 cursed energy.',
-    '혼자서, 자신의 손으로 쓰러뜨리면 길들일 수 있다. 길들인 뒤에는 주력 400으로 소환.')
+add(f'item.{M}.ten_shadows_talisman.desc3', 'Defeat it alone, by your own hand, to tame it. Tamed: summon for 400 cursed energy (at most 80% of yours), every 2 minutes.',
+    '혼자서, 자신의 손으로 쓰러뜨리면 조복. 조복 후: 주력 400(최대 주력의 80%까지)으로 2분마다 소환.')
 add(f'item.{M}.prison_realm', 'Prison Realm', '옥문강')
 add(f'item.{M}.prison_realm.desc', 'The cursed object that sealed Satoru Gojo. Open it, and the strongest walks free.',
     '고죠 사토루를 봉인했던 주물. 열면 최강이 풀려난다.')
@@ -187,6 +187,7 @@ msgs = {
     'technique_restored': ('Your technique has recovered', '술식이 회복되었다'),
     'burnout_start': ('The domain closes — your technique burns out', '영역이 닫히고 술식이 타버렸다'),
     'jackpot_end': ('The song ends. The jackpot round is over.', '노래가 끝났다. 대박 라운드 종료.'),
+    'jackpot_no_domain': ('The jackpot round is still playing: no new domain until it ends', '대박 라운드 중에는 영역을 다시 펼칠 수 없다'),
     'black_flash': ('BLACK FLASH!', '흑섬!!'),
     'wheel_turn': ('The wheel turns — adapting to %s (%s)', '법진이 돈다 — %s에 적응 (%s단계)'),
     'wheel_status': ('Adaptations borne by the wheel:', '법진이 짊어진 적응:'),

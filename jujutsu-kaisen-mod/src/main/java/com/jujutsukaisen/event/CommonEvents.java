@@ -1,6 +1,7 @@
 package com.jujutsukaisen.event;
 
 import com.jujutsukaisen.JujutsuKaisen;
+import com.jujutsukaisen.entity.HakariEntity;
 import com.jujutsukaisen.item.SukunaFingerItem;
 import com.jujutsukaisen.command.JJKCommand;
 import com.jujutsukaisen.domain.DomainManager;
@@ -167,9 +168,7 @@ public final class CommonEvents {
             event.setCanceled(true);
             return;
         }
-        if (SorcererLogic.infinityBlocks(target, source)) {
-            SorcererData targetData = JJK.get(target);
-            if (targetData != null && !targetData.isJackpot() && !targetData.consume(Math.max(2f, event.getAmount() * 3f))) return;
+        if (SorcererLogic.infinityStops(target, source, event.getAmount())) {
             event.setCanceled(true);
             SorcererLogic.infinityFeedback(target, source);
             // Mahoraga (or a wheel bearer) adapts to Infinity by being stopped by it.
@@ -240,6 +239,13 @@ public final class CommonEvents {
             entity.setHealth(entity.getMaxHealth() * 0.4f);
             Fx.burst(entity.level(), ParticleTypes.TOTEM_OF_UNDYING, entity.getBoundingBox().getCenter(), 60, 0.6, 0.5);
             Fx.sound(entity, SoundEvents.TOTEM_USE, 1.0f, 1.3f);
+            return;
+        }
+        // A fallen Fight Club challenger is not hunted again after respawning.
+        if (entity instanceof Player player && entity.level() instanceof ServerLevel level) {
+            for (HakariEntity hakari : level.getEntitiesOfClass(HakariEntity.class, player.getBoundingBox().inflate(128))) {
+                hakari.forgetChallenger(player);
+            }
         }
     }
 

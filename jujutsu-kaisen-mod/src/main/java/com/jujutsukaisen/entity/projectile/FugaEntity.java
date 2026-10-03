@@ -73,7 +73,7 @@ public class FugaEntity extends JJKProjectile {
             if (dist > radius) continue;
             float dmg = (float) ((empowered ? 38 : 28) * (1.0 - 0.55 * dist / radius));
             DamageSource source = ModDamageTypes.source(level(), ModDamageTypes.FUGA, this, owner);
-            boolean blocked = SorcererLogic.infinityBlocks(living, source);
+            boolean blocked = SorcererLogic.infinityHolds(living, source, dmg); // hurt() then pays for it
             living.hurt(source, dmg);
             if (blocked) continue;
             living.setSecondsOnFire(10);

@@ -1,6 +1,7 @@
 package com.jujutsukaisen.entity;
 
 import com.jujutsukaisen.domain.DomainManager;
+import com.jujutsukaisen.registry.ModEffects;
 import com.jujutsukaisen.registry.ModEntities;
 import com.jujutsukaisen.sorcery.Ability;
 import com.jujutsukaisen.sorcery.JJK;
@@ -122,6 +123,7 @@ public class SukunaEntity extends SorcererEntity {
         super.tick();
         if (level().isClientSide) return;
         // A volley of Dismantle: invisible slashes fired dozens at a time.
+        if (volley > 0 && (!isAlive() || data.isBurntOut() || hasEffect(ModEffects.INFORMATION_OVERLOAD.get()))) volley = 0;
         if (volley > 0 && --volleyDelay <= 0) {
             LivingEntity target = getTarget();
             if (target != null && data.getCasting() == null && data.consume(15f)) {

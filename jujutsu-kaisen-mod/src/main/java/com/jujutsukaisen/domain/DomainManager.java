@@ -19,7 +19,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.game.ClientboundClearTitlesPacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -472,12 +471,13 @@ public final class DomainManager {
         // A spin cut short (Hakari killed, domain cancelled or broken) must not go on to show a result.
         if (domain.isSpinning() && reason != CloseReason.JACKPOT) {
             S2CSlotSpin stop = new S2CSlotSpin(new int[]{0, 0, 0}, 0, 0, false, S2CSlotSpin.STOP, domain.spins);
+            ServerPlayer casterPlayer = level.getServer().getPlayerList().getPlayer(domain.casterId());
             for (ServerPlayer player : level.players()) {
-                if (player.position().distanceTo(domain.center()) <= domain.radius() + 48) {
+                if (player != casterPlayer && player.position().distanceTo(domain.center()) <= domain.radius() + 48) {
                     ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), stop);
-                    player.connection.send(new ClientboundClearTitlesPacket(true)); // the riichi call
                 }
             }
+            if (casterPlayer != null) ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> casterPlayer), stop);
             domain.spinTimer = -1;
         }
         if (domain.shrine != null) {

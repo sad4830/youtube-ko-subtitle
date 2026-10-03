@@ -70,8 +70,9 @@ public class RedEntity extends JJKProjectile {
             if (dist > radius) continue;
             double falloff = 1.0 - dist / radius;
             DamageSource source = ModDamageTypes.source(level(), ModDamageTypes.LIMITLESS, this, owner);
-            boolean blocked = SorcererLogic.infinityBlocks(living, source);
-            living.hurt(source, (float) (9 + 17 * falloff));
+            float damage = (float) (9 + 17 * falloff);
+            boolean blocked = SorcererLogic.infinityHolds(living, source, damage); // hurt() then pays for it
+            living.hurt(source, damage);
             if (blocked) continue; // Infinity: nothing reaches them, not even the blast
             Vec3 dir = dist < 0.2 ? forward : offset.normalize();
             living.setDeltaMovement(living.getDeltaMovement().add(dir.scale(1.4 + 2.8 * falloff)).add(0, 0.35 + 0.45 * falloff, 0));

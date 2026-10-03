@@ -414,6 +414,7 @@ public final class ClientShot {
     private static void respawn(ServerPlayer player) {
         // keepEverything=false is the death respawn: a new player entity, filled by PlayerEvent.Clone (wasDeath).
         ServerPlayer respawned = player.server.getPlayerList().respawn(player, false);
+        respawned.connection.player = respawned; // what the respawn packet handler does after PlayerList.respawn
         boolean ok = kept(JJK.get(respawned));
         if (!ok) playerFailures++;
         JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: data after a death respawn kept={}", ok);

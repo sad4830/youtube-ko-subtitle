@@ -59,13 +59,36 @@ public final class CursedEnergyHud implements IGuiOverlay {
     public void render(ForgeGui gui, GuiGraphics g, float partialTick, int width, int height) {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
-        if (player == null || mc.options.hideGui || mc.options.renderDebug || player.isSpectator()) return; // F3 uses the top left
+        if (player == null || mc.options.hideGui || player.isSpectator()) return;
         SorcererData data = JJK.get(player);
         if (data == null) return;
         Technique technique = data.getTechnique();
         if (technique == Technique.NONE && data.getFingers() == 0) return;
         Font font = mc.font;
 
+        // The top-left block gives way to the F3 screen; the wind-up bar below still shows.
+        if (!mc.options.renderDebug) {
+            drawBlock(g, font, player, data, technique, partialTick, width);
+        } else if (data.isJackpot()) {
+            int seconds = data.getJackpot() / 20;
+            Component jackpot = Component.translatable("hud.jujutsukaisen.jackpot", String.format("%d:%02d", seconds / 60, seconds % 60))
+                    .withStyle(ChatFormatting.BOLD);
+            g.drawCenteredString(font, jackpot, width / 2, height / 2 + 36, rainbow(player.tickCount + partialTick));
+        }
+
+        // Wind-up bar under the crosshair.
+        Ability casting = data.getCasting();
+        if (casting != null && data.getCastTotal() > 0) {
+            float progress = 1f - data.getCastTicks() / (float) data.getCastTotal();
+            int w = 80, cx = width / 2 - w / 2, cy = height / 2 + 14;
+            g.fill(cx - 1, cy - 1, cx + w + 1, cy + 4, 0xA0000000);
+            g.fill(cx, cy, cx + (int) (w * Mth.clamp(progress, 0, 1)), cy + 3, 0xFF000000 | technique.color());
+            g.drawCenteredString(font, casting.displayName(), width / 2, cy + 6, 0xFFFFFF);
+        }
+    }
+
+    /** Technique name, cursed energy, abilities and status in the top-left corner (below boss bars if they overlap). */
+    private void drawBlock(GuiGraphics g, Font font, LocalPlayer player, SorcererData data, Technique technique, float partialTick, int width) {
         int x = 6;
         int barW = 112;
         Component keys = Component.translatable("hud.jujutsukaisen.keys", KeyBindings.USE.getTranslatedKeyMessage(),
@@ -134,16 +157,6 @@ public final class CursedEnergyHud implements IGuiOverlay {
             String time = String.format("%d:%02d", seconds / 60, seconds % 60);
             Component jackpot = Component.translatable("hud.jujutsukaisen.jackpot", time).withStyle(ChatFormatting.BOLD);
             g.drawString(font, jackpot, x, y, rainbow(player.tickCount + partialTick), true);
-        }
-
-        // Wind-up bar under the crosshair.
-        Ability casting = data.getCasting();
-        if (casting != null && data.getCastTotal() > 0) {
-            float progress = 1f - data.getCastTicks() / (float) data.getCastTotal();
-            int w = 80, cx = width / 2 - w / 2, cy = height / 2 + 14;
-            g.fill(cx - 1, cy - 1, cx + w + 1, cy + 4, 0xA0000000);
-            g.fill(cx, cy, cx + (int) (w * Mth.clamp(progress, 0, 1)), cy + 3, 0xFF000000 | technique.color());
-            g.drawCenteredString(font, casting.displayName(), width / 2, cy + 6, 0xFFFFFF);
         }
     }
 

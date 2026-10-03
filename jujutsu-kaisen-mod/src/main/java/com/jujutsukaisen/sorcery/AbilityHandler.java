@@ -100,6 +100,10 @@ public final class AbilityHandler {
                 if (ability.isDomain()) {
                     DomainType type = DomainType.forAbility(ability);
                     if (type == null || DomainManager.find(caster) != null) return false;
+                    if (type == DomainType.IDLE_DEATH_GAMBLE && caster instanceof Player && data.isJackpot()) {
+                        fail(caster, "message.jujutsukaisen.jackpot_no_domain");
+                        return false;
+                    }
                 }
             }
         }

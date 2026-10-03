@@ -1,6 +1,7 @@
 package com.jujutsukaisen.entity.ai;
 
 import com.jujutsukaisen.entity.MahoragaEntity;
+import com.jujutsukaisen.sorcery.JJK;
 import com.jujutsukaisen.util.Fx;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.sounds.SoundEvents;
@@ -68,7 +69,7 @@ public class MahoragaAttackGoal extends Goal {
         if (windup >= 0) {
             mob.getNavigation().stop();
             if (--windup == 0) {
-                if (distSqr <= (reach + 1.5) * (reach + 1.5)) {
+                if (distSqr <= (reach + 1.5) * (reach + 1.5) && JJK.canHit(mob, target)) {
                     if (sword) {
                         mob.swordSweep(target);
                     } else {

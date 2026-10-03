@@ -94,16 +94,21 @@ public class HakariEntity extends SorcererEntity {
         say("line.jujutsukaisen.hakari.challenge");
     }
 
-    /** The fight is over once the challenger has fallen: the club does not hunt them at their respawn. */
+    /** The fight is over once the challenger has fallen (CommonEvents.livingDeath): no hunting them at their respawn. */
+    public void forgetChallenger(Player player) {
+        if (challenger != null && challenger.equals(player.getUUID())) {
+            challenger = null;
+            if (getTarget() == player) setTarget(null);
+        }
+    }
+
+    /** Fallback for a death that event missed (Hakari unloaded at the time). */
     @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
         if (challenger != null) {
             Player player = level().getPlayerByUUID(challenger);
-            if (player != null && player.isDeadOrDying()) {
-                challenger = null;
-                if (getTarget() == player) setTarget(null);
-            }
+            if (player != null && player.isDeadOrDying()) forgetChallenger(player);
         }
     }
 

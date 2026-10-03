@@ -74,7 +74,8 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
 
     @Nullable
     private UUID ownerId;
-    private int lifetime = -1;
+    /** Game time a summoned Mahoraga returns to the shadows, or -1 for unlimited. */
+    private long expiresAt = -1;
     private boolean ritual;
     @Nullable
     private UUID summonerId;
@@ -130,7 +131,7 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
     /** A tamed Mahoraga answering its summoner; lifetime in ticks, or -1 for unlimited. */
     public void setOwner(LivingEntity owner, int lifetime) {
         this.ownerId = owner.getUUID();
-        this.lifetime = lifetime;
+        this.expiresAt = lifetime > 0 ? level().getGameTime() + lifetime : -1;
         this.ritual = false;
     }
 
@@ -188,7 +189,8 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
         targetSelector.addGoal(1, new HurtByTargetGoal(this) {
             @Override
             public boolean canUse() {
-                return super.canUse() && !isOwnedBy(getLastHurtByMob());
+                LivingEntity attacker = getLastHurtByMob();
+                return super.canUse() && !isOwnedBy(attacker) && (attacker == null || JJK.canHit(MahoragaEntity.this, attacker));
             }
         });
         targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, 10, false, false,
@@ -223,16 +225,16 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
     }
 
     private void tickTamed() {
+        if (expiresAt > 0 && level().getGameTime() >= expiresAt) {
+            dissolve();
+            return;
+        }
         LivingEntity owner = getOwner();
         if (owner == null || !owner.isAlive()) {
             if (++lonelyTicks > 100) dissolve();
             return;
         }
         lonelyTicks = 0;
-        if (lifetime > 0 && --lifetime == 0) {
-            dissolve();
-            return;
-        }
         // Like a tamed wolf: defend the owner, or join the owner's fight — only recent ones.
         LivingEntity ownerTarget = null;
         if (owner instanceof Mob mob) {
@@ -315,6 +317,18 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
         swing(InteractionHand.MAIN_HAND);
     }
 
+    @Override
+    public boolean doHurtTarget(Entity target) {
+        boolean hit = super.doHurtTarget(target);
+        if (hit && target instanceof LivingEntity living) creditOwner(living);
+        return hit;
+    }
+
+    /** Like a tamed wolf's, a summoned Mahoraga's kills count as its owner's. */
+    private void creditOwner(LivingEntity victim) {
+        if (ownerId != null && getOwner() instanceof Player player) victim.setLastHurtByPlayer(player);
+    }
+
     /** Sword of Extermination: a wide slash in front, strongest against curses. */
     public void swordSweep(LivingEntity primary) {
         Vec3 forward = Vec3.directionFromRotation(0, getYRot());
@@ -323,7 +337,9 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
                 e -> e != this && JJK.canHit(this, e))) {
             Vec3 to = victim.position().subtract(position());
             if (to.horizontalDistance() > 5.0 || (victim != primary && to.normalize().dot(forward) < 0.2)) continue;
-            victim.hurt(ModDamageTypes.source(level(), ModDamageTypes.EXTERMINATION, this), base * exterminationBonus(victim));
+            if (victim.hurt(ModDamageTypes.source(level(), ModDamageTypes.EXTERMINATION, this), base * exterminationBonus(victim))) {
+                creditOwner(victim);
+            }
             victim.knockback(0.8, -forward.x, -forward.z);
         }
         Vec3 c = position().add(forward.scale(2.2)).add(0, 1.6, 0);
@@ -362,10 +378,14 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
         return super.hurt(source, amount);
     }
 
-    /** Someone's pet or shikigami joining in counts as outside help; a wild mob hitting it does not. */
+    /**
+     * Anyone joining in counts as outside help (golems, other sorcerers, pets, shikigami); only a wild monster
+     * that happens to hit it does not.
+     */
     private static boolean helpsSomeone(LivingEntity attacker) {
         if (attacker instanceof MahoragaEntity mahoraga) return mahoraga.getOwnerUUID() != null;
-        return attacker instanceof net.minecraft.world.entity.OwnableEntity pet && pet.getOwnerUUID() != null;
+        if (attacker instanceof net.minecraft.world.entity.OwnableEntity pet && pet.getOwnerUUID() != null) return true;
+        return !(attacker instanceof net.minecraft.world.entity.monster.Enemy);
     }
 
     /** The wheel turned: adaptation advanced one step. */
@@ -440,7 +460,7 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
         super.addAdditionalSaveData(tag);
         tag.put("Sorcerer", data.save());
         if (ownerId != null) tag.putUUID("Owner", ownerId);
-        tag.putInt("Lifetime", lifetime);
+        tag.putLong("ExpiresAt", expiresAt);
         tag.putBoolean("Ritual", ritual);
         tag.putBoolean("OutsideHelp", outsideHelp);
         if (summonerId != null) tag.putUUID("Summoner", summonerId);
@@ -458,7 +478,8 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
         data.setFixedMax(1000f);
         if (saved) data.setCursedEnergy(Math.min(energy, data.getMaxCursedEnergy()));
         ownerId = tag.hasUUID("Owner") ? tag.getUUID("Owner") : null;
-        lifetime = tag.getInt("Lifetime");
+        if (tag.contains("ExpiresAt")) expiresAt = tag.getLong("ExpiresAt");
+        else expiresAt = tag.getInt("Lifetime") > 0 ? level().getGameTime() + tag.getInt("Lifetime") : -1; // older saves
         ritual = tag.getBoolean("Ritual");
         outsideHelp = tag.getBoolean("OutsideHelp");
         summonerId = tag.hasUUID("Summoner") ? tag.getUUID("Summoner") : null;

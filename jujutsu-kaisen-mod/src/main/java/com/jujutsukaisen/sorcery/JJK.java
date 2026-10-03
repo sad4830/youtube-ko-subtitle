@@ -108,6 +108,7 @@ public final class JJK {
         if (other == null) return false;
         if (other == caster) return true;
         if (caster.isAlliedTo(other)) return true;
+        if (other == caster.getVehicle() || caster == other.getVehicle()) return true; // rider and mount
         if (other instanceof MahoragaEntity mahoraga && mahoraga.isOwnedBy(caster)) return true;
         if (caster instanceof MahoragaEntity mahoraga && mahoraga.isOwnedBy(other)) return true;
         if (caster instanceof MahoragaEntity a && other instanceof MahoragaEntity b

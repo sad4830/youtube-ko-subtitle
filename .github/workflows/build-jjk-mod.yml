@@ -69,21 +69,27 @@ jobs:
         run: |
           ls run/screenshots/jjk_*.png >/dev/null 2>&1 || { echo "no screenshots"; exit 0; }
           python3 -m pip install -q pillow
-          mkdir -p docs/screenshots && rm -f docs/screenshots/*.jpg
-          python3 - <<'PY'
+          OUT="$RUNNER_TEMP/jjk-screenshots"
+          rm -rf "$OUT" && mkdir -p "$OUT"
+          OUT="$OUT" python3 - <<'PY'
           import glob, os
           from PIL import Image
           for p in sorted(glob.glob('run/screenshots/jjk_*.png')):
               im = Image.open(p).convert('RGB')
               im.thumbnail((960, 540))
-              im.save(os.path.join('docs/screenshots', os.path.basename(p)[4:].replace('.png', '.jpg')), quality=82)
+              im.save(os.path.join(os.environ['OUT'], os.path.basename(p)[4:].replace('.png', '.jpg')), quality=82)
           PY
           cd ..
+          # Publish onto the branch tip (never rebase binaries), unless a newer code commit's build will do it.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add jujutsu-kaisen-mod/docs/screenshots
-          git commit -m "Update in-game screenshots [skip ci]" || exit 0
-          git pull --rebase -q origin ${GITHUB_REF_NAME}
+          git fetch -q origin ${GITHUB_REF_NAME}
+          if git log ${GITHUB_SHA}..FETCH_HEAD --format=%s | grep -vq 'skip ci'; then echo "superseded by a newer commit"; exit 0; fi
+          git checkout -q -B publish FETCH_HEAD
+          rm -f jujutsu-kaisen-mod/docs/screenshots/*.jpg
+          mkdir -p jujutsu-kaisen-mod/docs/screenshots && cp "$OUT"/*.jpg jujutsu-kaisen-mod/docs/screenshots/
+          git add -A jujutsu-kaisen-mod/docs/screenshots
+          git commit -q -m "Update in-game screenshots [skip ci]" || exit 0
           git push origin HEAD:${GITHUB_REF_NAME}
 
       - name: Check player technique test
@@ -95,15 +101,20 @@ jobs:
       - name: Publish the verified jar to the branch
         if: hashFiles('jujutsu-kaisen-mod/ci/screenshots.enabled') != ''
         run: |
-          mkdir -p dist && rm -f dist/*.jar
-          cp build/libs/jujutsukaisen-1.20.1-*.jar dist/
-          ls -la dist
+          OUT="$RUNNER_TEMP/jjk-jar"
+          rm -rf "$OUT" && mkdir -p "$OUT"
+          cp build/libs/jujutsukaisen-1.20.1-*.jar "$OUT"/
+          ls -la "$OUT"
           cd ..
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add jujutsu-kaisen-mod/dist
-          git commit -m "Update verified mod jar [skip ci]" || exit 0
-          git pull --rebase -q origin ${GITHUB_REF_NAME}
+          git fetch -q origin ${GITHUB_REF_NAME}
+          if git log ${GITHUB_SHA}..FETCH_HEAD --format=%s | grep -vq 'skip ci'; then echo "superseded by a newer commit"; exit 0; fi
+          git checkout -q -B publish FETCH_HEAD
+          mkdir -p jujutsu-kaisen-mod/dist && rm -f jujutsu-kaisen-mod/dist/*.jar
+          cp "$OUT"/*.jar jujutsu-kaisen-mod/dist/
+          git add -A jujutsu-kaisen-mod/dist
+          git commit -q -m "Update verified mod jar [skip ci]" || exit 0
           git push origin HEAD:${GITHUB_REF_NAME}
 
       - name: API signature probe (javap)

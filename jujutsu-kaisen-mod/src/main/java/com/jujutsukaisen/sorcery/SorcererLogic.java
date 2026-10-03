@@ -136,6 +136,26 @@ public final class SorcererLogic {
     }
 
     /** Whether Infinity stops this damage before it reaches the body. */
+    /** Cursed energy Infinity spends to stop a hit of this size. */
+    public static float infinityCost(float amount) {
+        return Math.max(2f, amount * 3f);
+    }
+
+    /** Whether Infinity will stop this hit: it blocks it and can pay for it (out of energy, the hit gets through). */
+    public static boolean infinityHolds(LivingEntity target, DamageSource source, float amount) {
+        if (!infinityBlocks(target, source)) return false;
+        SorcererData data = JJK.get(target);
+        return data == null || data.isJackpot() || data.getCursedEnergy() >= infinityCost(amount);
+    }
+
+    /** {@link #infinityHolds}, and pays for it. */
+    public static boolean infinityStops(LivingEntity target, DamageSource source, float amount) {
+        if (!infinityHolds(target, source, amount)) return false;
+        SorcererData data = JJK.get(target);
+        if (data != null && !data.isJackpot()) data.consume(infinityCost(amount));
+        return true;
+    }
+
     public static boolean infinityBlocks(LivingEntity target, DamageSource source) {
         if (!hasInfinity(target)) return false;
         if (source.is(DamageTypeTags.BYPASSES_INVULNERABILITY) || source.is(ModTags.BYPASSES_INFINITY)) return false;
