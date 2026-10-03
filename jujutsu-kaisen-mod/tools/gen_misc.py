@@ -205,31 +205,27 @@ def fuga(path):
 
 # ───────────────────────────────────────────── items (16x16) ──
 def finger(path):
+    """A mummified finger lying diagonally: three segments, creased knuckles, a dark nail, a severed base."""
     t = Tex(16, 16, seed=2)
-    base, dark, light, nail = rgb('6E3A2E'), rgb('3E1C16'), rgb('8E5444'), rgb('1A1212')
-    x0, y0, x1, y1 = 3.0, 13.0, 12.5, 3.5
-    for y in range(16):
-        for x in range(16):
-            px, py = x + 0.5, y + 0.5
-            vx, vy = x1 - x0, y1 - y0
-            tt = max(0.0, min(1.0, ((px - x0) * vx + (py - y0) * vy) / (vx * vx + vy * vy)))
-            cx, cy = x0 + vx * tt, y0 + vy * tt
-            d = math.hypot(px - cx, py - cy)
-            radius = 2.1 - 0.5 * tt
-            if d > radius:
-                continue
-            c = base
-            if d > radius - 0.8:
-                c = dark
-            elif (px - cx) * -vy + (py - cy) * vx < 0:
-                c = light
-            if abs(tt - 0.33) < 0.04 or abs(tt - 0.66) < 0.04:
-                c = dark  # knuckle creases
-            if tt > 0.86:
-                c = nail if d < radius - 0.5 else dark
-            if tt < 0.05:
-                c = rgb('5A0E10')
-            t.set(x, y, c)
+    rows = ['................',
+            '............oo..',
+            '...........oNno.',
+            '..........oNNno.',
+            '.........oFLFo..',
+            '........oFLFfo..',
+            '.......okkFfo...',
+            '......oFLFfo....',
+            '.....oFLFfo.....',
+            '....okkFffo.....',
+            '...oFLFffo......',
+            '..oFLFffo.......',
+            '.oRRrrfo........',
+            '.oRrrro.........',
+            '..oooo..........',
+            '................']
+    pal = {'o': rgb('2A120E'), 'F': rgb('6E3A2E'), 'f': rgb('55291F'), 'L': rgb('8C5242'), 'k': rgb('3A1A14'),
+           'N': rgb('8A7A70'), 'n': rgb('5A4C46'), 'R': rgb('7A1A1C'), 'r': rgb('4A0E10')}
+    t.charmap(0, 0, rows, pal)
     t.save(path)
 
 
