@@ -9,21 +9,23 @@ import com.jujutsukaisen.client.model.MalevolentShrineModel;
 import com.jujutsukaisen.client.model.ModLayers;
 import com.jujutsukaisen.client.model.ShutterDoorModel;
 import com.jujutsukaisen.client.model.SukunaModel;
+import com.jujutsukaisen.client.render.DharmaWheelLayer;
 import com.jujutsukaisen.client.render.FugaRenderer;
 import com.jujutsukaisen.client.render.MahoragaRenderer;
 import com.jujutsukaisen.client.render.MalevolentShrineRenderer;
 import com.jujutsukaisen.client.render.OrbRenderer;
+import com.jujutsukaisen.client.render.PlayerAuraLayer;
 import com.jujutsukaisen.client.render.ShutterDoorRenderer;
 import com.jujutsukaisen.client.render.SlashRenderer;
 import com.jujutsukaisen.client.render.SorcererRenderer;
 import com.jujutsukaisen.registry.ModEntities;
 import net.minecraft.client.renderer.entity.ThrownItemRenderer;
+import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
-import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -63,16 +65,15 @@ public final class ClientSetup {
         event.registerLayerDefinition(ModLayers.SHUTTER_DOOR, ShutterDoorModel::createBodyLayer);
     }
 
-    /** Before other mods add their layers: this mod's layers, and a casting model for the vanilla skins. */
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void prepareVanillaPlayers(EntityRenderersEvent.AddLayers event) {
-        CharacterRenderers.prepareVanilla(event);
-    }
-
-    /** After other mods added theirs: the character renderers, which adopt those layers. */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void buildCharacterRenderers(EntityRenderersEvent.AddLayers event) {
-        CharacterRenderers.rebuild(event);
+    @SubscribeEvent
+    public static void addLayers(EntityRenderersEvent.AddLayers event) {
+        for (String skin : event.getSkins()) {
+            if (event.getSkin(skin) instanceof PlayerRenderer renderer) {
+                renderer.addLayer(new DharmaWheelLayer(renderer, event.getEntityModels()));
+                renderer.addLayer(new PlayerAuraLayer(renderer));
+            }
+        }
+        CharacterRenderers.rebuild(event.getContext());
     }
 
     @SubscribeEvent

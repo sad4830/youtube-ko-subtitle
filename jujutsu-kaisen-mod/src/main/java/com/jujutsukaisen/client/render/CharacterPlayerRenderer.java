@@ -18,7 +18,6 @@ import net.minecraft.world.entity.player.PlayerModelPart;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  * Renders a player as Gojo / Hakari / Sukuna (or with their own skin) on a model that strikes the
@@ -43,18 +42,19 @@ public class CharacterPlayerRenderer extends PlayerRenderer {
 
     /**
      * Adds the layers other mods attached to the vanilla skin renderer (backpacks, curios, cosmetics...), so they
-     * do not vanish while a player wears a character look. Those layers draw against the vanilla model, which
-     * {@link CastingPlayerModel#mirror} keeps in this model's pose.
-     *
-     * @param builtIn the vanilla renderer's own layers (plus this mod's), which this renderer already has
+     * do not vanish while a player wears a character look or casts. Those layers draw against the vanilla model,
+     * which {@link CastingPlayerModel#mirror} keeps in this model's pose. Vanilla's own layers and this mod's are
+     * already here.
      */
-    public void adoptForeignLayers(@Nullable PlayerRenderer vanilla, Set<Object> builtIn) {
+    public void adoptForeignLayers(@Nullable PlayerRenderer vanilla) {
         if (vanilla == null || vanilla == this) return;
         List<?> theirs = RendererAccess.layers(vanilla);
         if (theirs == null) return;
         int adopted = 0;
         for (Object layer : theirs) {
-            if (builtIn.contains(layer) || !(layer instanceof RenderLayer<?, ?>)) continue;
+            if (!(layer instanceof RenderLayer<?, ?>)) continue;
+            String name = layer.getClass().getName();
+            if (name.startsWith("net.minecraft.") || name.startsWith("com.jujutsukaisen.")) continue;
             @SuppressWarnings("unchecked")
             RenderLayer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>> foreign =
                     (RenderLayer<AbstractClientPlayer, PlayerModel<AbstractClientPlayer>>) layer;
