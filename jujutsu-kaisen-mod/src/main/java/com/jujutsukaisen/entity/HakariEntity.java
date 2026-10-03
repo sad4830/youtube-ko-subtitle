@@ -5,6 +5,9 @@ import com.jujutsukaisen.domain.DomainManager;
 import com.jujutsukaisen.sorcery.Ability;
 import com.jujutsukaisen.sorcery.Technique;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.stats.Stats;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -26,6 +29,8 @@ import java.util.UUID;
 public class HakariEntity extends SorcererEntity {
     @Nullable
     private UUID challenger;
+    /** The challenger's death count when they challenged: one more death and the fight is over. */
+    private int challengerDeaths;
 
     public HakariEntity(EntityType<? extends HakariEntity> type, Level level) {
         super(type, level);
@@ -90,25 +95,31 @@ public class HakariEntity extends SorcererEntity {
     /** Underground fight club: this player challenged Hakari. */
     public void setChallenger(Player player) {
         this.challenger = player.getUUID();
+        this.challengerDeaths = deaths(player);
         setTarget(player);
         say("line.jujutsukaisen.hakari.challenge");
     }
 
-    /** The fight is over once the challenger has fallen (CommonEvents.livingDeath): no hunting them at their respawn. */
+    /** The fight is over once the challenger has fallen: the club does not hunt them after they respawn. */
     public void forgetChallenger(Player player) {
         if (challenger != null && challenger.equals(player.getUUID())) {
             challenger = null;
-            if (getTarget() == player) setTarget(null);
+            LivingEntity target = getTarget();
+            if (target != null && target.getUUID().equals(player.getUUID())) setTarget(null);
         }
     }
 
-    /** Fallback for a death that event missed (Hakari unloaded at the time). */
+    private static int deaths(Player player) {
+        return player instanceof ServerPlayer sp ? sp.getStats().getValue(Stats.CUSTOM.get(Stats.DEATHS)) : 0;
+    }
+
+    /** Covers deaths anywhere (another dimension, far away), which CommonEvents.livingDeath's nearby search misses. */
     @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
-        if (challenger != null) {
-            Player player = level().getPlayerByUUID(challenger);
-            if (player != null && player.isDeadOrDying()) forgetChallenger(player);
+        if (challenger != null && tickCount % 20 == 0 && level() instanceof ServerLevel server) {
+            ServerPlayer player = server.getServer().getPlayerList().getPlayer(challenger);
+            if (player != null && (player.isDeadOrDying() || deaths(player) > challengerDeaths)) forgetChallenger(player);
         }
     }
 
@@ -159,12 +170,18 @@ public class HakariEntity extends SorcererEntity {
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        if (challenger != null) tag.putUUID("Challenger", challenger);
+        if (challenger != null) {
+            tag.putUUID("Challenger", challenger);
+            tag.putInt("ChallengerDeaths", challengerDeaths);
+        }
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
-        if (tag.hasUUID("Challenger")) challenger = tag.getUUID("Challenger");
+        if (tag.hasUUID("Challenger")) {
+            challenger = tag.getUUID("Challenger");
+            challengerDeaths = tag.getInt("ChallengerDeaths");
+        }
     }
 }

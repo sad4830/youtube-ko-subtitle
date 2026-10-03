@@ -80,12 +80,12 @@ public class BlueEntity extends JJKProjectile {
                 e -> e != owner && !(e instanceof JJKProjectile) && !e.isSpectator())) {
             if (entity instanceof Player player && player.isCreative()) continue;
             if (entity instanceof LivingEntity living && owner != null && !JJK.canHit(owner, living)) continue;
-            // Infinity holds them in place, paying a little cursed energy each tick it resists the pull.
-            if (entity instanceof LivingEntity living
-                    && SorcererLogic.infinityStops(living, ModDamageTypes.source(level(), ModDamageTypes.LIMITLESS, this, owner), 0.5f)) continue;
             Vec3 toCenter = center.subtract(entity.position().add(0, entity.getBbHeight() * 0.5, 0));
             double dist = toCenter.length();
             if (dist > radius || dist < 0.05) continue;
+            // Infinity holds them in place, paying a little cursed energy each tick it resists the pull.
+            if (entity instanceof LivingEntity living
+                    && SorcererLogic.infinityStops(living, ModDamageTypes.source(level(), ModDamageTypes.LIMITLESS, this, owner), 0.5f)) continue;
             double strength = 0.1 + 0.24 * (1.0 - dist / radius);
             if (dist < 1.3) strength *= 0.35;
             entity.setDeltaMovement(entity.getDeltaMovement().scale(0.5).add(toCenter.normalize().scale(strength)));

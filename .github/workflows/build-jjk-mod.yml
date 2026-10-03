@@ -80,11 +80,10 @@ jobs:
               im.save(os.path.join(os.environ['OUT'], os.path.basename(p)[4:].replace('.png', '.jpg')), quality=82)
           PY
           cd ..
-          # Publish onto the branch tip (never rebase binaries), unless a newer code commit's build will do it.
+          # Publish onto the branch tip (never rebase binaries); a newer push cancels this run (concurrency).
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch -q origin ${GITHUB_REF_NAME}
-          if git log ${GITHUB_SHA}..FETCH_HEAD --format=%s | grep -vq 'skip ci'; then echo "superseded by a newer commit"; exit 0; fi
           git checkout -q -B publish FETCH_HEAD
           rm -f jujutsu-kaisen-mod/docs/screenshots/*.jpg
           mkdir -p jujutsu-kaisen-mod/docs/screenshots && cp "$OUT"/*.jpg jujutsu-kaisen-mod/docs/screenshots/
@@ -109,7 +108,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch -q origin ${GITHUB_REF_NAME}
-          if git log ${GITHUB_SHA}..FETCH_HEAD --format=%s | grep -vq 'skip ci'; then echo "superseded by a newer commit"; exit 0; fi
           git checkout -q -B publish FETCH_HEAD
           mkdir -p jujutsu-kaisen-mod/dist && rm -f jujutsu-kaisen-mod/dist/*.jar
           cp "$OUT"/*.jar jujutsu-kaisen-mod/dist/

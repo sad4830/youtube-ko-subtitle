@@ -17,7 +17,9 @@ import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.PlayerModelPart;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Renders a player as Gojo / Hakari / Sukuna (or with their own skin) on a model that strikes the
@@ -50,9 +52,11 @@ public class CharacterPlayerRenderer extends PlayerRenderer {
         if (vanilla == null || vanilla == this) return;
         List<?> theirs = RendererAccess.layers(vanilla);
         if (theirs == null) return;
+        Set<Class<?>> own = new HashSet<>();
+        for (RenderLayer<?, ?> layer : layers) own.add(layer.getClass());
         int adopted = 0;
         for (Object layer : theirs) {
-            if (!(layer instanceof RenderLayer<?, ?>)) continue;
+            if (!(layer instanceof RenderLayer<?, ?>) || own.contains(layer.getClass())) continue; // already ours (e.g. added in PlayerRenderer's constructor)
             String name = layer.getClass().getName();
             if (name.startsWith("net.minecraft.") || name.startsWith("com.jujutsukaisen.")) continue;
             @SuppressWarnings("unchecked")

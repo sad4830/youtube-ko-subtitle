@@ -12,7 +12,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
-import org.jetbrains.annotations.Nullable;
+
+import java.lang.ref.WeakReference;
 
 /**
  * The pachinko reels of CR Private Pure Love Train shown to everyone in Idle Death Gamble:
@@ -30,8 +31,7 @@ public final class SlotMachineHud implements IGuiOverlay {
     private static int spin;
     private static long startTick = -1000;
     /** The level the spin started in: changing dimension (or world) ends it on this client. */
-    @Nullable
-    private static Level spinLevel;
+    private static WeakReference<Level> spinLevel = new WeakReference<>(null);
 
     private SlotMachineHud() {
     }
@@ -45,7 +45,7 @@ public final class SlotMachineHud implements IGuiOverlay {
         spin = message.spin;
         Minecraft mc = Minecraft.getInstance();
         startTick = mc.level == null ? 0 : mc.level.getGameTime();
-        spinLevel = mc.level;
+        spinLevel = new WeakReference<>(mc.level);
     }
 
     /** Hides the machine immediately. */
@@ -56,7 +56,7 @@ public final class SlotMachineHud implements IGuiOverlay {
     @Override
     public void render(ForgeGui gui, GuiGraphics graphics, float partialTick, int width, int height) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.options.hideGui || mc.level != spinLevel) return;
+        if (mc.level == null || mc.options.hideGui || mc.level != spinLevel.get()) return;
         float elapsed = mc.level.getGameTime() - startTick + partialTick;
         if (elapsed < 0 || elapsed > total + HOLD_AFTER) return;
         Font font = mc.font;

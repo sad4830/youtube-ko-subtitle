@@ -319,9 +319,8 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
 
     @Override
     public boolean doHurtTarget(Entity target) {
-        boolean hit = super.doHurtTarget(target);
-        if (hit && target instanceof LivingEntity living) creditOwner(living);
-        return hit;
+        if (target instanceof LivingEntity living) creditOwner(living); // before the hit: loot is dropped inside it
+        return super.doHurtTarget(target);
     }
 
     /** Like a tamed wolf's, a summoned Mahoraga's kills count as its owner's. */
@@ -337,9 +336,8 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
                 e -> e != this && JJK.canHit(this, e))) {
             Vec3 to = victim.position().subtract(position());
             if (to.horizontalDistance() > 5.0 || (victim != primary && to.normalize().dot(forward) < 0.2)) continue;
-            if (victim.hurt(ModDamageTypes.source(level(), ModDamageTypes.EXTERMINATION, this), base * exterminationBonus(victim))) {
-                creditOwner(victim);
-            }
+            creditOwner(victim);
+            victim.hurt(ModDamageTypes.source(level(), ModDamageTypes.EXTERMINATION, this), base * exterminationBonus(victim));
             victim.knockback(0.8, -forward.x, -forward.z);
         }
         Vec3 c = position().add(forward.scale(2.2)).add(0, 1.6, 0);
@@ -379,13 +377,13 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
     }
 
     /**
-     * Anyone joining in counts as outside help (golems, other sorcerers, pets, shikigami); only a wild monster
-     * that happens to hit it does not.
+     * Someone joining in counts as outside help: a pet or shikigami with an owner, a golem, another sorcerer.
+     * A wild creature that happens to hit it (or that its own sweep provoked) does not.
      */
     private static boolean helpsSomeone(LivingEntity attacker) {
         if (attacker instanceof MahoragaEntity mahoraga) return mahoraga.getOwnerUUID() != null;
-        if (attacker instanceof net.minecraft.world.entity.OwnableEntity pet && pet.getOwnerUUID() != null) return true;
-        return !(attacker instanceof net.minecraft.world.entity.monster.Enemy);
+        if (attacker instanceof net.minecraft.world.entity.OwnableEntity pet) return pet.getOwnerUUID() != null;
+        return attacker instanceof net.minecraft.world.entity.animal.AbstractGolem || attacker instanceof SorcererEntity;
     }
 
     /** The wheel turned: adaptation advanced one step. */
