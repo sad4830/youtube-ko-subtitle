@@ -44,6 +44,7 @@ import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -78,6 +79,8 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
     private boolean outsideHelp;
     private int lonelyTicks;
     private int attackSwing;
+    private float wheelAngle;
+    private float wheelAngleO;
 
     public MahoragaEntity(EntityType<? extends MahoragaEntity> type, Level level) {
         super(type, level);
@@ -191,10 +194,20 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
                 m -> ownerId != null && m instanceof Mob mob && isOwnedBy(mob.getTarget())));
     }
 
+    /** Client: the wheel turns 45° per adaptation step, easing into place. */
+    public float wheelAngle(float partialTick) {
+        return Mth.lerp(partialTick, wheelAngleO, wheelAngle);
+    }
+
     @Override
     public void tick() {
         super.tick();
-        if (level().isClientSide) return;
+        if (level().isClientSide) {
+            wheelAngleO = wheelAngle;
+            float target = getWheelTurns() * 45f;
+            wheelAngle += (target - wheelAngle) * 0.18f;
+            return;
+        }
         SorcererLogic.tick(this, data);
         if (entityData.get(WHEEL_TURNS) != data.getWheelTurns()) entityData.set(WHEEL_TURNS, data.getWheelTurns());
         if (attackSwing > 0 && --attackSwing == 0) entityData.set(ATTACK_ANIM, (byte) 0);
