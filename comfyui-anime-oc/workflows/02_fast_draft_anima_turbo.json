@@ -1,0 +1,630 @@
+{
+  "id": "757a8dd3-fb2d-5d0c-a59b-13399ab276eb",
+  "revision": 0,
+  "last_node_id": 11,
+  "last_link_id": 11,
+  "nodes": [
+    {
+      "id": 11,
+      "type": "MarkdownNote",
+      "pos": [
+        -560,
+        50
+      ],
+      "size": [
+        520,
+        800
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "사용 안내",
+      "properties": {},
+      "widgets_values": [
+        "## 02. 빠른 시안 (Anima Turbo v1.1, 8스텝)\n코어 노드만 사용합니다. 필요한 파일: diffusion_models/**anima-turbo-v1.1.safetensors** + 01과 같은 TE/VAE.\n\n### 사용법\n- Positive의 `{long hair|medium hair|short hair}`처럼 중괄호로 묶은 부분은 **실행할 때마다 하나씩 랜덤으로 선택**됩니다. Run(실행)을 여러 번 눌러 외형 조합을 탐색하세요. 고정하려면 중괄호를 지우고 하나만 남기세요.\n- 어떤 조합이 뽑혔는지는 **결과 그림을 보고 판단하는 것이 가장 쉽습니다.** 정확한 문구가 필요하면 PNG를 메모장으로 열어 \"prompt\" 부분에서 CLIPTextEncode의 \"text\" 값을 찾으세요. (PNG를 화면에 다시 끌어다 놓으면 뽑힌 문구가 아니라 중괄호 템플릿이 그대로 복원됩니다.)\n- 마음에 드는 조합은 01 워크플로(Aesthetic)의 Positive로 옮겨 최종본을 만드세요. 모델이 달라서 같은 seed여도 그림은 달라집니다.\n\n### 설정 (가급적 그대로 두세요)\n- steps 8 (8~12), **CFG 1**, sampler euler, scheduler simple. er_sde는 지저분해질 수 있습니다. CFG를 올리면 그림이 타기 쉽습니다 (올려도 1.5~2까지).\n- **CFG 1에서는 Negative가 무시됩니다** (ComfyUI가 계산을 건너뜀). 빼고 싶은 요소는 Positive에서 지우거나 다르게 표현하세요.\n- 결과가 뭉개지거나 AI 느낌이 강하면 `masterpiece, best quality`를 빼고 `anime coloring`은 유지하세요.\n- Turbo 체크포인트에는 Turbo LoRA를 **추가로 걸지 마세요** (이미 증류된 모델).\n- batch_size 2 (VRAM 12GB 이상이면 4).\n- 스타일 LoRA 슬롯(BlueArchiveStyleB1, Civitai 토큰 필요)은 기본 OFF입니다. Ctrl+B(우회 해제)로 켜세요."
+      ],
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [
+        20,
+        80
+      ],
+      "size": [
+        340,
+        86
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "title": "Load Diffusion Model (Turbo v1.1)",
+      "properties": {
+        "Node name for S&R": "UNETLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "anima-turbo-v1.1.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-turbo-v1.1.safetensors",
+            "directory": "diffusion_models"
+          }
+        ]
+      },
+      "widgets_values": [
+        "anima-turbo-v1.1.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [
+        20,
+        226
+      ],
+      "size": [
+        340,
+        114
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "title": "Load CLIP (Qwen3 0.6B)",
+      "properties": {
+        "Node name for S&R": "CLIPLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "qwen_3_06b_base.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/text_encoders/qwen_3_06b_base.safetensors",
+            "directory": "text_encoders"
+          }
+        ]
+      },
+      "widgets_values": [
+        "qwen_3_06b_base.safetensors",
+        "stable_diffusion",
+        "default"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [
+        20,
+        400
+      ],
+      "size": [
+        340,
+        62
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "title": "Load VAE (Qwen-Image)",
+      "properties": {
+        "Node name for S&R": "VAELoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "qwen_image_vae.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors",
+            "directory": "vae"
+          }
+        ]
+      },
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "LoraLoader",
+      "pos": [
+        420,
+        80
+      ],
+      "size": [
+        340,
+        138
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            3
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            4,
+            5
+          ]
+        }
+      ],
+      "title": "스타일/OC LoRA (기본 OFF, Civitai)",
+      "properties": {
+        "Node name for S&R": "LoraLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "BlueArchiveStyleB1.safetensors",
+        0.8,
+        0.8
+      ]
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [
+        820,
+        80
+      ],
+      "size": [
+        480,
+        420
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "title": "Positive ({a|b} = 랜덤 선택)",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "masterpiece, best quality, safe, 1girl, solo, full body, standing, straight-on, looking at viewer, {long hair|medium hair|short hair}, {white hair|pink hair|black hair|blonde hair|blue hair}, {half updo|twintails|ponytail|hime cut}, {blue eyes|red eyes|purple eyes|yellow eyes}, {school uniform|hoodie|dress|serafuku}, white background, simple background, anime coloring. Full-body character design of an original anime girl standing on a plain white background."
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [
+        820,
+        560
+      ],
+      "size": [
+        480,
+        220
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "title": "Negative (CFG 1에서는 무시됨)",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "worst quality, low quality, artist name, blurry, jpeg artifacts, chromatic aberration, multiple views, watermark, signature, english text, feet out of frame"
+      ],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 7,
+      "type": "EmptyLatentImage",
+      "pos": [
+        1360,
+        80
+      ],
+      "size": [
+        360,
+        118
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "title": "Empty Latent (832x1216, batch 2)",
+      "properties": {
+        "Node name for S&R": "EmptyLatentImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        832,
+        1216,
+        2
+      ]
+    },
+    {
+      "id": 8,
+      "type": "KSampler",
+      "pos": [
+        1360,
+        260
+      ],
+      "size": [
+        360,
+        262
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 3
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 6
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 7
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "title": "KSampler Turbo (8 steps, CFG 1, euler)",
+      "properties": {
+        "Node name for S&R": "KSampler",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        20261003,
+        "randomize",
+        8,
+        1.0,
+        "euler",
+        "simple",
+        1.0
+      ]
+    },
+    {
+      "id": 9,
+      "type": "VAEDecode",
+      "pos": [
+        1360,
+        582
+      ],
+      "size": [
+        225,
+        54
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 9
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 10,
+      "type": "SaveImage",
+      "pos": [
+        1760,
+        80
+      ],
+      "size": [
+        420,
+        640
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "title": "Save (AnimaOC/02_draft)",
+      "properties": {
+        "Node name for S&R": "SaveImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "AnimaOC/02_draft"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      4,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      2,
+      0,
+      4,
+      1,
+      "CLIP"
+    ],
+    [
+      3,
+      4,
+      0,
+      8,
+      0,
+      "MODEL"
+    ],
+    [
+      4,
+      4,
+      1,
+      5,
+      0,
+      "CLIP"
+    ],
+    [
+      5,
+      4,
+      1,
+      6,
+      0,
+      "CLIP"
+    ],
+    [
+      6,
+      5,
+      0,
+      8,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      7,
+      6,
+      0,
+      8,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      8,
+      7,
+      0,
+      8,
+      3,
+      "LATENT"
+    ],
+    [
+      9,
+      8,
+      0,
+      9,
+      0,
+      "LATENT"
+    ],
+    [
+      10,
+      3,
+      0,
+      9,
+      1,
+      "VAE"
+    ],
+    [
+      11,
+      9,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. 모델 로드 (Turbo)",
+      "bounding": [
+        0,
+        0,
+        380,
+        540
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. 스타일 LoRA (Ctrl+B)",
+      "bounding": [
+        400,
+        0,
+        380,
+        240
+      ],
+      "color": "#a1309b",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3. 프롬프트 (여기를 수정)",
+      "bounding": [
+        800,
+        0,
+        520,
+        800
+      ],
+      "color": "#3f8f3f",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4. 생성 + 저장",
+      "bounding": [
+        1340,
+        0,
+        860,
+        760
+      ],
+      "color": "#b06634",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6,
+      "offset": [
+        680,
+        80
+      ]
+    },
+    "workflow_title_ko": "02. 빠른 시안 - Anima Turbo v1.1 (8스텝)"
+  },
+  "version": 0.4
+}

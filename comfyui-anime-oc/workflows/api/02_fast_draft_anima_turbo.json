@@ -1,0 +1,128 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "anima-turbo-v1.1.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model (Turbo v1.1)"
+    }
+  },
+  "2": {
+    "inputs": {
+      "clip_name": "qwen_3_06b_base.safetensors",
+      "type": "stable_diffusion",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP (Qwen3 0.6B)"
+    }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE (Qwen-Image)"
+    }
+  },
+  "5": {
+    "inputs": {
+      "text": "masterpiece, best quality, safe, 1girl, solo, full body, standing, straight-on, looking at viewer, long hair, white hair, half updo, blue eyes, school uniform, white background, simple background, anime coloring. Full-body character design of an original anime girl standing on a plain white background.",
+      "clip": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Positive ({a|b} = 랜덤 선택)"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": "worst quality, low quality, artist name, blurry, jpeg artifacts, chromatic aberration, multiple views, watermark, signature, english text, feet out of frame",
+      "clip": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative (CFG 1에서는 무시됨)"
+    }
+  },
+  "7": {
+    "inputs": {
+      "width": 832,
+      "height": 1216,
+      "batch_size": 2
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent (832x1216, batch 2)"
+    }
+  },
+  "8": {
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "seed": 20261003,
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": [
+        "5",
+        0
+      ],
+      "negative": [
+        "6",
+        0
+      ],
+      "latent_image": [
+        "7",
+        0
+      ],
+      "denoise": 1.0
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler Turbo (8 steps, CFG 1, euler)"
+    }
+  },
+  "9": {
+    "inputs": {
+      "samples": [
+        "8",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "10": {
+    "inputs": {
+      "images": [
+        "9",
+        0
+      ],
+      "filename_prefix": "AnimaOC/02_draft"
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save (AnimaOC/02_draft)"
+    }
+  }
+}

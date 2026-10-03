@@ -1,0 +1,1141 @@
+{
+  "id": "1e936c94-6321-5080-992f-8dc476f10bbe",
+  "revision": 0,
+  "last_node_id": 21,
+  "last_link_id": 24,
+  "nodes": [
+    {
+      "id": 21,
+      "type": "MarkdownNote",
+      "pos": [
+        -560,
+        50
+      ],
+      "size": [
+        520,
+        970
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "사용 안내",
+      "properties": {},
+      "widgets_values": [
+        "## 03. 캐릭터 레퍼런스 시트 (정면 / 옆 / 뒤 3면도)\n코어 노드만 사용합니다. 모델, LoRA, 업스케일러는 01과 같습니다 (업스케일러는 '누락된 모델' 창에서 받을 수 없으니 01 안내처럼 직접 받으세요).\n\n### 사용법\n1. 01에서 확정한 **외형 태그 블록과 색 설명 문장**을 Positive의 같은 위치에 그대로 붙여넣으세요 (시트 관련 태그와 앞쪽 설명 문장은 유지).\n2. 1536x1024 가로 캔버스에 같은 캐릭터를 3번 그립니다. 3면도는 seed 운이 크므로 먼저 [5] 그룹을 Ctrl+M으로 끄고 여러 장 뽑으세요.\n3. 마음에 드는 1차 결과 PNG(output/AnimaOC/03_sheet_base)를 **빈 화면에 끌어다 놓아** 그때의 seed가 든 워크플로를 복원하고, control_after_generate(생성 후 제어)를 `fixed`(고정)로 바꾼 뒤 [5] 그룹을 Ctrl+M으로 다시 켜고 실행하세요. 화면에 보이는 seed는 실행 직후 이미 다음 값으로 바뀌어 있으므로, 복원하지 않고 그대로 fixed로 바꾸면 다른 그림이 나옵니다.\n4. 레이아웃이 자주 무너지면 **LoRA 2: Character Sheet for Anima**(Civitai, 토큰 필요)를 Ctrl+B로 켜고 0.6~0.8로 쓰세요.\n\n### 01과 다른 점 (중요)\n- 시트에는 **`solo`를 쓰지 않습니다** (Danbooru 규칙상 여러 시점 그림은 solo가 아님).\n- Negative에 **`multiple views`를 넣지 마세요** (01에서는 넣음). 대신 `2girls, multiple girls`로 다른 인물이 섞이는 것을 막습니다.\n- 2차 패스 denoise를 0.35로 낮춰 세 시점의 디자인이 서로 달라지지 않게 했습니다.\n\n### 표정 시트로 바꾸려면\nPositive를 프롬프트 템플릿의 표정 시트로 교체하고 해상도를 1216x832(3x2) 또는 1024x1024로 바꾸세요.\n- 시트의 각 시점을 잘라 모아 두면 나중에 OC LoRA 학습 데이터(20~40장)로 쓸 수 있습니다."
+      ],
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [
+        20,
+        80
+      ],
+      "size": [
+        340,
+        86
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "title": "Load Diffusion Model (Aesthetic v1.1)",
+      "properties": {
+        "Node name for S&R": "UNETLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "anima-aesthetic-v1.1.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-aesthetic-v1.1.safetensors",
+            "directory": "diffusion_models"
+          }
+        ]
+      },
+      "widgets_values": [
+        "anima-aesthetic-v1.1.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [
+        20,
+        226
+      ],
+      "size": [
+        340,
+        114
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            5,
+            6
+          ]
+        }
+      ],
+      "title": "Load CLIP (Qwen3 0.6B)",
+      "properties": {
+        "Node name for S&R": "CLIPLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "qwen_3_06b_base.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/text_encoders/qwen_3_06b_base.safetensors",
+            "directory": "text_encoders"
+          }
+        ]
+      },
+      "widgets_values": [
+        "qwen_3_06b_base.safetensors",
+        "stable_diffusion",
+        "default"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [
+        20,
+        400
+      ],
+      "size": [
+        340,
+        62
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            11,
+            18,
+            23
+          ]
+        }
+      ],
+      "title": "Load VAE (Qwen-Image)",
+      "properties": {
+        "Node name for S&R": "VAELoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "qwen_image_vae.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors",
+            "directory": "vae"
+          }
+        ]
+      },
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        420,
+        80
+      ],
+      "size": [
+        356,
+        90
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "title": "LoRA 1: anima-rl (공식, ON)",
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "anima-rl-v0.1.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima-Official-LoRAs/resolve/main/anima-rl-v0.1.safetensors",
+            "directory": "loras"
+          }
+        ]
+      },
+      "widgets_values": [
+        "anima-rl-v0.1.safetensors",
+        0.5
+      ]
+    },
+    {
+      "id": 5,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        420,
+        230
+      ],
+      "size": [
+        356,
+        90
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            3,
+            4
+          ]
+        }
+      ],
+      "title": "LoRA 2: Character Sheet (Civitai, 레이아웃 보조)",
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "Character Sheet for Anima.safetensors",
+        0.7
+      ]
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [
+        820,
+        80
+      ],
+      "size": [
+        480,
+        420
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            7,
+            19
+          ]
+        }
+      ],
+      "title": "Positive (시트 프롬프트)",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "masterpiece, best quality, highres, safe, newest, 1girl, reference sheet, character sheet, turnaround, multiple views, full body, standing, straight-on, from side, from behind, arms at sides, long hair, white hair, colored inner hair, blue hair, half updo, black ribbon, hair between eyes, sidelocks, blue eyes, tsurime, pale skin, petite, mole under eye, white shirt, collared shirt, blue necktie, black jacket, cropped jacket, long sleeves, black skirt, pleated skirt, black thighhighs, zettai ryouiki, brown shoes, loafers, black choker, x hair ornament, white background, simple background. A character turnaround sheet of one original anime girl drawn three times side by side on a plain white background: front view on the left, side view in the middle, back view on the right. She keeps the same neutral standing pose, the same hairstyle and exactly the same outfit in every view. Her long white hair has light blue inner coloring and is tied in a half updo with a small black ribbon."
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 8,
+      "type": "CLIPTextEncode",
+      "pos": [
+        820,
+        560
+      ],
+      "size": [
+        480,
+        220
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            8,
+            20
+          ]
+        }
+      ],
+      "title": "Negative (multiple views 넣지 말 것)",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "worst quality, low quality, artist name, blurry, jpeg artifacts, chromatic aberration, watermark, signature, english text, 2girls, multiple girls"
+      ],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 9,
+      "type": "EmptyLatentImage",
+      "pos": [
+        1360,
+        80
+      ],
+      "size": [
+        360,
+        118
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "title": "Empty Latent (1536x1024 시트)",
+      "properties": {
+        "Node name for S&R": "EmptyLatentImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        1536,
+        1024,
+        1
+      ]
+    },
+    {
+      "id": 10,
+      "type": "KSampler",
+      "pos": [
+        1360,
+        260
+      ],
+      "size": [
+        360,
+        262
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 3
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 7
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 8
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "title": "KSampler 1차 (30 steps, CFG 3.5)",
+      "properties": {
+        "Node name for S&R": "KSampler",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        20261003,
+        "randomize",
+        30,
+        3.5,
+        "er_sde",
+        "simple",
+        1.0
+      ]
+    },
+    {
+      "id": 11,
+      "type": "VAEDecode",
+      "pos": [
+        1360,
+        582
+      ],
+      "size": [
+        225,
+        54
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 10
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            12,
+            14
+          ]
+        }
+      ],
+      "title": "VAE Decode 1차",
+      "properties": {
+        "Node name for S&R": "VAEDecode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 12,
+      "type": "SaveImage",
+      "pos": [
+        1360,
+        700
+      ],
+      "size": [
+        360,
+        420
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "title": "Save 1차 (AnimaOC/03_sheet_base)",
+      "properties": {
+        "Node name for S&R": "SaveImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "AnimaOC/03_sheet_base"
+      ]
+    },
+    {
+      "id": 13,
+      "type": "UpscaleModelLoader",
+      "pos": [
+        1780,
+        80
+      ],
+      "size": [
+        340,
+        62
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "UPSCALE_MODEL",
+          "type": "UPSCALE_MODEL",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "title": "Load Upscale Model",
+      "properties": {
+        "Node name for S&R": "UpscaleModelLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "RealESRGAN_x4plus_anime_6B.pth",
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+            "directory": "upscale_models"
+          }
+        ]
+      },
+      "widgets_values": [
+        "RealESRGAN_x4plus_anime_6B.pth"
+      ]
+    },
+    {
+      "id": 14,
+      "type": "ImageUpscaleWithModel",
+      "pos": [
+        1780,
+        202
+      ],
+      "size": [
+        260,
+        54
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "upscale_model",
+          "type": "UPSCALE_MODEL",
+          "link": 13
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "title": "Upscale x4 (model)",
+      "properties": {
+        "Node name for S&R": "ImageUpscaleWithModel",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 15,
+      "type": "ImageScaleToTotalPixels",
+      "pos": [
+        1780,
+        316
+      ],
+      "size": [
+        340,
+        114
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "title": "Scale to ~2.25MP (16의 배수)",
+      "properties": {
+        "Node name for S&R": "ImageScaleToTotalPixels",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "lanczos",
+        2.25,
+        16
+      ]
+    },
+    {
+      "id": 16,
+      "type": "RebatchImages",
+      "pos": [
+        1780,
+        490
+      ],
+      "size": [
+        260,
+        62
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            17
+          ],
+          "shape": 6
+        }
+      ],
+      "title": "Rebatch Images (지우지 마세요)",
+      "properties": {
+        "Node name for S&R": "RebatchImages",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        1
+      ]
+    },
+    {
+      "id": 17,
+      "type": "VAEEncode",
+      "pos": [
+        1780,
+        612
+      ],
+      "size": [
+        225,
+        54
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pixels",
+          "type": "IMAGE",
+          "link": 17
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 18
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            21
+          ]
+        }
+      ],
+      "title": "VAE Encode",
+      "properties": {
+        "Node name for S&R": "VAEEncode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 18,
+      "type": "KSampler",
+      "pos": [
+        2150,
+        80
+      ],
+      "size": [
+        360,
+        262
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 4
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 19
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 20
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            22
+          ]
+        }
+      ],
+      "title": "KSampler 2차 (denoise 0.35)",
+      "properties": {
+        "Node name for S&R": "KSampler",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        20261003,
+        "fixed",
+        20,
+        3.5,
+        "er_sde",
+        "simple",
+        0.35
+      ]
+    },
+    {
+      "id": 19,
+      "type": "VAEDecode",
+      "pos": [
+        2150,
+        402
+      ],
+      "size": [
+        225,
+        54
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 22
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 23
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "title": "VAE Decode 2차",
+      "properties": {
+        "Node name for S&R": "VAEDecode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 20,
+      "type": "SaveImage",
+      "pos": [
+        2150,
+        516
+      ],
+      "size": [
+        560,
+        400
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 24
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "title": "Save 하이레즈 (AnimaOC/03_sheet_hires)",
+      "properties": {
+        "Node name for S&R": "SaveImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "AnimaOC/03_sheet_hires"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      4,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      4,
+      0,
+      5,
+      0,
+      "MODEL"
+    ],
+    [
+      3,
+      5,
+      0,
+      10,
+      0,
+      "MODEL"
+    ],
+    [
+      4,
+      5,
+      0,
+      18,
+      0,
+      "MODEL"
+    ],
+    [
+      5,
+      2,
+      0,
+      7,
+      0,
+      "CLIP"
+    ],
+    [
+      6,
+      2,
+      0,
+      8,
+      0,
+      "CLIP"
+    ],
+    [
+      7,
+      7,
+      0,
+      10,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      8,
+      8,
+      0,
+      10,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      9,
+      9,
+      0,
+      10,
+      3,
+      "LATENT"
+    ],
+    [
+      10,
+      10,
+      0,
+      11,
+      0,
+      "LATENT"
+    ],
+    [
+      11,
+      3,
+      0,
+      11,
+      1,
+      "VAE"
+    ],
+    [
+      12,
+      11,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      13,
+      0,
+      14,
+      0,
+      "UPSCALE_MODEL"
+    ],
+    [
+      14,
+      11,
+      0,
+      14,
+      1,
+      "IMAGE"
+    ],
+    [
+      15,
+      14,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ],
+    [
+      16,
+      15,
+      0,
+      16,
+      0,
+      "IMAGE"
+    ],
+    [
+      17,
+      16,
+      0,
+      17,
+      0,
+      "IMAGE"
+    ],
+    [
+      18,
+      3,
+      0,
+      17,
+      1,
+      "VAE"
+    ],
+    [
+      19,
+      7,
+      0,
+      18,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      20,
+      8,
+      0,
+      18,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      21,
+      17,
+      0,
+      18,
+      3,
+      "LATENT"
+    ],
+    [
+      22,
+      18,
+      0,
+      19,
+      0,
+      "LATENT"
+    ],
+    [
+      23,
+      3,
+      0,
+      19,
+      1,
+      "VAE"
+    ],
+    [
+      24,
+      19,
+      0,
+      20,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. 모델 로드",
+      "bounding": [
+        0,
+        0,
+        380,
+        540
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. LoRA (Ctrl+B = 켜기/끄기)",
+      "bounding": [
+        400,
+        0,
+        380,
+        360
+      ],
+      "color": "#a1309b",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3. 시트 프롬프트 (외형 블록을 01에서 복사)",
+      "bounding": [
+        800,
+        0,
+        520,
+        800
+      ],
+      "color": "#3f8f3f",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4. 1차 생성 (1536x1024)",
+      "bounding": [
+        1340,
+        0,
+        400,
+        1160
+      ],
+      "color": "#b06634",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "5. 하이레즈 2차 패스 (끄려면 그룹 노드 전체 선택 후 Ctrl+M)",
+      "bounding": [
+        1760,
+        0,
+        970,
+        960
+      ],
+      "color": "#8a6d2f",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6,
+      "offset": [
+        680,
+        80
+      ]
+    },
+    "workflow_title_ko": "03. 캐릭터 레퍼런스 시트 - 정면/옆/뒤 3면도"
+  },
+  "version": 0.4
+}

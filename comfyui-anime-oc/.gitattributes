@@ -1,0 +1,7 @@
+# Line endings: bash scripts must stay LF (Git for Windows defaults to core.autocrlf=true,
+# and a CRLF .sh fails in Git Bash/WSL with "$'\r': command not found").
+*.sh   text eol=lf
+*.ps1  text eol=crlf
+*.json text eol=lf
+*.py   text eol=lf
+*.md   text

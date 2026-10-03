@@ -1,0 +1,1266 @@
+{
+  "id": "cecc4798-e313-5a20-b6b6-595effa556e9",
+  "revision": 0,
+  "last_node_id": 23,
+  "last_link_id": 26,
+  "nodes": [
+    {
+      "id": 21,
+      "type": "MarkdownNote",
+      "pos": [
+        -560,
+        50
+      ],
+      "size": [
+        520,
+        970
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "사용 안내",
+      "properties": {},
+      "widgets_values": [
+        "## 01. OC 외형 디자인 (Anima Aesthetic v1.1 + 하이레즈 2패스)\n코어 노드만 사용합니다. 커스텀 노드 설치가 필요 없습니다.\n\n### 필요한 파일 (ComfyUI/models/ 아래)\n- diffusion_models/**anima-aesthetic-v1.1.safetensors** (4.18GB)\n- text_encoders/**qwen_3_06b_base.safetensors**\n- vae/**qwen_image_vae.safetensors**\n- loras/**anima-rl-v0.1.safetensors** (기본 ON)\n- upscale_models/**RealESRGAN_x4plus_anime_6B.pth**\n\n다운로드: https://huggingface.co/circlestone-labs/Anima (모델, TE, VAE) / https://huggingface.co/circlestone-labs/Anima-Official-LoRAs (LoRA) / https://github.com/xinntao/Real-ESRGAN/releases/tag/v0.2.2.4 (업스케일러)\n- 워크플로를 열 때 뜨는 오류 알림(\"자세히 보기\" → 누락된 모델)에서 다른 파일은 Download 버튼으로 받을 수 있지만, **업스케일러 RealESRGAN_x4plus_anime_6B.pth는 GitHub 배포라 버튼이 없고 \"Download all\"로도 받아지지 않습니다.** 위 링크나 download_models 스크립트로 받아 upscale_models 폴더에 넣으세요.\n\n### 여기만 고치세요\n1. **[3] Positive(초록)**: 캐릭터 외형 태그만 교체. 순서 = 머리 길이 → 머리색 → 헤어스타일/장식 → 앞머리 → 눈 → 피부/얼굴 → 상의 → 하의 → 다리 → 신발 → 액세서리. 옷마다 색을 붙이면(예: black jacket) 디자인이 안정됩니다. 끝의 영어 문장 1~2개는 태그로 표현하기 어려운 부분(이너컬러 위치 등)을 설명합니다.\n2. **그림체**: `1girl, solo,` 뒤에 `@작가명` 하나만 추가 (예: `@fkey`). 2명 이상 섞으면 화풍이 흐려집니다. 너무 세면 `(@작가명:0.6)`.\n3. **[4] 해상도**: 전신 832x1216 / 반신 896x1152 / 바스트업 1024x1024. 32의 배수를 권장합니다.\n4. **seed 고정**: 화면의 seed 값은 실행하자마자 **다음 실행용 값으로 이미 바뀌어** 있습니다. 마음에 드는 그림이 나오면 그 PNG(output/AnimaOC/01_base 또는 01_hires)를 ComfyUI 빈 화면에 끌어다 놓아 당시 seed가 든 워크플로를 복원한 뒤, control_after_generate(한국어 화면: 생성 후 제어)를 `fixed`(고정)로 바꾸세요. 그다음 프롬프트를 한 번에 한 가지씩만 고칩니다.\n\n### 프롬프트 규칙 (Anima 전용)\n- 영어만 사용. 태그는 소문자 + 띄어쓰기 (밑줄 금지). score_7 같은 score 태그만 밑줄 유지.\n- **Aesthetic 모델에는 score 태그를 쓰지 마세요** (Positive/Negative 모두).\n- 가중치는 SDXL보다 세게 (공식 예시 `(chibi:2)`): `(twintails:1.5)` ~ `(chibi:2)`. 1.1~1.2는 효과가 약하다는 경험담이 많습니다(공식 기준은 아님).\n- `{a|b}`는 ComfyUI에서 **랜덤 선택** 문법입니다 (NovelAI 강조 아님). BREAK도 동작하지 않습니다.\n\n### 단축키\n- LoRA 켜기/끄기: 노드 클릭 → **Ctrl+B** (우회/Bypass, 보라색 = 꺼짐).\n- 하이레즈 끄기: [5] 그룹 안 노드를 Ctrl+드래그로 모두 선택 → **Ctrl+M** (음소거/Mute, 다시 누르면 복구). 1차 결과는 `AnimaOC/01_base`로 저장됩니다.\n- 실행: Run(실행) 버튼 또는 Ctrl+Enter."
+      ],
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 22,
+      "type": "MarkdownNote",
+      "pos": [
+        400,
+        590
+      ],
+      "size": [
+        380,
+        480
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "LoRA 안내",
+      "properties": {},
+      "widgets_values": [
+        "### [2] LoRA 체인 (위에서 아래로 적용)\n| 슬롯 | 파일 | 기본 | 권장 가중치 |\n|---|---|---|---|\n| 1 | anima-rl-v0.1 (공식) | **ON** | 0.5 (0.3~1.0) 디테일·미감 |\n| 2 | anima-highres-aesthetic-boost (공식) | OFF | 0.5~1.0, 1536px 이상일 때 |\n| 3 | anima-base-1-masterpiece-v51 (Civitai, 토큰 필요) | OFF | 0.6, 켜면 Positive 맨 앞에 `masterpiece, very aesthetic` |\n\n- 슬롯 3은 LoraLoader(모델+CLIP)라서 나중에 직접 학습한 **내 OC LoRA**나 스타일 LoRA를 넣기 좋습니다 (lora_name 드롭다운에서 교체).\n- 같이 켜는 LoRA는 3개 이하 권장. 많이 쌓으면 손·팔이 깨지기 쉽습니다.\n- Illustrious/SDXL/Pony용 LoRA는 동작하지 않습니다. Civitai에서 Base Model이 **Anima**인 것만 쓰세요.\n- 효과 비교: 같은 seed(fixed)로 슬롯 1을 Ctrl+B로 껐다 켜며 확인하세요."
+      ],
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 23,
+      "type": "MarkdownNote",
+      "pos": [
+        1780,
+        726
+      ],
+      "size": [
+        340,
+        420
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "하이레즈 안내",
+      "properties": {},
+      "widgets_values": [
+        "### [5] 2차 패스 (하이레즈)\n1차 이미지를 RealESRGAN(4배)로 키운 뒤 약 **2.25MP**(1536x1536 면적, 16의 배수)로 줄이고 denoise 0.40으로 다시 그립니다. 832x1216 → 1264x1856.\n- denoise: 0.35(원본 유지) ~ 0.45(디테일 추가). 0.5 이상이면 얼굴·옷 디자인이 바뀔 수 있습니다.\n- 한 번에 약 1.5배 넘게 키우지 않는 것을 권장합니다 (커뮤니티 경험칙: 2배 이상을 한 번에 다시 그리면 불안정해지기 쉬움).\n- **Rebatch Images 노드는 지우지 마세요.** Anima(Qwen-Image) VAE는 여러 장을 한 번에 인코딩하면 1장으로 합쳐 버립니다. 이 노드가 batch_size가 2 이상일 때도 1장씩 나눠 줍니다.\n- 8GB 이하에서 디코딩 OOM이 나면 마지막 VAE Decode를 VAE Decode (Tiled)로 교체하세요."
+      ],
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [
+        20,
+        80
+      ],
+      "size": [
+        340,
+        86
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "title": "Load Diffusion Model (Aesthetic v1.1)",
+      "properties": {
+        "Node name for S&R": "UNETLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "anima-aesthetic-v1.1.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-aesthetic-v1.1.safetensors",
+            "directory": "diffusion_models"
+          }
+        ]
+      },
+      "widgets_values": [
+        "anima-aesthetic-v1.1.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [
+        20,
+        226
+      ],
+      "size": [
+        340,
+        114
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "title": "Load CLIP (Qwen3 0.6B)",
+      "properties": {
+        "Node name for S&R": "CLIPLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "qwen_3_06b_base.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/text_encoders/qwen_3_06b_base.safetensors",
+            "directory": "text_encoders"
+          }
+        ]
+      },
+      "widgets_values": [
+        "qwen_3_06b_base.safetensors",
+        "stable_diffusion",
+        "default"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [
+        20,
+        400
+      ],
+      "size": [
+        340,
+        62
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            13,
+            20,
+            25
+          ]
+        }
+      ],
+      "title": "Load VAE (Qwen-Image)",
+      "properties": {
+        "Node name for S&R": "VAELoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "qwen_image_vae.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors",
+            "directory": "vae"
+          }
+        ]
+      },
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        420,
+        80
+      ],
+      "size": [
+        340,
+        90
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "title": "LoRA 1: anima-rl (공식, ON)",
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "anima-rl-v0.1.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima-Official-LoRAs/resolve/main/anima-rl-v0.1.safetensors",
+            "directory": "loras"
+          }
+        ]
+      },
+      "widgets_values": [
+        "anima-rl-v0.1.safetensors",
+        0.5
+      ]
+    },
+    {
+      "id": 5,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        420,
+        230
+      ],
+      "size": [
+        340,
+        90
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "title": "LoRA 2: highres boost (1536px 이상일 때만)",
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "anima-highres-aesthetic-boost.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima-Official-LoRAs/resolve/main/anima-highres-aesthetic-boost.safetensors",
+            "directory": "loras"
+          }
+        ]
+      },
+      "widgets_values": [
+        "anima-highres-aesthetic-boost.safetensors",
+        0.5
+      ]
+    },
+    {
+      "id": 6,
+      "type": "LoraLoader",
+      "pos": [
+        420,
+        380
+      ],
+      "size": [
+        340,
+        138
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 3
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            5,
+            6
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            7,
+            8
+          ]
+        }
+      ],
+      "title": "LoRA 3: 품질/스타일/내 OC LoRA (Civitai)",
+      "properties": {
+        "Node name for S&R": "LoraLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "anima-base-1-masterpiece-v51.safetensors",
+        0.6,
+        0.6
+      ]
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [
+        820,
+        80
+      ],
+      "size": [
+        480,
+        420
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            9,
+            21
+          ]
+        }
+      ],
+      "title": "Positive (외형 프롬프트)",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "masterpiece, best quality, highres, safe, newest, 1girl, solo, full body, standing, straight-on, looking at viewer, arms at sides, light smile, closed mouth, long hair, white hair, colored inner hair, blue hair, half updo, black ribbon, hair between eyes, sidelocks, blue eyes, tsurime, pale skin, petite, mole under eye, white shirt, collared shirt, blue necktie, black jacket, cropped jacket, long sleeves, black skirt, pleated skirt, black thighhighs, zettai ryouiki, brown shoes, loafers, black choker, x hair ornament, white background, simple background, anime coloring. Full-body character design of an original anime girl standing upright and facing the viewer on a plain white background, her whole figure visible from the top of her head to her shoes. Her long white hair has light blue inner coloring and is tied in a half updo with a small black ribbon."
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 8,
+      "type": "CLIPTextEncode",
+      "pos": [
+        820,
+        560
+      ],
+      "size": [
+        480,
+        220
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            10,
+            22
+          ]
+        }
+      ],
+      "title": "Negative",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "worst quality, low quality, artist name, blurry, jpeg artifacts, chromatic aberration, multiple views, watermark, signature, english text, feet out of frame"
+      ],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 9,
+      "type": "EmptyLatentImage",
+      "pos": [
+        1360,
+        80
+      ],
+      "size": [
+        360,
+        118
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "title": "Empty Latent (832x1216 전신)",
+      "properties": {
+        "Node name for S&R": "EmptyLatentImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        832,
+        1216,
+        1
+      ]
+    },
+    {
+      "id": 10,
+      "type": "KSampler",
+      "pos": [
+        1360,
+        260
+      ],
+      "size": [
+        360,
+        262
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 5
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 9
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 10
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "title": "KSampler 1차 (30 steps, CFG 3.5)",
+      "properties": {
+        "Node name for S&R": "KSampler",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        20261003,
+        "randomize",
+        30,
+        3.5,
+        "er_sde",
+        "simple",
+        1.0
+      ]
+    },
+    {
+      "id": 11,
+      "type": "VAEDecode",
+      "pos": [
+        1360,
+        582
+      ],
+      "size": [
+        225,
+        54
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 12
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            14,
+            16
+          ]
+        }
+      ],
+      "title": "VAE Decode 1차",
+      "properties": {
+        "Node name for S&R": "VAEDecode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 12,
+      "type": "SaveImage",
+      "pos": [
+        1360,
+        700
+      ],
+      "size": [
+        360,
+        420
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "title": "Save 1차 (AnimaOC/01_base)",
+      "properties": {
+        "Node name for S&R": "SaveImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "AnimaOC/01_base"
+      ]
+    },
+    {
+      "id": 13,
+      "type": "UpscaleModelLoader",
+      "pos": [
+        1780,
+        80
+      ],
+      "size": [
+        340,
+        62
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "UPSCALE_MODEL",
+          "type": "UPSCALE_MODEL",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "title": "Load Upscale Model",
+      "properties": {
+        "Node name for S&R": "UpscaleModelLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "RealESRGAN_x4plus_anime_6B.pth",
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+            "directory": "upscale_models"
+          }
+        ]
+      },
+      "widgets_values": [
+        "RealESRGAN_x4plus_anime_6B.pth"
+      ]
+    },
+    {
+      "id": 14,
+      "type": "ImageUpscaleWithModel",
+      "pos": [
+        1780,
+        202
+      ],
+      "size": [
+        260,
+        54
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "upscale_model",
+          "type": "UPSCALE_MODEL",
+          "link": 15
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "title": "Upscale x4 (model)",
+      "properties": {
+        "Node name for S&R": "ImageUpscaleWithModel",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 15,
+      "type": "ImageScaleToTotalPixels",
+      "pos": [
+        1780,
+        316
+      ],
+      "size": [
+        340,
+        114
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            18
+          ]
+        }
+      ],
+      "title": "Scale to ~2.25MP (16의 배수)",
+      "properties": {
+        "Node name for S&R": "ImageScaleToTotalPixels",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "lanczos",
+        2.25,
+        16
+      ]
+    },
+    {
+      "id": 16,
+      "type": "RebatchImages",
+      "pos": [
+        1780,
+        490
+      ],
+      "size": [
+        260,
+        62
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 18
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            19
+          ],
+          "shape": 6
+        }
+      ],
+      "title": "Rebatch Images (지우지 마세요)",
+      "properties": {
+        "Node name for S&R": "RebatchImages",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        1
+      ]
+    },
+    {
+      "id": 17,
+      "type": "VAEEncode",
+      "pos": [
+        1780,
+        612
+      ],
+      "size": [
+        225,
+        54
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pixels",
+          "type": "IMAGE",
+          "link": 19
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            23
+          ]
+        }
+      ],
+      "title": "VAE Encode",
+      "properties": {
+        "Node name for S&R": "VAEEncode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 18,
+      "type": "KSampler",
+      "pos": [
+        2150,
+        80
+      ],
+      "size": [
+        360,
+        262
+      ],
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 6
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 21
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 22
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 23
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "title": "KSampler 2차 (denoise 0.40)",
+      "properties": {
+        "Node name for S&R": "KSampler",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        20261003,
+        "fixed",
+        20,
+        3.5,
+        "er_sde",
+        "simple",
+        0.4
+      ]
+    },
+    {
+      "id": 19,
+      "type": "VAEDecode",
+      "pos": [
+        2150,
+        402
+      ],
+      "size": [
+        225,
+        54
+      ],
+      "flags": {},
+      "order": 21,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 24
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 25
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            26
+          ]
+        }
+      ],
+      "title": "VAE Decode 2차",
+      "properties": {
+        "Node name for S&R": "VAEDecode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 20,
+      "type": "SaveImage",
+      "pos": [
+        2150,
+        516
+      ],
+      "size": [
+        400,
+        560
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 26
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "title": "Save 하이레즈 (AnimaOC/01_hires)",
+      "properties": {
+        "Node name for S&R": "SaveImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "AnimaOC/01_hires"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      4,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      4,
+      0,
+      5,
+      0,
+      "MODEL"
+    ],
+    [
+      3,
+      5,
+      0,
+      6,
+      0,
+      "MODEL"
+    ],
+    [
+      4,
+      2,
+      0,
+      6,
+      1,
+      "CLIP"
+    ],
+    [
+      5,
+      6,
+      0,
+      10,
+      0,
+      "MODEL"
+    ],
+    [
+      6,
+      6,
+      0,
+      18,
+      0,
+      "MODEL"
+    ],
+    [
+      7,
+      6,
+      1,
+      7,
+      0,
+      "CLIP"
+    ],
+    [
+      8,
+      6,
+      1,
+      8,
+      0,
+      "CLIP"
+    ],
+    [
+      9,
+      7,
+      0,
+      10,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      10,
+      8,
+      0,
+      10,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      11,
+      9,
+      0,
+      10,
+      3,
+      "LATENT"
+    ],
+    [
+      12,
+      10,
+      0,
+      11,
+      0,
+      "LATENT"
+    ],
+    [
+      13,
+      3,
+      0,
+      11,
+      1,
+      "VAE"
+    ],
+    [
+      14,
+      11,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      15,
+      13,
+      0,
+      14,
+      0,
+      "UPSCALE_MODEL"
+    ],
+    [
+      16,
+      11,
+      0,
+      14,
+      1,
+      "IMAGE"
+    ],
+    [
+      17,
+      14,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ],
+    [
+      18,
+      15,
+      0,
+      16,
+      0,
+      "IMAGE"
+    ],
+    [
+      19,
+      16,
+      0,
+      17,
+      0,
+      "IMAGE"
+    ],
+    [
+      20,
+      3,
+      0,
+      17,
+      1,
+      "VAE"
+    ],
+    [
+      21,
+      7,
+      0,
+      18,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      22,
+      8,
+      0,
+      18,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      23,
+      17,
+      0,
+      18,
+      3,
+      "LATENT"
+    ],
+    [
+      24,
+      18,
+      0,
+      19,
+      0,
+      "LATENT"
+    ],
+    [
+      25,
+      3,
+      0,
+      19,
+      1,
+      "VAE"
+    ],
+    [
+      26,
+      19,
+      0,
+      20,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. 모델 로드",
+      "bounding": [
+        0,
+        0,
+        380,
+        540
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. LoRA 체인 (Ctrl+B = 켜기/끄기)",
+      "bounding": [
+        400,
+        0,
+        380,
+        540
+      ],
+      "color": "#a1309b",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3. 프롬프트 (여기를 수정)",
+      "bounding": [
+        800,
+        0,
+        520,
+        800
+      ],
+      "color": "#3f8f3f",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4. 1차 생성 (832x1216)",
+      "bounding": [
+        1340,
+        0,
+        400,
+        1160
+      ],
+      "color": "#b06634",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "5. 하이레즈 2차 패스 (끄려면 그룹 노드 전체 선택 후 Ctrl+M)",
+      "bounding": [
+        1760,
+        0,
+        810,
+        1160
+      ],
+      "color": "#8a6d2f",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6,
+      "offset": [
+        680,
+        80
+      ]
+    },
+    "workflow_title_ko": "01. OC 외형 디자인 - Aesthetic v1.1 + 하이레즈 2패스"
+  },
+  "version": 0.4
+}

@@ -1,0 +1,1073 @@
+{
+  "id": "0516f88d-2d9b-5b7d-9927-f6aca7bd5149",
+  "revision": 0,
+  "last_node_id": 19,
+  "last_link_id": 20,
+  "nodes": [
+    {
+      "id": 19,
+      "type": "MarkdownNote",
+      "pos": [
+        -560,
+        50
+      ],
+      "size": [
+        520,
+        900
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "사용 안내",
+      "properties": {},
+      "widgets_values": [
+        "## 05. 스케치/선화 → OC 완성 일러스트 (Anima LLLite, 코어 노드)\n필요한 파일: model_patches/**anima-lllite-any-test-like-v2.safetensors** (https://huggingface.co/Comfy-Org/Anima-LLLite). 스크립트로 받으려면 `-Only lllite_any_test_v2` (bash는 `--only`)를 붙이세요.\n\n### 사용법\n1. **Load Image** 노드의 \"choose file to upload\"(업로드할 파일 선택) 버튼으로 러프 스케치, 포즈 낙서, 선화를 고르세요. 끌어다 놓을 때는 Load Image 노드 위에 정확히 놓으세요 (ComfyUI가 만든 PNG를 빈 화면에 놓으면 그 PNG의 워크플로가 열립니다). 입력 비율에 맞춰 약 1MP(16의 배수) 해상도가 자동으로 정해집니다.\n2. Canny(0.17/0.45) → Invert = 흰 바탕에 검은 선 컨트롤 이미지입니다 (공식 템플릿과 같음). **이미 깔끔한 흑백 선화(흰 바탕/검은 선)라면 Canny와 Invert Image를 Ctrl+B로 끄세요.**\n3. Positive에는 01의 외형 블록을 넣으세요. 형태는 스케치가, 색과 디테일은 프롬프트가 결정합니다.\n4. strength 1.0이 기본입니다. 선을 너무 그대로 따라가면 0.6~0.8로 낮추거나 end_percent를 0.5~0.7로 바꾸세요.\n\n### 참고\n- LLLite는 공식적으로 **Anima Base v1.0**으로 학습되었습니다. 여기서는 Aesthetic v1.1에 적용했으며, 결과가 이상하면 Load Diffusion Model을 anima-base-v1.0으로 바꾸세요 (그때는 Positive에 `score_7`, Negative에 `score_1, score_2, score_3` 추가, CFG 4~5).\n- 빠르게 확인하려면 Turbo LoRA를 Ctrl+B로 켜고 KSampler를 steps 8, cfg 1로 바꾸세요.\n- 포즈 전용 pose-1 모델은 공식 문서에서도 약하다고 명시되어 있어 넣지 않았습니다. 간단한 사람 실루엣이나 선화를 이 any-test 모델에 넣는 방식을 권장합니다."
+      ],
+      "color": "#222",
+      "bgcolor": "#000"
+    },
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [
+        20,
+        80
+      ],
+      "size": [
+        340,
+        86
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "title": "Load Diffusion Model (Aesthetic v1.1)",
+      "properties": {
+        "Node name for S&R": "UNETLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "anima-aesthetic-v1.1.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-aesthetic-v1.1.safetensors",
+            "directory": "diffusion_models"
+          }
+        ]
+      },
+      "widgets_values": [
+        "anima-aesthetic-v1.1.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [
+        20,
+        226
+      ],
+      "size": [
+        340,
+        114
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            13,
+            14
+          ]
+        }
+      ],
+      "title": "Load CLIP (Qwen3 0.6B)",
+      "properties": {
+        "Node name for S&R": "CLIPLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "qwen_3_06b_base.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/text_encoders/qwen_3_06b_base.safetensors",
+            "directory": "text_encoders"
+          }
+        ]
+      },
+      "widgets_values": [
+        "qwen_3_06b_base.safetensors",
+        "stable_diffusion",
+        "default"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "VAELoader",
+      "pos": [
+        20,
+        400
+      ],
+      "size": [
+        340,
+        62
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            19
+          ]
+        }
+      ],
+      "title": "Load VAE (Qwen-Image)",
+      "properties": {
+        "Node name for S&R": "VAELoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "qwen_image_vae.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors",
+            "directory": "vae"
+          }
+        ]
+      },
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "ModelPatchLoader",
+      "pos": [
+        20,
+        522
+      ],
+      "size": [
+        340,
+        86
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL_PATCH",
+          "type": "MODEL_PATCH",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "title": "Load LLLite (any-test-like v2)",
+      "properties": {
+        "Node name for S&R": "ModelPatchLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "anima-lllite-any-test-like-v2.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/Anima-LLLite/resolve/main/model_patches/anima-lllite-any-test-like-v2.safetensors",
+            "directory": "model_patches"
+          }
+        ]
+      },
+      "widgets_values": [
+        "anima-lllite-any-test-like-v2.safetensors"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        420,
+        80
+      ],
+      "size": [
+        340,
+        380
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "title": "Load Image (스케치/선화/포즈 낙서)",
+      "properties": {
+        "Node name for S&R": "LoadImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "example.png",
+        "image"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "ImageScaleToTotalPixels",
+      "pos": [
+        420,
+        520
+      ],
+      "size": [
+        340,
+        114
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2,
+            10
+          ]
+        }
+      ],
+      "title": "Scale to ~1MP (16의 배수)",
+      "properties": {
+        "Node name for S&R": "ImageScaleToTotalPixels",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "lanczos",
+        1.0,
+        16
+      ]
+    },
+    {
+      "id": 7,
+      "type": "Canny",
+      "pos": [
+        790,
+        80
+      ],
+      "size": [
+        340,
+        90
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "title": "Canny (깔끔한 선화면 Ctrl+B로 끄기)",
+      "properties": {
+        "Node name for S&R": "Canny",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        0.17,
+        0.45
+      ]
+    },
+    {
+      "id": 8,
+      "type": "ImageInvert",
+      "pos": [
+        790,
+        230
+      ],
+      "size": [
+        240,
+        46
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            4,
+            7
+          ]
+        }
+      ],
+      "title": "Invert Image (흰 바탕/검은 선)",
+      "properties": {
+        "Node name for S&R": "ImageInvert",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 9,
+      "type": "PreviewImage",
+      "pos": [
+        790,
+        336
+      ],
+      "size": [
+        360,
+        470
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "title": "컨트롤 이미지 확인",
+      "properties": {
+        "Node name for S&R": "PreviewImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 10,
+      "type": "AnimaLLLiteApply",
+      "pos": [
+        1200,
+        80
+      ],
+      "size": [
+        340,
+        202
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 5
+        },
+        {
+          "name": "model_patch",
+          "type": "MODEL_PATCH",
+          "link": 6
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "shape": 7,
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "title": "Apply Anima LLLite (strength 1.0)",
+      "properties": {
+        "Node name for S&R": "AnimaLLLiteApply",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        1.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "id": 11,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        1200,
+        342
+      ],
+      "size": [
+        340,
+        90
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 4,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "title": "Turbo LoRA (기본 OFF: 켜면 8 steps / CFG 1)",
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0",
+        "models": [
+          {
+            "name": "anima-turbo-lora-v0.2.safetensors",
+            "url": "https://huggingface.co/circlestone-labs/Anima-Official-LoRAs/resolve/main/anima-turbo-lora-v0.2.safetensors",
+            "directory": "loras"
+          }
+        ]
+      },
+      "widgets_values": [
+        "anima-turbo-lora-v0.2.safetensors",
+        1.0
+      ]
+    },
+    {
+      "id": 12,
+      "type": "GetImageSize",
+      "pos": [
+        2140,
+        80
+      ],
+      "size": [
+        225,
+        86
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "links": [
+            11
+          ]
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": [
+            12
+          ]
+        },
+        {
+          "name": "batch_size",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetImageSize",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 13,
+      "type": "EmptyLatentImage",
+      "pos": [
+        2140,
+        226
+      ],
+      "size": [
+        300,
+        118
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": 11
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "title": "Empty Latent (컨트롤 이미지 크기)",
+      "properties": {
+        "Node name for S&R": "EmptyLatentImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        1024,
+        1024,
+        1
+      ]
+    },
+    {
+      "id": 14,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1600,
+        80
+      ],
+      "size": [
+        480,
+        420
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "title": "Positive (01의 외형 블록)",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "masterpiece, best quality, highres, safe, newest, 1girl, solo, full body, standing, looking at viewer, long hair, white hair, colored inner hair, blue hair, half updo, black ribbon, hair between eyes, sidelocks, blue eyes, tsurime, pale skin, petite, mole under eye, white shirt, collared shirt, blue necktie, black jacket, cropped jacket, long sleeves, black skirt, pleated skirt, black thighhighs, zettai ryouiki, brown shoes, loafers, black choker, x hair ornament, white background, simple background, anime coloring. A finished full-color anime illustration of an original girl that follows the pose and outline of the sketch. Her long white hair has light blue inner coloring and is tied in a half updo with a small black ribbon."
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 15,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1600,
+        560
+      ],
+      "size": [
+        480,
+        220
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "title": "Negative",
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "worst quality, low quality, artist name, blurry, jpeg artifacts, chromatic aberration, watermark, signature, english text, monochrome, greyscale, sketch"
+      ],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 16,
+      "type": "KSampler",
+      "pos": [
+        2140,
+        404
+      ],
+      "size": [
+        360,
+        262
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 9
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 15
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 16
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            18
+          ]
+        }
+      ],
+      "title": "KSampler (30 steps, CFG 4, euler)",
+      "properties": {
+        "Node name for S&R": "KSampler",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        20261003,
+        "randomize",
+        30,
+        4.0,
+        "euler",
+        "simple",
+        1.0
+      ]
+    },
+    {
+      "id": 17,
+      "type": "VAEDecode",
+      "pos": [
+        2140,
+        726
+      ],
+      "size": [
+        225,
+        54
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 18
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            20
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 18,
+      "type": "SaveImage",
+      "pos": [
+        2540,
+        80
+      ],
+      "size": [
+        380,
+        620
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "title": "Save (AnimaOC/05_lllite)",
+      "properties": {
+        "Node name for S&R": "SaveImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.38.0"
+      },
+      "widgets_values": [
+        "AnimaOC/05_lllite"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      5,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      6,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
+      7,
+      0,
+      8,
+      0,
+      "IMAGE"
+    ],
+    [
+      4,
+      8,
+      0,
+      9,
+      0,
+      "IMAGE"
+    ],
+    [
+      5,
+      1,
+      0,
+      10,
+      0,
+      "MODEL"
+    ],
+    [
+      6,
+      4,
+      0,
+      10,
+      1,
+      "MODEL_PATCH"
+    ],
+    [
+      7,
+      8,
+      0,
+      10,
+      2,
+      "IMAGE"
+    ],
+    [
+      8,
+      10,
+      0,
+      11,
+      0,
+      "MODEL"
+    ],
+    [
+      9,
+      11,
+      0,
+      16,
+      0,
+      "MODEL"
+    ],
+    [
+      10,
+      6,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      11,
+      12,
+      0,
+      13,
+      0,
+      "INT"
+    ],
+    [
+      12,
+      12,
+      1,
+      13,
+      1,
+      "INT"
+    ],
+    [
+      13,
+      2,
+      0,
+      14,
+      0,
+      "CLIP"
+    ],
+    [
+      14,
+      2,
+      0,
+      15,
+      0,
+      "CLIP"
+    ],
+    [
+      15,
+      14,
+      0,
+      16,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      16,
+      15,
+      0,
+      16,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      17,
+      13,
+      0,
+      16,
+      3,
+      "LATENT"
+    ],
+    [
+      18,
+      16,
+      0,
+      17,
+      0,
+      "LATENT"
+    ],
+    [
+      19,
+      3,
+      0,
+      17,
+      1,
+      "VAE"
+    ],
+    [
+      20,
+      17,
+      0,
+      18,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1. 모델 로드",
+      "bounding": [
+        0,
+        0,
+        380,
+        640
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2. 컨트롤 이미지 (스케치/선화)",
+      "bounding": [
+        400,
+        0,
+        760,
+        840
+      ],
+      "color": "#b06634",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3. LLLite 적용 + (선택) Turbo",
+      "bounding": [
+        1180,
+        0,
+        380,
+        460
+      ],
+      "color": "#a1309b",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "4. 프롬프트",
+      "bounding": [
+        1580,
+        0,
+        520,
+        840
+      ],
+      "color": "#3f8f3f",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "5. 생성 + 저장",
+      "bounding": [
+        2120,
+        0,
+        810,
+        820
+      ],
+      "color": "#8a6d2f",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6,
+      "offset": [
+        680,
+        80
+      ]
+    },
+    "workflow_title_ko": "05. 스케치/선화 → OC 완성 일러스트 (Anima LLLite, 선택)"
+  },
+  "version": 0.4
+}
