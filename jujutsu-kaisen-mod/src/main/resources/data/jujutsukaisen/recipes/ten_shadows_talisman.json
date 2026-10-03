@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SSS",
+    "SES",
+    "SSS"
+  ],
+  "key": {
+    "S": {
+      "item": "minecraft:iron_sword"
+    },
+    "E": {
+      "item": "minecraft:echo_shard"
+    }
+  },
+  "result": {
+    "item": "jujutsukaisen:ten_shadows_talisman",
+    "count": 1
+  }
+}

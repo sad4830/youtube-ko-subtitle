@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "item": "jujutsukaisen:idle_death_gamble_imprint"
+    },
+    "title": {
+      "translate": "advancements.jujutsukaisen.idle_death_gamble.title"
+    },
+    "description": {
+      "translate": "advancements.jujutsukaisen.idle_death_gamble.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "granted": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "jujutsukaisen:root"
+}

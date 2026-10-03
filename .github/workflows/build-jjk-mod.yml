@@ -32,11 +32,15 @@ jobs:
 
       - name: Server smoke test (registries, data, entities)
         if: hashFiles('jujutsu-kaisen-mod/ci/smoketest.enabled') != ''
+        env:
+          JJK_SMOKETEST: '1'
         run: |
           mkdir -p run
           echo "eula=true" > run/eula.txt
           printf "online-mode=false\nlevel-type=minecraft\\:flat\nspawn-protection=0\n" > run/server.properties
-          timeout 900 ./gradlew runServer --no-daemon -Djjk.smoketest=true 2>&1 | tee smoketest.log
+          timeout 900 ./gradlew runServer --no-daemon 2>&1 | tee smoketest.log || true
+          echo "----- smoke test summary -----"
+          grep -E "JJK-SMOKETEST|Exception|ERROR|Caused by" smoketest.log | head -150 || true
           grep -q "JJK-SMOKETEST: PASS" smoketest.log
 
       - name: API signature probe (javap)

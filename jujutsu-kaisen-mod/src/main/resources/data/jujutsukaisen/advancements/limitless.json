@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "item": "jujutsukaisen:limitless_imprint"
+    },
+    "title": {
+      "translate": "advancements.jujutsukaisen.limitless.title"
+    },
+    "description": {
+      "translate": "advancements.jujutsukaisen.limitless.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "granted": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "jujutsukaisen:root"
+}

@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "jujutsukaisen:block/idle_death_gamble_barrier"
+  }
+}

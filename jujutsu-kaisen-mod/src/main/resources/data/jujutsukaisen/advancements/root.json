@@ -1,0 +1,41 @@
+{
+  "display": {
+    "icon": {
+      "item": "jujutsukaisen:sukuna_finger"
+    },
+    "title": {
+      "translate": "advancements.jujutsukaisen.root.title"
+    },
+    "description": {
+      "translate": "advancements.jujutsukaisen.root.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false,
+    "background": "minecraft:textures/block/crying_obsidian.png"
+  },
+  "criteria": {
+    "has_item": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "jujutsukaisen:sukuna_finger",
+              "jujutsukaisen:limitless_imprint",
+              "jujutsukaisen:idle_death_gamble_imprint",
+              "jujutsukaisen:ten_shadows_talisman",
+              "jujutsukaisen:prison_realm",
+              "jujutsukaisen:fight_club_invitation",
+              "jujutsukaisen:dharma_wheel",
+              "jujutsukaisen:sword_of_extermination",
+              "jujutsukaisen:gojo_blindfold",
+              "jujutsukaisen:pachinko_ball"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

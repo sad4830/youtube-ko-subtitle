@@ -1,0 +1,10 @@
+{
+  "values": [
+    "#minecraft:wither_immune",
+    "minecraft:bedrock",
+    "minecraft:end_portal_frame",
+    "minecraft:reinforced_deepslate",
+    "jujutsukaisen:infinite_void_barrier",
+    "jujutsukaisen:idle_death_gamble_barrier"
+  ]
+}

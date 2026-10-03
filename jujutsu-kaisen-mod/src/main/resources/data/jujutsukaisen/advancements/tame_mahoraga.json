@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "item": "jujutsukaisen:dharma_wheel"
+    },
+    "title": {
+      "translate": "advancements.jujutsukaisen.tame_mahoraga.title"
+    },
+    "description": {
+      "translate": "advancements.jujutsukaisen.tame_mahoraga.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "granted": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "jujutsukaisen:furube_yura_yura"
+}

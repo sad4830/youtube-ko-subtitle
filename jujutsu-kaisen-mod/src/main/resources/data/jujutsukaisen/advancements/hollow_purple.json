@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:amethyst_cluster"
+    },
+    "title": {
+      "translate": "advancements.jujutsukaisen.hollow_purple.title"
+    },
+    "description": {
+      "translate": "advancements.jujutsukaisen.hollow_purple.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "granted": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "jujutsukaisen:limitless"
+}

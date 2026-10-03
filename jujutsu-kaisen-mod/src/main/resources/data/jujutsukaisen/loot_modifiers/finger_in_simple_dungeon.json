@@ -1,0 +1,14 @@
+{
+  "type": "jujutsukaisen:add_item",
+  "conditions": [
+    {
+      "condition": "forge:loot_table_id",
+      "loot_table_id": "minecraft:chests/simple_dungeon"
+    },
+    {
+      "condition": "minecraft:random_chance",
+      "chance": 0.06
+    }
+  ],
+  "item": "jujutsukaisen:sukuna_finger"
+}

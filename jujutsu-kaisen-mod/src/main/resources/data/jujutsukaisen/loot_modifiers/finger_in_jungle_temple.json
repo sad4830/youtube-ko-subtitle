@@ -1,0 +1,14 @@
+{
+  "type": "jujutsukaisen:add_item",
+  "conditions": [
+    {
+      "condition": "forge:loot_table_id",
+      "loot_table_id": "minecraft:chests/jungle_temple"
+    },
+    {
+      "condition": "minecraft:random_chance",
+      "chance": 0.15
+    }
+  ],
+  "item": "jujutsukaisen:sukuna_finger"
+}

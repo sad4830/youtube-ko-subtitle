@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "item": "jujutsukaisen:sukuna_finger"
+    },
+    "title": {
+      "translate": "advancements.jujutsukaisen.twenty_fingers.title"
+    },
+    "description": {
+      "translate": "advancements.jujutsukaisen.twenty_fingers.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "granted": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "jujutsukaisen:vessel"
+}

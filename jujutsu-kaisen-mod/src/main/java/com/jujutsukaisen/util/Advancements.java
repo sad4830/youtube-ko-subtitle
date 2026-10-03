@@ -11,6 +11,7 @@ public final class Advancements {
 
     /** Grants every remaining criterion of {@code jujutsukaisen:<name>}. */
     public static void award(ServerPlayer player, String name) {
+        if (!"root".equals(name)) award(player, "root");
         Advancement advancement = player.server.getAdvancements().getAdvancement(JujutsuKaisen.id(name));
         if (advancement == null) return;
         AdvancementProgress progress = player.getAdvancements().getOrStartProgress(advancement);

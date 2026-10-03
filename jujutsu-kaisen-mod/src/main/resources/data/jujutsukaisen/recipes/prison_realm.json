@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "OEO",
+    "EDE",
+    "OEO"
+  ],
+  "key": {
+    "O": {
+      "item": "minecraft:crying_obsidian"
+    },
+    "E": {
+      "item": "minecraft:ender_eye"
+    },
+    "D": {
+      "item": "minecraft:diamond_block"
+    }
+  },
+  "result": {
+    "item": "jujutsukaisen:prison_realm",
+    "count": 1
+  }
+}

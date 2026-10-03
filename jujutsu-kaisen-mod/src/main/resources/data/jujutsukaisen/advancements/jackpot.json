@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:gold_block"
+    },
+    "title": {
+      "translate": "advancements.jujutsukaisen.jackpot.title"
+    },
+    "description": {
+      "translate": "advancements.jujutsukaisen.jackpot.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "granted": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "jujutsukaisen:idle_death_gamble"
+}
