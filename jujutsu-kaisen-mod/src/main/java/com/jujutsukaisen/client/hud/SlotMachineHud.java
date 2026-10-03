@@ -60,17 +60,18 @@ public final class SlotMachineHud implements IGuiOverlay {
         int x = Math.max((width - boxW) / 2, CursedEnergyHud.blockRight() + 4);
         if (x + boxW > width - 2) x = Math.max(2, width - 2 - boxW);
         int y = CursedEnergyHud.topBelowBossBars() + 14;
+        int mid = x + boxW / 2;
         float fade = elapsed > total + HOLD_AFTER - 10 ? (total + HOLD_AFTER - elapsed) / 10f : 1f;
         int alpha = (int) (Mth.clamp(fade, 0, 1) * 220) << 24;
 
         graphics.fill(x - 2, y - 2, x + boxW + 2, y + boxH + 2, alpha | (indicator.color() & 0xFFFFFF));
         graphics.fill(x, y, x + boxW, y + boxH, alpha | 0x14101C);
         graphics.drawCenteredString(font, Component.translatable("gamble.jujutsukaisen.machine").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
-                width / 2, y + 4, 0xFFFFFF);
+                mid, y + 4, 0xFFFFFF);
 
         // Reels: the first two stop together (riichi), the third keeps spinning until the end.
         int reelW = 40, reelH = 34, gap = 12;
-        int rx = width / 2 - (reelW * 3 + gap * 2) / 2;
+        int rx = mid - (reelW * 3 + gap * 2) / 2;
         int ry = y + 16;
         float stopTwo = total * 0.35f;
         for (int i = 0; i < 3; i++) {
@@ -97,7 +98,7 @@ public final class SlotMachineHud implements IGuiOverlay {
             line = win ? Component.translatable("gamble.jujutsukaisen.jackpot").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
                     : Component.translatable("gamble.jujutsukaisen.miss").withStyle(ChatFormatting.GRAY);
         }
-        graphics.drawCenteredString(font, line, width / 2, ry + reelH + 6, 0xFFFFFF);
+        graphics.drawCenteredString(font, line, mid, ry + reelH + 6, 0xFFFFFF);
         graphics.drawString(font, indicator.displayName(), x + 4, y + boxH - 10, 0xFFFFFF);
     }
 

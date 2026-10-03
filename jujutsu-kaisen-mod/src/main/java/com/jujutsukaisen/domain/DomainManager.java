@@ -19,6 +19,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundClearTitlesPacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -474,6 +475,7 @@ public final class DomainManager {
             for (ServerPlayer player : level.players()) {
                 if (player.position().distanceTo(domain.center()) <= domain.radius() + 48) {
                     ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), stop);
+                    player.connection.send(new ClientboundClearTitlesPacket(true)); // the riichi call
                 }
             }
             domain.spinTimer = -1;

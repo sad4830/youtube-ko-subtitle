@@ -195,6 +195,7 @@ public final class ClientShot {
     private static void tidy(Minecraft mc) {
         mc.gui.getChat().clearMessages(false);
         mc.getToasts().clear();
+        mc.gui.clear(); // titles
     }
 
     private static void shot(Minecraft mc, String name) {
