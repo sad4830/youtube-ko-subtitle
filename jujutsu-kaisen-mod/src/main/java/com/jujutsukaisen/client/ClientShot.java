@@ -84,7 +84,26 @@ public final class ClientShot {
             case 440 -> shot(mc, "07_idle_death_gamble_hud");
             case 450 -> server(mc, ClientShot::stageVoid);
             case 520 -> shot(mc, "08_unlimited_void");
-            case 540 -> mc.stop();
+            // ── The player becomes the characters and casts through the normal player path ──
+            case 525 -> {
+                mc.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_FRONT);
+                server(mc, ClientShot::stagePlayerGojo);
+            }
+            case 545 -> {
+                shot(mc, "09_player_gojo_purple");
+                server(mc, ClientShot::checkInfinity);
+            }
+            case 560 -> server(mc, ClientShot::stagePlayerHakari);
+            case 600 -> shot(mc, "10_player_hakari_domain");
+            case 610 -> server(mc, ClientShot::stagePlayerSukuna);
+            case 632 -> shot(mc, "11_player_sukuna_world_slash");
+            case 640 -> {
+                mc.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
+                server(mc, ClientShot::stagePlayerFirstPerson);
+            }
+            case 660 -> shot(mc, "12_first_person_gojo_hand");
+            case 670 -> server(mc, ClientShot::playerSummary);
+            case 690 -> mc.stop();
             default -> {
             }
         }
@@ -207,6 +226,72 @@ public final class ClientShot {
         add(level, slash);
         put(level, ModEntities.SHUTTER_DOOR.get(), origin.x + 1, origin.y, z - 1, 0);
         look(player, origin.add(0, 2.4, 0), new Vec3(origin.x, origin.y + 2, z));
+    }
+
+    private static net.minecraft.world.entity.projectile.Arrow testArrow;
+
+    private static SorcererData become(ServerPlayer player, Technique technique) {
+        SorcererData data = JJK.get(player);
+        if (data == null) throw new IllegalStateException("player has no sorcerer data");
+        com.jujutsukaisen.domain.DomainManager.cancel(player);
+        data.setTechnique(technique);
+        if (technique == Technique.SHRINE) data.setFingers(SorcererData.MAX_FINGERS);
+        data.setAppearance(true);
+        data.setBurnout(0);
+        data.clearCast();
+        for (Ability a : Ability.values()) data.setCooldown(a, 0);
+        data.setCursedEnergy(data.getMaxCursedEnergy());
+        player.removeEffect(ModEffects.INFORMATION_OVERLOAD.get());
+        player.removeEffect(ModEffects.TECHNIQUE_BURNOUT.get());
+        return data;
+    }
+
+    private static void cast(ServerPlayer player, SorcererData data, Ability ability) {
+        boolean ok = com.jujutsukaisen.sorcery.AbilityHandler.tryUse(player, data, ability);
+        JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: {} cast {} -> {}", data.getTechnique(), ability, ok ? "OK" : "REFUSED");
+    }
+
+    private static void stagePlayerGojo(ServerPlayer player) {
+        clear(player);
+        ServerLevel level = player.serverLevel();
+        SorcererData data = become(player, Technique.LIMITLESS);
+        data.setInfinityEnabled(true);
+        look(player, origin.add(0, 1.62, 0), origin.add(0, 4.5, 6)); // aim Purple at the sky, not the stage
+        cast(player, data, Ability.HOLLOW_PURPLE);
+        // An arrow fired at the player: Infinity must stop it in mid-air.
+        testArrow = new net.minecraft.world.entity.projectile.Arrow(level, origin.x, origin.y + 1.5, origin.z + 7);
+        testArrow.setDeltaMovement(0, 0.05, -1.4);
+        level.addFreshEntity(testArrow);
+        staged.add(testArrow);
+    }
+
+    private static void checkInfinity(ServerPlayer player) {
+        boolean frozen = testArrow != null && testArrow.isAlive()
+                && testArrow.getTags().contains(com.jujutsukaisen.sorcery.SorcererLogic.FROZEN_TAG);
+        JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: Infinity held the arrow={} distance={} playerHealth={}/{}", frozen,
+                testArrow == null ? -1 : String.format("%.2f", testArrow.distanceTo(player)), player.getHealth(), player.getMaxHealth());
+    }
+
+    private static void stagePlayerHakari(ServerPlayer player) {
+        SorcererData data = become(player, Technique.IDLE_DEATH_GAMBLE);
+        cast(player, data, Ability.DOMAIN_IDLE_DEATH_GAMBLE);
+    }
+
+    private static void stagePlayerSukuna(ServerPlayer player) {
+        SorcererData data = become(player, Technique.SHRINE);
+        cast(player, data, Ability.WORLD_SLASH);
+    }
+
+    private static void stagePlayerFirstPerson(ServerPlayer player) {
+        become(player, Technique.LIMITLESS);
+        player.getInventory().clearContent();
+    }
+
+    private static void playerSummary(ServerPlayer player) {
+        SorcererData data = JJK.get(player);
+        JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: final technique={} appearance={} energy={}/{}",
+                data == null ? null : data.getTechnique(), data != null && data.hasAppearance(),
+                data == null ? 0 : (int) data.getCursedEnergy(), data == null ? 0 : (int) data.getMaxCursedEnergy());
     }
 
     private static void add(ServerLevel level, JJKProjectile projectile) {

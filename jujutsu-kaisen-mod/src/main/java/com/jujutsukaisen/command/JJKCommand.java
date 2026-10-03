@@ -48,6 +48,23 @@ public final class JJKCommand {
                                                 data.setCursedEnergy(data.getMaxCursedEnergy());
                                             }, "command.jujutsukaisen.technique", technique.displayName());
                                         }))))
+                .then(Commands.literal("become")
+                        .then(Commands.argument("targets", EntityArgument.players())
+                                .then(Commands.argument("character", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
+                                                new String[]{"satoru_gojo", "kinji_hakari", "ryomen_sukuna", "none"}, builder))
+                                        .executes(ctx -> {
+                                            String character = StringArgumentType.getString(ctx, "character");
+                                            Technique technique = Technique.ofCharacter(character);
+                                            Technique result = technique == null ? Technique.NONE : technique;
+                                            return apply(ctx, (player, data) -> {
+                                                data.setTechnique(result);
+                                                data.setAppearance(technique != null);
+                                                if (result == Technique.SHRINE && data.getFingers() == 0) data.setFingers(1);
+                                                data.setCursedEnergy(data.getMaxCursedEnergy());
+                                            }, "command.jujutsukaisen.become", technique == null ? Component.translatable("technique.jujutsukaisen.none")
+                                                    : Component.translatable("entity.jujutsukaisen." + character));
+                                        }))))
                 .then(Commands.literal("energy")
                         .then(Commands.argument("targets", EntityArgument.players())
                                 .then(Commands.argument("amount", FloatArgumentType.floatArg(0))

@@ -18,7 +18,7 @@ import java.util.function.Supplier;
 /** A jujutsu key was pressed on the client. */
 public class C2SKeyAction {
     public enum Action {
-        USE, NEXT, PREVIOUS, DOMAIN, RCT_START, RCT_STOP, TOGGLE_INFINITY
+        USE, NEXT, PREVIOUS, DOMAIN, RCT_START, RCT_STOP, TOGGLE_INFINITY, TOGGLE_APPEARANCE
     }
 
     private final Action action;
@@ -69,6 +69,16 @@ public class C2SKeyAction {
                 }
             }
             case RCT_STOP -> data.setRctActive(false);
+            case TOGGLE_APPEARANCE -> {
+                if (technique.character() == null) {
+                    tell(player, "message.jujutsukaisen.no_character");
+                } else {
+                    data.setAppearance(!data.hasAppearance());
+                    player.displayClientMessage(Component.translatable(data.hasAppearance()
+                                    ? "message.jujutsukaisen.appearance_on" : "message.jujutsukaisen.appearance_off",
+                            Component.translatable("entity.jujutsukaisen." + technique.character())).withStyle(technique.format()), true);
+                }
+            }
             case TOGGLE_INFINITY -> {
                 if (technique == Technique.LIMITLESS) {
                     data.setInfinityEnabled(!data.isInfinityEnabled());

@@ -11,6 +11,7 @@ public final class KeyBindings {
     public static final KeyMapping DOMAIN = new KeyMapping("key.jujutsukaisen.domain", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, CATEGORY);
     public static final KeyMapping RCT = new KeyMapping("key.jujutsukaisen.rct", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G, CATEGORY);
     public static final KeyMapping INFINITY = new KeyMapping("key.jujutsukaisen.infinity", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, CATEGORY);
+    public static final KeyMapping APPEARANCE = new KeyMapping("key.jujutsukaisen.appearance", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_J, CATEGORY);
 
     private KeyBindings() {
     }

@@ -14,6 +14,7 @@ import com.jujutsukaisen.client.render.FugaRenderer;
 import com.jujutsukaisen.client.render.MahoragaRenderer;
 import com.jujutsukaisen.client.render.MalevolentShrineRenderer;
 import com.jujutsukaisen.client.render.OrbRenderer;
+import com.jujutsukaisen.client.render.PlayerAuraLayer;
 import com.jujutsukaisen.client.render.ShutterDoorRenderer;
 import com.jujutsukaisen.client.render.SlashRenderer;
 import com.jujutsukaisen.client.render.SorcererRenderer;
@@ -69,8 +70,10 @@ public final class ClientSetup {
         for (String skin : event.getSkins()) {
             if (event.getSkin(skin) instanceof PlayerRenderer renderer) {
                 renderer.addLayer(new DharmaWheelLayer(renderer, event.getEntityModels()));
+                renderer.addLayer(new PlayerAuraLayer(renderer));
             }
         }
+        CharacterRenderers.rebuild(event.getContext());
     }
 
     @SubscribeEvent
@@ -80,6 +83,7 @@ public final class ClientSetup {
         event.register(KeyBindings.DOMAIN);
         event.register(KeyBindings.RCT);
         event.register(KeyBindings.INFINITY);
+        event.register(KeyBindings.APPEARANCE);
     }
 
     @SubscribeEvent

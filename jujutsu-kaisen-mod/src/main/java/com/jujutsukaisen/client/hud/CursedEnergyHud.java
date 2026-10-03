@@ -42,9 +42,12 @@ public final class CursedEnergyHud implements IGuiOverlay {
         int barW = 112;
 
         // Keys hint, then the technique name.
-        g.drawString(font, Component.translatable("hud.jujutsukaisen.keys", KeyBindings.USE.getTranslatedKeyMessage(),
-                KeyBindings.CYCLE.getTranslatedKeyMessage(), KeyBindings.DOMAIN.getTranslatedKeyMessage()).withStyle(ChatFormatting.GRAY),
-                x, y - 11, 0xFFFFFF, true);
+        Component keys = Component.translatable("hud.jujutsukaisen.keys", KeyBindings.USE.getTranslatedKeyMessage(),
+                KeyBindings.CYCLE.getTranslatedKeyMessage(), KeyBindings.DOMAIN.getTranslatedKeyMessage());
+        if (technique.character() != null) {
+            keys = keys.copy().append(Component.translatable("hud.jujutsukaisen.keys_appearance", KeyBindings.APPEARANCE.getTranslatedKeyMessage()));
+        }
+        g.drawString(font, keys.copy().withStyle(ChatFormatting.GRAY), x, y - 11, 0xFFFFFF, true);
         g.drawString(font, technique.displayName().copy().withStyle(ChatFormatting.BOLD), x, y, 0xFFFFFF, true);
         y += 11;
 

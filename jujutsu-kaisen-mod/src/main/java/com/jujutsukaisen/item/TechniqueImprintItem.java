@@ -45,8 +45,12 @@ public class TechniqueImprintItem extends Item {
             }
             data.setTechnique(technique);
             data.setCursedEnergy(data.getMaxCursedEnergy());
+            // Taking the technique of a sorcerer you defeated, you also take on their look (toggle with the key).
+            data.setAppearance(true);
             ModNetwork.sync(player, data);
             player.sendSystemMessage(Component.translatable("message.jujutsukaisen.technique_gained", technique.displayName()).withStyle(ChatFormatting.GOLD));
+            player.sendSystemMessage(Component.translatable("message.jujutsukaisen.appearance_hint",
+                    Component.translatable("entity.jujutsukaisen." + technique.character())).withStyle(ChatFormatting.GRAY));
             Fx.burst(level, technique == Technique.LIMITLESS ? Fx.BLUE : Fx.GOLD, player.position().add(0, 1, 0), 60, 0.6, 0.1);
             Fx.sound(player, SoundEvents.PLAYER_LEVELUP, 1.0f, 0.6f);
             Advancements.award(serverPlayer, technique == Technique.LIMITLESS ? "limitless" : "idle_death_gamble");

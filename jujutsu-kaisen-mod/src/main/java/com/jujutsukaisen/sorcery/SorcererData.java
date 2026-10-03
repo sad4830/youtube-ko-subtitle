@@ -37,6 +37,8 @@ public class SorcererData {
     private boolean probabilityUp;
     private int zone;
     private boolean mahoragaTamed;
+    /** Player only: look like the character whose technique you carry (Gojo, Hakari, Sukuna). */
+    private boolean appearance;
 
     @Nullable
     private Ability casting;
@@ -253,6 +255,15 @@ public class SorcererData {
         markDirty();
     }
 
+    public boolean hasAppearance() {
+        return appearance;
+    }
+
+    public void setAppearance(boolean appearance) {
+        this.appearance = appearance;
+        markDirty();
+    }
+
     public boolean isMahoragaTamed() {
         return mahoragaTamed;
     }
@@ -444,6 +455,7 @@ public class SorcererData {
         tag.putInt("JackpotCount", jackpotCount);
         tag.putBoolean("ProbabilityUp", probabilityUp);
         tag.putBoolean("MahoragaTamed", mahoragaTamed);
+        tag.putBoolean("Appearance", appearance);
         tag.putInt("WheelTurns", wheelTurns);
         tag.put("Cooldowns", new IntArrayTag(cooldowns.clone()));
         CompoundTag adapt = new CompoundTag();
@@ -469,6 +481,7 @@ public class SorcererData {
         jackpotCount = tag.getInt("JackpotCount");
         probabilityUp = tag.getBoolean("ProbabilityUp");
         mahoragaTamed = tag.getBoolean("MahoragaTamed");
+        appearance = tag.getBoolean("Appearance");
         wheelTurns = tag.getInt("WheelTurns");
         int[] saved = tag.getIntArray("Cooldowns");
         for (int i = 0; i < Math.min(saved.length, cooldowns.length); i++) cooldowns[i] = saved[i];
@@ -493,6 +506,7 @@ public class SorcererData {
         tag.putBoolean("PUp", probabilityUp);
         tag.putInt("Zone", zone);
         tag.putBoolean("Tamed", mahoragaTamed);
+        tag.putBoolean("Look", appearance);
         tag.putInt("Wheel", wheelTurns);
         tag.putByte("Cast", (byte) (casting == null ? -1 : casting.ordinal()));
         tag.putShort("CastT", (short) castTicks);
@@ -517,6 +531,7 @@ public class SorcererData {
         probabilityUp = tag.getBoolean("PUp");
         zone = tag.getInt("Zone");
         mahoragaTamed = tag.getBoolean("Tamed");
+        appearance = tag.getBoolean("Look");
         wheelTurns = tag.getInt("Wheel");
         casting = Ability.byOrdinal(tag.getByte("Cast"));
         castTicks = tag.getShort("CastT");

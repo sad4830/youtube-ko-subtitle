@@ -22,6 +22,7 @@ add('key.jujutsukaisen.cycle', 'Cycle Technique (Shift: back)', '술식 전환 (
 add('key.jujutsukaisen.domain', 'Domain Expansion', '영역전개')
 add('key.jujutsukaisen.rct', 'Reverse Cursed Technique (hold)', '반전술식 (누르고 있기)')
 add('key.jujutsukaisen.infinity', 'Toggle Infinity', '무한 켜기/끄기')
+add('key.jujutsukaisen.appearance', 'Toggle Character Appearance', '캐릭터 모습 전환')
 
 # ── Entities ───────────────────────────────────────────────────────────────
 add(f'entity.{M}.satoru_gojo', 'Satoru Gojo', '고죠 사토루')
@@ -211,6 +212,11 @@ msgs = {
     'technique_gained': ('Engraved into your brain: %s', '뇌에 술식이 새겨졌다: %s'),
     'already_technique': ('That technique is already engraved in you', '이미 새겨진 술식이다'),
     'indicator': ('[Notice] %s — %s', '[예고] %s — %s'),
+    'appearance_on': ('You look like %s', '%s의 모습이 되었다'),
+    'appearance_off': ('You look like yourself again', '원래 모습으로 돌아왔다'),
+    'appearance_hint': ('You took on the look of %s. Toggle it with the "Toggle Character Appearance" key (default J).',
+                        '%s의 모습이 되었다. 「캐릭터 모습 전환」 키(기본 J)로 켜고 끌 수 있다.'),
+    'no_character': ('Your technique has no character look', '이 술식에는 캐릭터 모습이 없다'),
 }
 for k, (en, ko) in msgs.items():
     add(f'message.{M}.{k}', en, ko)
@@ -220,6 +226,7 @@ add(f'hud.{M}.cursed_energy', 'CE %s', '주력 %s')
 add(f'hud.{M}.burnout', 'Technique burnt out: %ss', '술식 타버림: %s초')
 add(f'hud.{M}.jackpot', 'JACKPOT  %s', '대박  %s')
 add(f'hud.{M}.keys', '[%s] Technique  [%s] Cycle  [%s] Domain', '[%s] 술식  [%s] 전환  [%s] 영역전개')
+add(f'hud.{M}.keys_appearance', '  [%s] Look', '  [%s] 모습')
 
 # ── Adaptation (phenomena) ─────────────────────────────────────────────────
 adapt = {
@@ -261,6 +268,7 @@ for k, (en, ko) in deaths.items():
 
 # ── Commands ───────────────────────────────────────────────────────────────
 add(f'command.{M}.technique', 'Set the technique of %s player(s) to %s', '플레이어 %s명의 술식을 %s(으)로 설정')
+add(f'command.{M}.become', '%s player(s) became %s', '플레이어 %s명이 %s(이)가 되었다')
 add(f'command.{M}.energy', 'Set the cursed energy of %s player(s) to %s', '플레이어 %s명의 주력을 %s(으)로 설정')
 add(f'command.{M}.fingers', "Set Sukuna's fingers of %s player(s) to %s", '플레이어 %s명의 스쿠나 손가락을 %s개로 설정')
 add(f'command.{M}.tamed', '%s player(s) now have a tamed Mahoraga%s', '플레이어 %s명이 마허라를 길들였다%s')

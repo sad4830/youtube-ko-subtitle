@@ -64,6 +64,25 @@ public enum Technique {
         return name().toLowerCase(Locale.ROOT);
     }
 
+    /** The character whose look a player may take on with this technique (entity id), or null. */
+    @Nullable
+    public String character() {
+        return switch (this) {
+            case LIMITLESS -> "satoru_gojo";
+            case SHRINE -> "ryomen_sukuna";
+            case IDLE_DEATH_GAMBLE -> "kinji_hakari";
+            case NONE -> null;
+        };
+    }
+
+    @Nullable
+    public static Technique ofCharacter(String character) {
+        for (Technique t : values()) {
+            if (character.equals(t.character())) return t;
+        }
+        return null;
+    }
+
     public Component displayName() {
         return Component.translatable("technique.jujutsukaisen." + id()).withStyle(format);
     }
