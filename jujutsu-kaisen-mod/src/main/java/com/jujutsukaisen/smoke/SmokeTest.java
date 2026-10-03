@@ -53,6 +53,7 @@ public final class SmokeTest {
         server = srv;
         ServerLevel level = server.overworld();
         try {
+            checkEnums();
             checkData(level);
             // Fight away from spawn so the client screenshot stage stays intact.
             BlockPos spawn = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, level.getSharedSpawnPos().offset(80, 0, 0));
@@ -79,6 +80,30 @@ public final class SmokeTest {
         mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.COMMAND, null, null);
         level.addFreshEntity(mob);
         return mob;
+    }
+
+    private static void checkEnums() {
+        for (Ability ability : Ability.values()) {
+            if (ability.technique() == null) fail("ability " + ability + " has no technique (class init cycle)");
+            else if (!ability.isDomain() && !ability.technique().abilities().contains(ability)) fail("ability " + ability + " not listed by its technique");
+        }
+        for (com.jujutsukaisen.sorcery.Technique t : com.jujutsukaisen.sorcery.Technique.values()) {
+            if (t != com.jujutsukaisen.sorcery.Technique.NONE && (t.domain() == null || t.domain().ability().technique() != t)) {
+                fail("technique " + t + " has a broken domain link");
+            }
+        }
+    }
+
+    /** The normal cast path (cooldowns, cost, requirements) must accept a fresh, full-energy caster. */
+    private static void tryUseOnce(net.minecraft.world.entity.LivingEntity caster, SorcererData data, Ability ability) {
+        data.clearCast();
+        data.setBurnout(0);
+        data.setCooldown(ability, 0);
+        data.setCursedEnergy(data.getMaxCursedEnergy());
+        boolean ok = AbilityHandler.tryUse(caster, data, ability);
+        if (ok) AbilityHandler.aiCasts--; // forced by the test, not chosen by the AI
+        JujutsuKaisen.LOGGER.info("JJK-SMOKETEST: tryUse {} -> {}", ability, ok);
+        if (!ok) fail("tryUse refused " + ability + " for a ready caster");
     }
 
     private static void checkData(ServerLevel level) {
@@ -145,6 +170,9 @@ public final class SmokeTest {
                     case 420 -> force(sukuna.getSorcererData(), sukuna, Ability.DOMAIN_MALEVOLENT_SHRINE);
                     case 560 -> force(hakari.getSorcererData(), hakari, Ability.DOMAIN_IDLE_DEATH_GAMBLE);
                     case 700 -> DomainManager.grantJackpot(hakari, hakari.getSorcererData());
+                    case 760 -> tryUseOnce(gojo, gojo.getSorcererData(), Ability.RED);
+                    case 780 -> tryUseOnce(sukuna, sukuna.getSorcererData(), Ability.DISMANTLE);
+                    case 800 -> tryUseOnce(hakari, hakari.getSorcererData(), Ability.RESERVE_BALLS);
                     default -> {
                     }
                 }
@@ -164,6 +192,8 @@ public final class SmokeTest {
             JujutsuKaisen.LOGGER.info("JJK-SMOKETEST: Mahoraga wheel turns = {}, adaptations = {}",
                     mahoraga.getWheelTurns(), mahoraga.getSorcererData().adaptationView());
         }
+        JujutsuKaisen.LOGGER.info("JJK-SMOKETEST: casts started by the characters' own AI = {}", AbilityHandler.aiCasts);
+        if (AbilityHandler.aiCasts < 3) fail("the characters' AI started only " + AbilityHandler.aiCasts + " casts in a minute of fighting");
         if (FAILURES.isEmpty()) {
             JujutsuKaisen.LOGGER.info("JJK-SMOKETEST: PASS");
         } else {

@@ -80,6 +80,12 @@ jobs:
           git commit -m "Update in-game screenshots [skip ci]" || exit 0
           git push origin HEAD:${GITHUB_REF_NAME}
 
+      - name: Check player technique test
+        if: hashFiles('jujutsu-kaisen-mod/ci/screenshots.enabled') != ''
+        run: |
+          grep -E "JJK-PLAYERTEST" client.log || true
+          grep -q "JJK-PLAYERTEST: PASS" client.log
+
       - name: API signature probe (javap)
         if: always() && hashFiles('jujutsu-kaisen-mod/ci/javap-classes.txt') != ''
         continue-on-error: true

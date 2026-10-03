@@ -23,6 +23,9 @@ public final class AbilityHandler {
     private AbilityHandler() {
     }
 
+    /** Casts started by the character entities' own AI (read by the CI smoke test). */
+    public static int aiCasts;
+
     /** Attempts to use an ability. Returns true if it started (or executed). */
     public static boolean tryUse(LivingEntity caster, SorcererData data, Ability ability) {
         if (caster.level().isClientSide || !caster.isAlive()) return false;
@@ -48,6 +51,7 @@ public final class AbilityHandler {
             fail(caster, "message.jujutsukaisen.no_energy", ability.displayName());
             return false;
         }
+        if (caster instanceof SorcererEntity) aiCasts++;
         int cd = ability.cooldown();
         if (data.isJackpot()) cd /= 2;
         if (caster instanceof SorcererEntity sorcerer) cd = (int) (cd * sorcerer.cooldownMultiplier());

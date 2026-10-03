@@ -246,8 +246,11 @@ public final class ClientShot {
         return data;
     }
 
+    private static int playerFailures;
+
     private static void cast(ServerPlayer player, SorcererData data, Ability ability) {
         boolean ok = com.jujutsukaisen.sorcery.AbilityHandler.tryUse(player, data, ability);
+        if (!ok) playerFailures++;
         JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: {} cast {} -> {}", data.getTechnique(), ability, ok ? "OK" : "REFUSED");
     }
 
@@ -268,6 +271,7 @@ public final class ClientShot {
     private static void checkInfinity(ServerPlayer player) {
         boolean frozen = testArrow != null && testArrow.isAlive()
                 && testArrow.getTags().contains(com.jujutsukaisen.sorcery.SorcererLogic.FROZEN_TAG);
+        if (!frozen) playerFailures++;
         JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: Infinity held the arrow={} distance={} playerHealth={}/{}", frozen,
                 testArrow == null ? -1 : String.format("%.2f", testArrow.distanceTo(player)), player.getHealth(), player.getMaxHealth());
     }
@@ -289,6 +293,7 @@ public final class ClientShot {
 
     private static void playerSummary(ServerPlayer player) {
         SorcererData data = JJK.get(player);
+        JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: {}", playerFailures == 0 ? "PASS" : "FAIL (" + playerFailures + ")");
         JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: final technique={} appearance={} energy={}/{}",
                 data == null ? null : data.getTechnique(), data != null && data.hasAppearance(),
                 data == null ? 0 : (int) data.getCursedEnergy(), data == null ? 0 : (int) data.getMaxCursedEnergy());
