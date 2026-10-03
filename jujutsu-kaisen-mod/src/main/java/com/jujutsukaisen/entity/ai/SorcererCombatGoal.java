@@ -1,6 +1,7 @@
 package com.jujutsukaisen.entity.ai;
 
 import com.jujutsukaisen.entity.SorcererEntity;
+import com.jujutsukaisen.registry.ModEffects;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -49,6 +50,10 @@ public class SorcererCombatGoal extends Goal {
     public void tick() {
         LivingEntity target = mob.getTarget();
         if (target == null) return;
+        if (mob.hasEffect(ModEffects.INFORMATION_OVERLOAD.get())) {
+            mob.getNavigation().stop();
+            return;
+        }
         mob.getLookControl().setLookAt(target, 40f, 40f);
         if (mob.getSorcererData().getCasting() != null) {
             mob.getNavigation().stop();

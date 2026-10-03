@@ -88,10 +88,30 @@ public class DismantleEntity extends JJKProjectile {
         Vec3 now = getBoundingBox().getCenter();
         Vec3 before = now.subtract(velocity);
         float scale = getScale();
-        AABB swept = new AABB(before, now).inflate(0.7 * scale);
         double traveled = origin == Vec3.ZERO ? age * velocity.length() : position().distanceTo(origin);
         float power = (float) Math.max(0.45, 1.0 - traveled / 70.0);
 
+        // Walk this tick's path block by block (it moves 2.6 blocks a tick): soft matter is cut, hard matter stops
+        // the slash, and nobody behind that point is hit.
+        Vec3 stop = null;
+        int steps = Math.max(1, (int) Math.ceil(velocity.length() / 0.5));
+        BlockPos last = null;
+        for (int i = 1; i <= steps && stop == null; i++) {
+            Vec3 p = before.add(velocity.scale(i / (double) steps));
+            BlockPos pos = BlockPos.containing(p);
+            if (pos.equals(last)) continue;
+            last = pos;
+            if (level().getBlockState(pos).isAir()) continue;
+            boolean cut = blocksLeft > 0 && JJK.canGrief(owner, false) && Blast.cut(level(), owner, pos, 3.0f, true);
+            if (cut) {
+                blocksLeft--;
+                Blast.cut(level(), owner, pos.above(), 3.0f, false);
+            } else if (level().getBlockState(pos).blocksMotion()) {
+                stop = p;
+            }
+        }
+
+        AABB swept = new AABB(before, stop != null ? stop : now).inflate(0.7 * scale);
         for (LivingEntity living : level().getEntitiesOfClass(LivingEntity.class, swept,
                 e -> canHitEntity(e) && owner != null && JJK.canHit(owner, e))) {
             if (!hit.add(living.getId())) continue;
@@ -103,18 +123,11 @@ public class DismantleEntity extends JJKProjectile {
             Fx.burst(level(), ParticleTypes.SWEEP_ATTACK, living.getBoundingBox().getCenter(), 1, 0, 0);
         }
 
-        // Cut through soft matter along the path; hard matter stops the slash.
-        BlockPos pos = BlockPos.containing(now);
-        if (!level().getBlockState(pos).isAir()) {
-            boolean cut = blocksLeft > 0 && JJK.canGrief(owner, false) && Blast.cut(level(), owner, pos, 3.0f, true);
-            if (cut) {
-                blocksLeft--;
-                Blast.cut(level(), owner, pos.above(), 3.0f, false);
-            } else if (level().getBlockState(pos).blocksMotion()) {
-                Fx.burst(level(), ParticleTypes.CRIT, now, 10, 0.2, 0.2);
-                Fx.sound(level(), now, SoundEvents.ANVIL_PLACE, 0.5f, 1.8f);
-                discard();
-            }
+        if (stop != null) {
+            Fx.burst(level(), ParticleTypes.CRIT, stop, 10, 0.2, 0.2);
+            Fx.sound(level(), stop, SoundEvents.ANVIL_PLACE, 0.5f, 1.8f);
+            discard();
+            return;
         }
         if (age == 1) Fx.sound(level(), now, SoundEvents.PLAYER_ATTACK_SWEEP, 1.2f, 1.6f);
     }

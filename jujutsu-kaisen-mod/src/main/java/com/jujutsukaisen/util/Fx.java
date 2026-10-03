@@ -38,6 +38,25 @@ public final class Fx {
         }
     }
 
+    /**
+     * Particles at a caster's hands or just in front of their eyes. Everyone else sees them as given; the caster
+     * gets fewer, smaller ones, because in first person they sit right in front of the camera and fill the view.
+     */
+    public static void casterBurst(LivingEntity caster, ParticleOptions particle, Vec3 pos, int count, double spread, double speed) {
+        if (!(caster.level() instanceof ServerLevel server)) return;
+        for (ServerPlayer viewer : server.players()) {
+            if (viewer == caster) {
+                ParticleOptions own = particle instanceof DustParticleOptions dust && dust.getScale() > OWN_DUST_SCALE
+                        ? new DustParticleOptions(dust.getColor(), OWN_DUST_SCALE) : particle;
+                server.sendParticles(viewer, own, false, pos.x, pos.y, pos.z, Math.max(1, count / 2), spread, spread, spread, speed);
+            } else {
+                server.sendParticles(viewer, particle, false, pos.x, pos.y, pos.z, count, spread, spread, spread, speed);
+            }
+        }
+    }
+
+    private static final float OWN_DUST_SCALE = 0.5f;
+
     public static void burst(Level level, ParticleOptions particle, Vec3 pos, int count, double sx, double sy, double sz, double speed) {
         if (level instanceof ServerLevel server) {
             server.sendParticles(particle, pos.x, pos.y, pos.z, count, sx, sy, sz, speed);

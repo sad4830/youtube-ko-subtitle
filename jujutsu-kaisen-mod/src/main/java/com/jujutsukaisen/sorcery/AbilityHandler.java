@@ -130,7 +130,7 @@ public final class AbilityHandler {
     public static void tickCast(LivingEntity caster, SorcererData data) {
         Ability ability = data.getCasting();
         if (ability == null) return;
-        if (caster.hasEffect(ModEffects.INFORMATION_OVERLOAD.get()) || data.isBurntOut()) {
+        if (!caster.isAlive() || caster.hasEffect(ModEffects.INFORMATION_OVERLOAD.get()) || data.isBurntOut()) {
             data.clearCast();
             return;
         }
@@ -143,7 +143,7 @@ public final class AbilityHandler {
 
         switch (ability) {
             case HOLLOW_PURPLE -> Limitless.chargePurple(caster, elapsed, data.getCastTotal());
-            case RED -> Fx.burst(caster.level(), Fx.RED, Fx.hand(caster, true), 4, 0.08, 0.0);
+            case RED -> Fx.casterBurst(caster, Fx.RED, Fx.hand(caster, true), 4, 0.08, 0.0);
             case FUGA -> Shrine.chargeFuga(caster, elapsed);
             case WORLD_SLASH -> Shrine.chantWorldSlash(caster, elapsed, data.getCastTotal());
             default -> {

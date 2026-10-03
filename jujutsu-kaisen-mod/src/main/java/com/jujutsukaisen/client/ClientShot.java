@@ -87,8 +87,10 @@ public final class ClientShot {
             // ── The player becomes the characters and casts through the normal player path ──
             case 525 -> {
                 mc.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_FRONT);
+                tidy(mc);
                 server(mc, ClientShot::stagePlayerGojo);
             }
+            case 542, 632, 664, 737 -> mc.getToasts().clear(); // advancement toasts would cover the scene
             case 545 -> {
                 shot(mc, "09_player_gojo_purple");
                 server(mc, ClientShot::checkInfinity);
@@ -96,19 +98,33 @@ public final class ClientShot {
             // Each check runs well after the wind-up ends (Purple 36, World Slash 45 ticks) and before the next
             // stage changes technique, which would cancel a cast still winding up.
             case 590 -> server(mc, s -> verifyExecuted(s, Ability.HOLLOW_PURPLE));
-            case 595 -> server(mc, ClientShot::stagePlayerHakari);
+            case 595 -> {
+                tidy(mc);
+                server(mc, ClientShot::stagePlayerHakari);
+            }
             case 635 -> shot(mc, "10_player_hakari_domain");
             case 640 -> server(mc, s -> verifyExecuted(s, Ability.DOMAIN_IDLE_DEATH_GAMBLE));
-            case 645 -> server(mc, ClientShot::stagePlayerSukuna);
+            case 645 -> {
+                tidy(mc);
+                SlotMachineHud.stop();
+                server(mc, ClientShot::stagePlayerSukuna);
+            }
             case 667 -> shot(mc, "11_player_sukuna_world_slash");
             case 715 -> server(mc, s -> verifyExecuted(s, Ability.WORLD_SLASH));
             case 720 -> {
                 mc.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);
+                tidy(mc);
+                SlotMachineHud.stop();
                 server(mc, ClientShot::stagePlayerFirstPerson);
             }
             case 740 -> shot(mc, "12_first_person_gojo_hand");
-            case 750 -> server(mc, ClientShot::playerSummary);
-            case 770 -> mc.stop();
+            // Sorcerer data must survive a dimension change and a death respawn (both revive the player's caps).
+            case 750 -> server(mc, ClientShot::toNether);
+            case 760 -> server(mc, ClientShot::backFromNether);
+            case 770 -> server(mc, ClientShot::respawn);
+            case 785 -> checkClientSync(mc);
+            case 790 -> server(mc, ClientShot::playerSummary);
+            case 810 -> mc.stop();
             default -> {
             }
         }
@@ -126,6 +142,12 @@ public final class ClientShot {
                 JujutsuKaisen.LOGGER.error("ClientShot stage failed", t);
             }
         });
+    }
+
+    /** Clears chat and toasts left over from the previous scene. */
+    private static void tidy(Minecraft mc) {
+        mc.gui.getChat().clearMessages(false);
+        mc.getToasts().clear();
     }
 
     private static void shot(Minecraft mc, String name) {
@@ -309,7 +331,53 @@ public final class ClientShot {
         player.getInventory().clearContent();
     }
 
+    private static net.minecraft.world.phys.Vec3 beforeNether;
+    private static volatile boolean clientSynced;
+
+    /** Technique, look and fingers this test expects the player to still have. */
+    private static boolean kept(@org.jetbrains.annotations.Nullable SorcererData data) {
+        return data != null && data.getTechnique() == Technique.LIMITLESS && data.hasAppearance();
+    }
+
+    private static void toNether(ServerPlayer player) {
+        ServerLevel nether = player.server.getLevel(net.minecraft.world.level.Level.NETHER);
+        if (nether == null) {
+            playerFailures++;
+            JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: no nether level");
+            return;
+        }
+        beforeNether = player.position();
+        player.setGameMode(net.minecraft.world.level.GameType.CREATIVE); // no suffocation in the nether roof
+        player.teleportTo(nether, 0.5, 128.0, 0.5, player.getYRot(), player.getXRot());
+        boolean ok = kept(JJK.get(player));
+        if (!ok) playerFailures++;
+        JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: data after entering the nether kept={}", ok);
+    }
+
+    private static void backFromNether(ServerPlayer player) {
+        ServerLevel overworld = player.server.overworld();
+        net.minecraft.world.phys.Vec3 to = beforeNether != null ? beforeNether : origin;
+        player.teleportTo(overworld, to.x, to.y, to.z, player.getYRot(), player.getXRot());
+        boolean ok = kept(JJK.get(player));
+        if (!ok) playerFailures++;
+        JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: data after returning to the overworld kept={}", ok);
+    }
+
+    private static void respawn(ServerPlayer player) {
+        // keepEverything=false is the death respawn: a new player entity, filled by PlayerEvent.Clone (wasDeath).
+        ServerPlayer respawned = player.server.getPlayerList().respawn(player, false);
+        boolean ok = kept(JJK.get(respawned));
+        if (!ok) playerFailures++;
+        JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: data after a death respawn kept={}", ok);
+    }
+
+    private static void checkClientSync(Minecraft mc) {
+        clientSynced = mc.player != null && kept(JJK.get(mc.player));
+    }
+
     private static void playerSummary(ServerPlayer player) {
+        if (!clientSynced) playerFailures++;
+        JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: client copy after the respawn synced={}", clientSynced);
         SorcererData data = JJK.get(player);
         JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: {}", playerFailures == 0 ? "PASS" : "FAIL (" + playerFailures + ")");
         JujutsuKaisen.LOGGER.info("JJK-PLAYERTEST: final technique={} appearance={} energy={}/{}",

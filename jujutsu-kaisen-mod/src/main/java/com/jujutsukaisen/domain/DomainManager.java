@@ -26,6 +26,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
@@ -96,7 +97,7 @@ public final class DomainManager {
             case MALEVOLENT_SHRINE -> Fx.ring(caster.level(), Fx.CRIMSON, caster.position().add(0, 0.1, 0), 1.2 + elapsed * 0.25, 20);
             case IDLE_DEATH_GAMBLE -> Fx.ring(caster.level(), Fx.GOLD, caster.position().add(0, 0.1, 0), 1.2 + elapsed * 0.4, 20);
         }
-        Fx.burst(caster.level(), Fx.BLACK, c, 6, 0.4, 0.0);
+        Fx.casterBurst(caster, Fx.BLACK, c, 6, 0.4, 0.0);
     }
 
     public static void expand(LivingEntity caster, SorcererData data, DomainType type) {
@@ -244,6 +245,14 @@ public final class DomainManager {
         return level.getEntitiesOfClass(LivingEntity.class, box, e -> domain.contains(e.getBoundingBox().getCenter()) && JJK.canHit(caster, e));
     }
 
+    /** A sure-hit lands where the victim stands: it hurts without knocking them away from the caster. */
+    private static boolean sureHit(LivingEntity victim, DamageSource source, float amount) {
+        Vec3 motion = victim.getDeltaMovement();
+        boolean hit = victim.hurt(source, amount);
+        if (hit) victim.setDeltaMovement(motion);
+        return hit;
+    }
+
     /** 무량공처 — the sure-hit pours infinite information into everyone inside. */
     private static void tickInfiniteVoid(ServerLevel level, ActiveDomain domain, LivingEntity caster) {
         AABB touch = caster.getBoundingBox().inflate(0.35);
@@ -262,7 +271,7 @@ public final class DomainManager {
                 victim.addEffect(new MobEffectInstance(ModEffects.INFORMATION_OVERLOAD.get(), 30, 0, false, false, true));
             }
             if (domain.age % 20 == 0) {
-                victim.hurt(ModDamageTypes.source(level, ModDamageTypes.INFINITE_VOID, caster), 2.0f);
+                sureHit(victim, ModDamageTypes.source(level, ModDamageTypes.INFINITE_VOID, caster), 2.0f);
             }
         }
         if (domain.age % 2 == 0) {
@@ -283,10 +292,11 @@ public final class DomainManager {
     private static void tickMalevolentShrine(ServerLevel level, ActiveDomain domain, LivingEntity caster) {
         RandomSource random = level.random;
         double r = domain.radius();
-        if (domain.age % 4 == 0) {
+        // Every 12 ticks: a hit every 4 ticks would mostly land inside the victim's hurt cooldown and do nothing.
+        if (domain.age % 12 == 0) {
             for (LivingEntity victim : victims(level, domain, caster)) {
                 float damage = 2.5f + victim.getMaxHealth() * 0.035f;
-                if (victim.hurt(ModDamageTypes.source(level, ModDamageTypes.MALEVOLENT_SHRINE, caster), damage)) {
+                if (sureHit(victim, ModDamageTypes.source(level, ModDamageTypes.MALEVOLENT_SHRINE, caster), damage)) {
                     Vec3 c = victim.getBoundingBox().getCenter();
                     level.sendParticles(ParticleTypes.SWEEP_ATTACK, c.x, c.y, c.z, 2, 0.4, 0.5, 0.4, 0);
                     level.sendParticles(Fx.CRIMSON, c.x, c.y, c.z, 8, 0.4, 0.6, 0.4, 0);
@@ -369,7 +379,8 @@ public final class DomainManager {
     public static void onGambleIndicator(LivingEntity caster, com.jujutsukaisen.sorcery.Ability ability) {
         ActiveDomain domain = find(caster);
         SorcererData data = JJK.get(caster);
-        if (domain == null || data == null || domain.type() != DomainType.IDLE_DEATH_GAMBLE || domain.isSpinning()) return;
+        if (domain == null || data == null || domain.type() != DomainType.IDLE_DEATH_GAMBLE) return;
+        // Used mid-spin, it plays right after the current spin (tickIdleDeathGamble only starts one when idle).
         domain.queuedIndicator = data.getLastIndicator();
         // Four pseudo-consecutives in a row guarantee the jackpot.
         if (data.getPseudoStreak() >= 4) {
@@ -393,7 +404,7 @@ public final class DomainManager {
         int[] reels = {number, number, third};
         domain.spins++;
         domain.spinWins = win;
-        int ticks = data.getJackpotCount() > 0 && data.getJackpotCount() % 2 == 0 ? TIME_SHORT_SPIN_TICKS : SPIN_TICKS;
+        int ticks = data.isTimeShort() ? TIME_SHORT_SPIN_TICKS : SPIN_TICKS;
         domain.spinTimer = ticks;
 
         S2CSlotSpin packet = new S2CSlotSpin(reels, indicator.ordinal(), riichi.ordinal(), win, ticks, domain.spins);
@@ -427,6 +438,7 @@ public final class DomainManager {
         data.setJackpotCount(data.getJackpotCount() + 1);
         // Odd jackpot → increased probability (확변) for the next expansion; even → time-shortening (시단).
         data.setProbabilityUp(data.getJackpotCount() % 2 == 1);
+        data.setTimeShort(data.getJackpotCount() % 2 == 0);
         data.setBurnout(0);
         caster.removeEffect(ModEffects.TECHNIQUE_BURNOUT.get());
         caster.addEffect(new MobEffectInstance(ModEffects.JACKPOT.get(), round, 0, false, true, true));
@@ -456,6 +468,16 @@ public final class DomainManager {
         if (domain.closed) return;
         domain.closed = true;
         removeBarrier(level, domain);
+        // A spin cut short (Hakari killed, domain cancelled or broken) must not go on to show a result.
+        if (domain.isSpinning() && reason != CloseReason.JACKPOT) {
+            S2CSlotSpin stop = new S2CSlotSpin(new int[]{0, 0, 0}, 0, 0, false, S2CSlotSpin.STOP, domain.spins);
+            for (ServerPlayer player : level.players()) {
+                if (player.position().distanceTo(domain.center()) <= domain.radius() + 48) {
+                    ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), stop);
+                }
+            }
+            domain.spinTimer = -1;
+        }
         if (domain.shrine != null) {
             domain.shrine.collapse();
             domain.shrine = null;
@@ -468,6 +490,11 @@ public final class DomainManager {
         if (caster == null || data == null || reason == CloseReason.SHUTDOWN) return;
         data.setPseudoStreak(0);
         if (domain.type() == DomainType.MALEVOLENT_SHRINE) data.setLastShrineDomain(level.getGameTime());
+        // The bonus from the last jackpot was for this expansion; one that ends without a new jackpot uses it up.
+        if (domain.type() == DomainType.IDLE_DEATH_GAMBLE && reason != CloseReason.JACKPOT) {
+            data.setProbabilityUp(false);
+            data.setTimeShort(false);
+        }
         if (reason == CloseReason.CLASH_LOST) {
             Fx.title(level, domain.center(), domain.radius() + 16, Component.empty(),
                     Component.translatable("domain.jujutsukaisen.clash_lost", caster.getDisplayName()).withStyle(ChatFormatting.GRAY));

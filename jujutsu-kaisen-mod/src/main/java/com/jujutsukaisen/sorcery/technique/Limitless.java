@@ -56,9 +56,9 @@ public final class Limitless {
         Vec3 front = caster.getEyePosition().add(JJK.aim(caster).scale(1.1)).subtract(0, 0.3, 0);
         Vec3 right = Fx.hand(caster, true).lerp(front, t * t);
         Vec3 left = Fx.hand(caster, false).lerp(front, t * t);
-        Fx.burst(level, Fx.RED, right, 5, 0.12, 0.0);
-        Fx.burst(level, Fx.BLUE, left, 5, 0.12, 0.0);
-        if (t > 0.6f) Fx.burst(level, Fx.PURPLE, front, 4, 0.2, 0.0);
+        Fx.casterBurst(caster, Fx.RED, right, 5, 0.12, 0.0);
+        Fx.casterBurst(caster, Fx.BLUE, left, 5, 0.12, 0.0);
+        if (t > 0.6f) Fx.casterBurst(caster, Fx.PURPLE, front, 4, 0.2, 0.0);
         if (elapsed % 8 == 0) Fx.sound(level, front, SoundEvents.BEACON_AMBIENT, 2.0f, 0.6f + t);
         if (elapsed == 1 && caster instanceof Mob) Fx.say(caster, "chant.jujutsukaisen.hollow_purple", 48);
     }

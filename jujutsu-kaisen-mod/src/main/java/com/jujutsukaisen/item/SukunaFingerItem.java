@@ -81,7 +81,14 @@ public class SukunaFingerItem extends Item {
 
     @Override
     public InteractionResult interactLivingEntity(ItemStack stack, Player player, LivingEntity target, InteractionHand hand) {
-        if (!(target instanceof AbstractVillager villager)) return InteractionResult.PASS;
+        return target instanceof AbstractVillager villager ? incarnate(stack, player, villager) : InteractionResult.PASS;
+    }
+
+    /**
+     * Feeding a finger to a villager makes Sukuna incarnate in them. Called from PlayerInteractEvent.EntityInteract,
+     * because villagers and wandering traders take the right-click for trading before the item ever sees it.
+     */
+    public static InteractionResult incarnate(ItemStack stack, Player player, AbstractVillager villager) {
         if (player.level() instanceof ServerLevel server) {
             SukunaEntity sukuna = ModEntities.RYOMEN_SUKUNA.get().create(server);
             if (sukuna == null) return InteractionResult.PASS;

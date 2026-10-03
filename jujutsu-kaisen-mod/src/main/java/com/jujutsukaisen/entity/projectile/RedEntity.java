@@ -3,10 +3,12 @@ package com.jujutsukaisen.entity.projectile;
 import com.jujutsukaisen.registry.ModDamageTypes;
 import com.jujutsukaisen.registry.ModEntities;
 import com.jujutsukaisen.sorcery.JJK;
+import com.jujutsukaisen.sorcery.SorcererLogic;
 import com.jujutsukaisen.util.Blast;
 import com.jujutsukaisen.util.Fx;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
@@ -67,7 +69,10 @@ public class RedEntity extends JJKProjectile {
             double dist = offset.length();
             if (dist > radius) continue;
             double falloff = 1.0 - dist / radius;
-            living.hurt(ModDamageTypes.source(level(), ModDamageTypes.LIMITLESS, this, owner), (float) (9 + 17 * falloff));
+            DamageSource source = ModDamageTypes.source(level(), ModDamageTypes.LIMITLESS, this, owner);
+            boolean blocked = SorcererLogic.infinityBlocks(living, source);
+            living.hurt(source, (float) (9 + 17 * falloff));
+            if (blocked) continue; // Infinity: nothing reaches them, not even the blast
             Vec3 dir = dist < 0.2 ? forward : offset.normalize();
             living.setDeltaMovement(living.getDeltaMovement().add(dir.scale(1.4 + 2.8 * falloff)).add(0, 0.35 + 0.45 * falloff, 0));
             living.hurtMarked = true;

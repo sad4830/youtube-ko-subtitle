@@ -32,6 +32,11 @@ public final class BlackFlash {
     private BlackFlash() {
     }
 
+    /** Forgets every pending strike (server stopping: the next world starts from a different game time). */
+    public static void clear() {
+        FULL_STRIKES.clear();
+    }
+
     /** Remember that a player started a fully charged swing this tick. */
     public static void markStrike(Player player) {
         if (player.getAttackStrengthScale(0.5f) > 0.9f) {
@@ -46,7 +51,9 @@ public final class BlackFlash {
         if (data == null || data.getCursedEnergy() < 10f) return amount;
         if (attacker instanceof Player player) {
             Long tick = FULL_STRIKES.remove(player.getUUID());
-            if (tick == null || player.level().getGameTime() - tick > 1) return amount;
+            if (tick == null) return amount;
+            long age = player.level().getGameTime() - tick;
+            if (age < 0 || age > 1) return amount; // stale, or left over from another world
         }
 
         double chance = data.getZone() > 0 ? JJKConfig.BLACK_FLASH_ZONE_CHANCE.get() : JJKConfig.BLACK_FLASH_CHANCE.get();

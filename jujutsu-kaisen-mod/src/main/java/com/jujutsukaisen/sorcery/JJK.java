@@ -113,6 +113,11 @@ public final class JJK {
         if (caster instanceof MahoragaEntity a && other instanceof MahoragaEntity b
                 && a.getOwnerUUID() != null && a.getOwnerUUID().equals(b.getOwnerUUID())) return true;
         if (caster instanceof SorcererEntity a && other instanceof SorcererEntity b) return a.isFriendlyWith(b);
+        // A tamed Mahoraga fights for its owner: whoever is the owner's ally is its ally too.
+        if (caster instanceof MahoragaEntity m && m.getOwner() instanceof LivingEntity owner && owner != caster
+                && !(owner instanceof MahoragaEntity) && isAlly(owner, other)) return true;
+        if (other instanceof MahoragaEntity m && m.getOwner() instanceof LivingEntity owner && owner != other
+                && !(owner instanceof MahoragaEntity) && isAlly(caster, owner)) return true;
         // Never hit your own tamed animals.
         if (other instanceof net.minecraft.world.entity.OwnableEntity pet && caster.getUUID().equals(pet.getOwnerUUID())) return true;
         return false;

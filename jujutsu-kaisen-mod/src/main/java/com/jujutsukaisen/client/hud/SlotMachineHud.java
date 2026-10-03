@@ -42,6 +42,11 @@ public final class SlotMachineHud implements IGuiOverlay {
         startTick = mc.level == null ? 0 : mc.level.getGameTime();
     }
 
+    /** Hides the machine immediately. */
+    public static void stop() {
+        startTick = -100000;
+    }
+
     @Override
     public void render(ForgeGui gui, GuiGraphics graphics, float partialTick, int width, int height) {
         Minecraft mc = Minecraft.getInstance();
@@ -51,7 +56,10 @@ public final class SlotMachineHud implements IGuiOverlay {
         Font font = mc.font;
 
         int boxW = 168, boxH = 74;
-        int x = (width - boxW) / 2, y = 18;
+        // Centred below the boss bars, nudged right if the cursed-energy block (top left) is in the way.
+        int x = Math.max((width - boxW) / 2, CursedEnergyHud.blockRight() + 4);
+        if (x + boxW > width - 2) x = Math.max(2, width - 2 - boxW);
+        int y = CursedEnergyHud.topBelowBossBars() + 14;
         float fade = elapsed > total + HOLD_AFTER - 10 ? (total + HOLD_AFTER - elapsed) / 10f : 1f;
         int alpha = (int) (Mth.clamp(fade, 0, 1) * 220) << 24;
 

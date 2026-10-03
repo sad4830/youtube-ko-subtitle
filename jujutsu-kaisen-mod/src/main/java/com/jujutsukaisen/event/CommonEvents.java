@@ -1,6 +1,7 @@
 package com.jujutsukaisen.event;
 
 import com.jujutsukaisen.JujutsuKaisen;
+import com.jujutsukaisen.item.SukunaFingerItem;
 import com.jujutsukaisen.command.JJKCommand;
 import com.jujutsukaisen.domain.DomainManager;
 import com.jujutsukaisen.entity.MahoragaEntity;
@@ -34,6 +35,7 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.event.entity.living.LivingUseTotemEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
@@ -56,9 +58,10 @@ public final class CommonEvents {
     @SubscribeEvent
     public static void attachCapabilities(AttachCapabilitiesEvent<Entity> event) {
         if (event.getObject() instanceof Player) {
-            SorcererCapability.Provider provider = new SorcererCapability.Provider();
-            event.addCapability(SorcererCapability.ID, provider);
-            event.addListener(provider::invalidate);
+            // No invalidation listener: it would kill the LazyOptional for good, and the player's caps are
+            // invalidated on death and on every dimension change, then revived (Clone, changeDimension).
+            // Forge's own valid flag already hides the data while the caps are invalidated.
+            event.addCapability(SorcererCapability.ID, new SorcererCapability.Provider());
         }
     }
 
@@ -122,8 +125,8 @@ public final class CommonEvents {
         SorcererData data = JJK.get(player);
         if (data == null) return;
         SorcererLogic.tick(player, data);
-        if (data.isDirty() && player.tickCount % 3 == 0) {
-            ModNetwork.sync(player, data);
+        if (data.isDirty() && player.tickCount % 3 == 0 && player instanceof ServerPlayer serverPlayer) {
+            ModNetwork.syncPlayer(serverPlayer, data);
             data.clearDirty();
         }
     }
@@ -141,6 +144,7 @@ public final class CommonEvents {
         if (entity.level().isClientSide || !entity.hasEffect(ModEffects.INFORMATION_OVERLOAD.get())) return;
         // Unlimited Void: perceiving anything at all becomes an endless loop.
         if (entity instanceof Mob mob) mob.getNavigation().stop();
+        if (entity.isUsingItem()) entity.stopUsingItem();
         Vec3 v = entity.getDeltaMovement();
         entity.setDeltaMovement(0, Math.min(v.y, 0), 0);
         if (entity.tickCount % 10 == 0 && entity.level() instanceof ServerLevel server) {
@@ -158,12 +162,14 @@ public final class CommonEvents {
         DamageSource source = event.getSource();
         Entity attacker = source.getEntity();
 
-        if (attacker instanceof LivingEntity living && source.getDirectEntity() == attacker
+        if (attacker instanceof LivingEntity living && living != target
                 && living.hasEffect(ModEffects.INFORMATION_OVERLOAD.get())) {
             event.setCanceled(true);
             return;
         }
         if (SorcererLogic.infinityBlocks(target, source)) {
+            SorcererData targetData = JJK.get(target);
+            if (targetData != null && !targetData.isJackpot() && !targetData.consume(Math.max(2f, event.getAmount() * 3f))) return;
             event.setCanceled(true);
             SorcererLogic.infinityFeedback(target, source);
             // Mahoraga (or a wheel bearer) adapts to Infinity by being stopped by it.
@@ -213,6 +219,16 @@ public final class CommonEvents {
         if (data != null) Adaptation.onDamaged(data, event.getSource(), event.getAmount());
     }
 
+    /** A jackpot already keeps its holder alive (livingDeath), so a held Totem of Undying is not used up. */
+    @SubscribeEvent
+    public static void useTotem(LivingUseTotemEvent event) {
+        LivingEntity entity = event.getEntity();
+        SorcererData data = JJK.get(entity);
+        if (data != null && data.isJackpot() && !event.getSource().is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+            event.setCanceled(true);
+        }
+    }
+
     @SubscribeEvent
     public static void livingDeath(LivingDeathEvent event) {
         LivingEntity entity = event.getEntity();
@@ -254,7 +270,15 @@ public final class CommonEvents {
 
     @SubscribeEvent
     public static void entityInteract(PlayerInteractEvent.EntityInteract event) {
-        if (event.getEntity().hasEffect(ModEffects.INFORMATION_OVERLOAD.get())) event.setCanceled(true);
+        if (event.getEntity().hasEffect(ModEffects.INFORMATION_OVERLOAD.get())) {
+            event.setCanceled(true);
+            return;
+        }
+        if (event.getItemStack().getItem() instanceof SukunaFingerItem
+                && event.getTarget() instanceof net.minecraft.world.entity.npc.AbstractVillager villager && villager.isAlive()) {
+            event.setCancellationResult(SukunaFingerItem.incarnate(event.getItemStack(), event.getEntity(), villager));
+            event.setCanceled(true);
+        }
     }
 
     @SubscribeEvent
@@ -281,5 +305,6 @@ public final class CommonEvents {
     @SubscribeEvent
     public static void serverStopping(ServerStoppingEvent event) {
         DomainManager.shutdown(event.getServer());
+        BlackFlash.clear();
     }
 }

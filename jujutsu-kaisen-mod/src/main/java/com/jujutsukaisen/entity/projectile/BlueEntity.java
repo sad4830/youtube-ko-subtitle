@@ -3,6 +3,7 @@ package com.jujutsukaisen.entity.projectile;
 import com.jujutsukaisen.registry.ModDamageTypes;
 import com.jujutsukaisen.registry.ModEntities;
 import com.jujutsukaisen.sorcery.JJK;
+import com.jujutsukaisen.sorcery.SorcererLogic;
 import com.jujutsukaisen.util.Blast;
 import com.jujutsukaisen.util.Fx;
 import net.minecraft.core.BlockPos;
@@ -79,6 +80,8 @@ public class BlueEntity extends JJKProjectile {
                 e -> e != owner && !(e instanceof JJKProjectile) && !e.isSpectator())) {
             if (entity instanceof Player player && player.isCreative()) continue;
             if (entity instanceof LivingEntity living && owner != null && !JJK.canHit(owner, living)) continue;
+            if (entity instanceof LivingEntity living
+                    && SorcererLogic.infinityBlocks(living, ModDamageTypes.source(level(), ModDamageTypes.LIMITLESS, this, owner))) continue;
             Vec3 toCenter = center.subtract(entity.position().add(0, entity.getBbHeight() * 0.5, 0));
             double dist = toCenter.length();
             if (dist > radius || dist < 0.05) continue;

@@ -4,6 +4,8 @@ import com.jujutsukaisen.entity.HakariEntity;
 import com.jujutsukaisen.registry.ModEntities;
 import com.jujutsukaisen.util.Fx;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -33,9 +35,10 @@ public class FightClubInvitationItem extends Item {
         if (level instanceof ServerLevel server) {
             HakariEntity hakari = ModEntities.KINJI_HAKARI.get().create(server);
             if (hakari == null) return InteractionResultHolder.fail(stack);
-            Vec3 pos = player.position().add(Vec3.directionFromRotation(0, player.getYRot()).scale(6.0));
+            Vec3 pos = arenaSpot(server, hakari, player);
             hakari.moveTo(pos.x, pos.y, pos.z, player.getYRot() + 180, 0);
             hakari.finalizeSpawn(server, server.getCurrentDifficultyAt(player.blockPosition()), MobSpawnType.MOB_SUMMONED, null, null);
+            hakari.setXpReward(60); // an invitation costs a few ingots: not a 250-XP farm
             server.addFreshEntity(hakari);
             hakari.setChallenger(player);
             Fx.burst(server, Fx.GOLD, pos.add(0, 1, 0), 80, 0.8, 0.1);
@@ -46,6 +49,22 @@ public class FightClubInvitationItem extends Item {
             if (!player.getAbilities().instabuild) stack.shrink(1);
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
+    }
+
+    /** Up to 6 blocks in front of the player, on solid ground with room to stand; else right beside them. */
+    private static Vec3 arenaSpot(ServerLevel level, HakariEntity hakari, Player player) {
+        Vec3 forward = Vec3.directionFromRotation(0, player.getYRot());
+        for (int distance = 6; distance >= 2; distance--) {
+            for (int dy : new int[]{0, 1, -1, 2, -2}) {
+                Vec3 pos = player.position().add(forward.scale(distance)).add(0, dy, 0);
+                BlockPos feet = BlockPos.containing(pos);
+                pos = new Vec3(pos.x, feet.getY(), pos.z);
+                BlockPos below = feet.below();
+                if (!level.getBlockState(below).isFaceSturdy(level, below, Direction.UP)) continue;
+                if (level.noCollision(hakari, hakari.getType().getAABB(pos.x, pos.y, pos.z))) return pos;
+            }
+        }
+        return player.position();
     }
 
     @Override

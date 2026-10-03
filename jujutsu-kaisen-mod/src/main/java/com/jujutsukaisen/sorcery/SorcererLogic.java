@@ -22,6 +22,9 @@ import net.minecraft.world.phys.Vec3;
 
 /** Per-tick upkeep shared by players and the character entities (server side). */
 public final class SorcererLogic {
+    /** Domain cooldown once a player's jackpot round ends (3 minutes). */
+    private static final int JACKPOT_DOMAIN_COOLDOWN = 20 * 180;
+
     public static final String FROZEN_TAG = "jujutsukaisen.infinity_frozen";
     private static final String DROPPED_TAG = "jujutsukaisen.infinity_dropped";
     private static final String FROZEN_AT = "jujutsukaisen.frozen_at";
@@ -66,6 +69,11 @@ public final class SorcererLogic {
             }
             if (left <= 0) {
                 entity.removeEffect(ModEffects.JACKPOT.get());
+                // The next expansion has to wait: no chaining jackpot into jackpot for near-permanent immortality.
+                if (entity instanceof Player) {
+                    data.setCooldown(Ability.DOMAIN_IDLE_DEATH_GAMBLE,
+                            Math.max(data.getCooldown(Ability.DOMAIN_IDLE_DEATH_GAMBLE), JACKPOT_DOMAIN_COOLDOWN));
+                }
                 Fx.actionBar(entity, Component.translatable("message.jujutsukaisen.jackpot_end").withStyle(ChatFormatting.YELLOW));
             }
         }
@@ -87,7 +95,8 @@ public final class SorcererLogic {
 
         // Reverse Cursed Technique: negative × negative = positive energy.
         if (data.isRctActive()) {
-            boolean usable = data.getTechnique().canUseRct() && !data.isJackpot();
+            boolean usable = data.getTechnique().canUseRct() && !data.isJackpot()
+                    && !entity.hasEffect(ModEffects.INFORMATION_OVERLOAD.get());
             boolean needed = entity.getHealth() < entity.getMaxHealth() || data.isBurntOut();
             if (!usable || (entity instanceof Mob && !needed)) {
                 data.setRctActive(false);

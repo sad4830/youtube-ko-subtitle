@@ -94,6 +94,19 @@ public class HakariEntity extends SorcererEntity {
         say("line.jujutsukaisen.hakari.challenge");
     }
 
+    /** The fight is over once the challenger has fallen: the club does not hunt them at their respawn. */
+    @Override
+    protected void customServerAiStep() {
+        super.customServerAiStep();
+        if (challenger != null) {
+            Player player = level().getPlayerByUUID(challenger);
+            if (player != null && player.isDeadOrDying()) {
+                challenger = null;
+                if (getTarget() == player) setTarget(null);
+            }
+        }
+    }
+
     @Override
     protected void registerTargets() {
         targetSelector.addGoal(1, new HurtByTargetGoal(this));

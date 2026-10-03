@@ -2,6 +2,7 @@ package com.jujutsukaisen.network;
 
 import com.jujutsukaisen.JujutsuKaisen;
 import com.jujutsukaisen.sorcery.SorcererData;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkRegistry;
@@ -28,6 +29,17 @@ public final class ModNetwork {
 
     /** Sends the entity's jujutsu state to itself (if a player) and everyone tracking it. */
     public static void sync(LivingEntity entity, SorcererData data) {
+        data.markLookSent();
         CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> entity), new S2CSyncSorcerer(entity.getId(), data.saveSync()));
+    }
+
+    /**
+     * The routine per-player sync: the full state (energy, cooldowns...) goes to the player, and other clients,
+     * which only draw the look, cast pose and auras, get it only when one of those changed.
+     */
+    public static void syncPlayer(ServerPlayer player, SorcererData data) {
+        S2CSyncSorcerer packet = new S2CSyncSorcerer(player.getId(), data.saveSync());
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
+        if (data.takeLookChange()) CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> player), packet);
     }
 }

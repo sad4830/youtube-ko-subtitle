@@ -137,7 +137,7 @@ public final class JJKCommand {
         source.sendSuccess(() -> Component.translatable("command.jujutsukaisen.info.mahoraga",
                 Component.translatable(data.isMahoragaTamed() ? "gui.yes" : "gui.no")), false);
         data.adaptationView().forEach((key, level) -> source.sendSuccess(() -> Component.literal(" • ")
-                .append(Component.translatable("adaptation.jujutsukaisen." + key))
+                .append(Adaptation.displayName(key))
                 .append(" " + Math.min(level, Adaptation.MAX) + "/" + Adaptation.MAX), false));
         return 1;
     }

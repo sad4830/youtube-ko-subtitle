@@ -12,6 +12,7 @@ import com.jujutsukaisen.sorcery.SorcererLogic;
 import com.jujutsukaisen.util.Advancements;
 import com.jujutsukaisen.util.Fx;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -25,6 +26,7 @@ import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.util.Mth;
 import net.minecraft.world.BossEvent;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
@@ -44,7 +46,8 @@ import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.util.Mth;
+import net.minecraft.world.level.pathfinder.BlockPathTypes;
+import net.minecraft.world.level.pathfinder.WalkNodeEvaluator;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -247,7 +250,26 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
         }
         if (getTarget() == null && distanceToSqr(owner) > 10 * 10) {
             getNavigation().moveTo(owner, 1.1);
-            if (distanceToSqr(owner) > 40 * 40) teleportTo(owner.getX(), owner.getY(), owner.getZ());
+            if (distanceToSqr(owner) > 40 * 40) teleportNear(owner);
+        }
+    }
+
+    /**
+     * Catches up with a far-away owner the way a tamed wolf does: only onto walkable ground next to them, so it is
+     * never dropped in mid-air behind a flying owner (falling from there could kill it and cost the tame).
+     */
+    private void teleportNear(LivingEntity owner) {
+        BlockPos center = owner.blockPosition();
+        BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
+        for (int i = 0; i < 10; i++) {
+            BlockPos pos = center.offset(random.nextInt(7) - 3, random.nextInt(3) - 1, random.nextInt(7) - 3);
+            probe.set(pos);
+            if (WalkNodeEvaluator.getBlockPathTypeStatic(level(), probe) != BlockPathTypes.WALKABLE) continue;
+            if (!level().noCollision(this, getBoundingBox().move(pos.getX() + 0.5 - getX(), pos.getY() - getY(), pos.getZ() + 0.5 - getZ()))) continue;
+            moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, getYRot(), getXRot());
+            resetFallDistance();
+            getNavigation().stop();
+            return;
         }
     }
 
@@ -324,7 +346,7 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
             if (source.getEntity() instanceof Player player && !participants.contains(player.getUUID())) {
                 participants.add(player.getUUID());
                 outsideHelp = true;
-            } else if (source.getEntity() instanceof LivingEntity attacker && !(attacker instanceof Player)) {
+            } else if (source.getEntity() instanceof LivingEntity attacker && !(attacker instanceof Player) && helpsSomeone(attacker)) {
                 outsideHelp = true;
             }
         }
@@ -340,10 +362,16 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
         return super.hurt(source, amount);
     }
 
+    /** Someone's pet or shikigami joining in counts as outside help; a wild mob hitting it does not. */
+    private static boolean helpsSomeone(LivingEntity attacker) {
+        if (attacker instanceof MahoragaEntity mahoraga) return mahoraga.getOwnerUUID() != null;
+        return attacker instanceof net.minecraft.world.entity.OwnableEntity pet && pet.getOwnerUUID() != null;
+    }
+
     /** The wheel turned: adaptation advanced one step. */
     public void onWheelTurn(String key, int level) {
         if (!(this.level() instanceof ServerLevel)) return;
-        Component phenomenon = Component.translatable("adaptation.jujutsukaisen." + key);
+        Component phenomenon = Adaptation.displayName(key);
         Component message = Component.translatable("message.jujutsukaisen.mahoraga_adapt", phenomenon, Math.min(level, Adaptation.MAX), Adaptation.MAX)
                 .withStyle(ChatFormatting.GOLD);
         if (Adaptation.INFINITY.equals(key) && level == Adaptation.MAX) {
@@ -424,8 +452,11 @@ public class MahoragaEntity extends PathfinderMob implements SorcererHolder {
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
-        if (tag.contains("Sorcerer")) data.load(tag.getCompound("Sorcerer"));
+        boolean saved = tag.contains("Sorcerer");
+        if (saved) data.load(tag.getCompound("Sorcerer"));
+        float energy = data.getCursedEnergy();
         data.setFixedMax(1000f);
+        if (saved) data.setCursedEnergy(Math.min(energy, data.getMaxCursedEnergy()));
         ownerId = tag.hasUUID("Owner") ? tag.getUUID("Owner") : null;
         lifetime = tag.getInt("Lifetime");
         ritual = tag.getBoolean("Ritual");

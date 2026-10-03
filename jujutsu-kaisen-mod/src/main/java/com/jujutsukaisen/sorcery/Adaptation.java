@@ -2,6 +2,7 @@ package com.jujutsukaisen.sorcery;
 
 import com.jujutsukaisen.entity.MahoragaEntity;
 import com.jujutsukaisen.item.DharmaWheelItem;
+import com.jujutsukaisen.registry.ModDamageTypes;
 import com.jujutsukaisen.registry.ModTags;
 import com.jujutsukaisen.util.Fx;
 import net.minecraft.ChatFormatting;
@@ -41,9 +42,20 @@ public final class Adaptation {
                 || entity.getMainHandItem().getItem() instanceof DharmaWheelItem;
     }
 
+    /** The phenomenon's name; damage types without a lang entry fall back to their prettified id. */
+    public static Component displayName(String key) {
+        StringBuilder pretty = new StringBuilder();
+        for (String word : key.split("_")) {
+            if (word.isEmpty()) continue;
+            if (pretty.length() > 0) pretty.append(' ');
+            pretty.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return Component.translatableWithFallback("adaptation.jujutsukaisen." + key, pretty.toString());
+    }
+
     public static String keyFor(DamageSource source) {
         if (source.is(ModTags.SLASHING)) return "slashing";
-        if (source.is(DamageTypeTags.IS_FIRE)) return "fire";
+        if (source.is(ModDamageTypes.FUGA) || source.is(DamageTypeTags.IS_FIRE)) return "fire";
         if (source.is(DamageTypeTags.IS_EXPLOSION)) return "explosion";
         if (source.is(DamageTypeTags.IS_PROJECTILE)) return "projectile";
         if (source.is(DamageTypeTags.IS_LIGHTNING)) return "lightning";
@@ -124,7 +136,7 @@ public final class Adaptation {
         if (entity instanceof MahoragaEntity mahoraga) mahoraga.onWheelTurn(key, level);
         if (entity instanceof ServerPlayer player) {
             player.displayClientMessage(Component.translatable("message.jujutsukaisen.wheel_turn",
-                    Component.translatable("adaptation.jujutsukaisen." + key), level).withStyle(ChatFormatting.GOLD), true);
+                    displayName(key), level).withStyle(ChatFormatting.GOLD), true);
         }
     }
 

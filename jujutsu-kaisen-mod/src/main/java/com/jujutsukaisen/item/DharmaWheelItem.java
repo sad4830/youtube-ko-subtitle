@@ -37,7 +37,7 @@ public class DharmaWheelItem extends Item {
                     player.sendSystemMessage(Component.translatable("message.jujutsukaisen.wheel_none").withStyle(ChatFormatting.GRAY));
                 }
                 for (Map.Entry<String, Integer> entry : data.adaptationView().entrySet()) {
-                    player.sendSystemMessage(Component.literal(" • ").append(Component.translatable("adaptation.jujutsukaisen." + entry.getKey()))
+                    player.sendSystemMessage(Component.literal(" • ").append(Adaptation.displayName(entry.getKey()))
                             .append(Component.literal(" " + Math.min(entry.getValue(), Adaptation.MAX) + "/" + Adaptation.MAX)).withStyle(ChatFormatting.YELLOW));
                 }
             }

@@ -33,6 +33,8 @@ import java.util.List;
 public class TenShadowsTalismanItem extends Item {
     private static final float SUMMON_COST = 400f;
     private static final int TAMED_LIFETIME = 20 * 90;
+    /** Longer than the lifetime, so only one summoned Mahoraga at a time. */
+    private static final int SUMMON_COOLDOWN = 20 * 120;
 
     public TenShadowsTalismanItem(Properties properties) {
         super(properties);
@@ -55,14 +57,22 @@ public class TenShadowsTalismanItem extends Item {
         mahoraga.finalizeSpawn(server, server.getCurrentDifficultyAt(player.blockPosition()), MobSpawnType.MOB_SUMMONED, null, null);
 
         if (data.isMahoragaTamed()) {
-            if (!data.consume(SUMMON_COST)) {
+            long wait = data.getMahoragaSummonReady() - server.getGameTime();
+            if (wait > 0) {
+                player.displayClientMessage(Component.translatable("message.jujutsukaisen.cooldown", Component.translatable("entity.jujutsukaisen.mahoraga"),
+                        String.format("%.1f", wait / 20f)).withStyle(ChatFormatting.RED), true);
+                return InteractionResultHolder.fail(stack);
+            }
+            // A sorcerer without a technique (max 100) can still afford most of their reserve.
+            if (!data.consume(Math.min(SUMMON_COST, data.getMaxCursedEnergy() * 0.8f))) {
                 player.displayClientMessage(Component.translatable("message.jujutsukaisen.no_energy", Component.translatable("entity.jujutsukaisen.mahoraga"))
                         .withStyle(ChatFormatting.RED), true);
                 return InteractionResultHolder.fail(stack);
             }
             mahoraga.setOwner(player, TAMED_LIFETIME);
             server.addFreshEntity(mahoraga);
-            player.getCooldowns().addCooldown(this, 20 * 120);
+            player.getCooldowns().addCooldown(this, SUMMON_COOLDOWN);
+            data.setMahoragaSummonReady(server.getGameTime() + SUMMON_COOLDOWN);
         } else {
             server.addFreshEntity(mahoraga);
             mahoraga.startRitual(serverPlayer);

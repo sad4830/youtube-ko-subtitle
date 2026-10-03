@@ -10,6 +10,7 @@ import com.jujutsukaisen.sorcery.Technique;
 import com.jujutsukaisen.sorcery.technique.Shrine;
 import com.jujutsukaisen.util.Fx;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.BossEvent;
@@ -128,7 +129,8 @@ public class SukunaEntity extends SorcererEntity {
                 Shrine.dismantle(this, data);
             }
             volley--;
-            volleyDelay = 3;
+            // Past the target's hurt cooldown (10 ticks), so every slash of the volley actually lands.
+            volleyDelay = 11;
         }
     }
 
@@ -170,7 +172,7 @@ public class SukunaEntity extends SorcererEntity {
         if (seen && distSqr > 3.5 * 3.5 && volley <= 0 && ready(Ability.DISMANTLE) && random.nextInt(7) == 0) {
             if (use(Ability.DISMANTLE)) {
                 volley = 2 + random.nextInt(4);
-                volleyDelay = 3;
+                volleyDelay = 11;
             }
         }
     }
@@ -193,5 +195,19 @@ public class SukunaEntity extends SorcererEntity {
         Fx.burst(server, ParticleTypes.SQUID_INK, pos.add(0, 0.2, 0), 120, 1.5, 0.05);
         Fx.burst(server, Fx.BLACK, pos.add(0, 1.5, 0), 80, 1.0, 0.0);
         Fx.sound(server, pos, SoundEvents.WARDEN_EMERGE, 2.5f, 0.8f);
+    }
+
+    @Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        tag.putBoolean("SummonedMahoraga", summonedMahoraga);
+        tag.putBoolean("Praised", praised);
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        summonedMahoraga = tag.getBoolean("SummonedMahoraga");
+        praised = tag.getBoolean("Praised");
     }
 }

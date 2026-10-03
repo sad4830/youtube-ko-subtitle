@@ -38,9 +38,5 @@ public final class SorcererCapability {
         public void deserializeNBT(CompoundTag tag) {
             data.load(tag);
         }
-
-        public void invalidate() {
-            optional.invalidate();
-        }
     }
 }

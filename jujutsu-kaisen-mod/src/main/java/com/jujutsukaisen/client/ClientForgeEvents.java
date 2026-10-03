@@ -3,11 +3,14 @@ package com.jujutsukaisen.client;
 import com.jujutsukaisen.JujutsuKaisen;
 import com.jujutsukaisen.network.C2SKeyAction;
 import com.jujutsukaisen.network.ModNetwork;
+import com.jujutsukaisen.client.hud.CursedEnergyHud;
 import com.jujutsukaisen.client.render.CharacterPlayerRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.util.Mth;
+import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
 import net.minecraftforge.client.event.RenderArmEvent;
+import net.minecraftforge.client.event.RenderGuiEvent;
 import net.minecraftforge.client.event.RenderPlayerEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraftforge.api.distmarker.Dist;
@@ -63,6 +66,16 @@ public final class ClientForgeEvents {
         if (renderer == null) return;
         event.setCanceled(true);
         renderer.renderCharacterHand(event.getPoseStack(), event.getMultiBufferSource(), event.getPackedLight(), player, event.getArm());
+    }
+
+    @SubscribeEvent
+    public static void bossBar(CustomizeGuiOverlayEvent.BossEventProgress event) {
+        CursedEnergyHud.bossBarAt(event.getY());
+    }
+
+    @SubscribeEvent
+    public static void guiFrame(RenderGuiEvent.Pre event) {
+        CursedEnergyHud.frameStart();
     }
 
     private static void send(C2SKeyAction.Action action) {

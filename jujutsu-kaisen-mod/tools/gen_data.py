@@ -30,8 +30,8 @@ write('minecraft/tags/damage_type/bypasses_armor.json',
       {'replace': False, 'values': ids('hollow_purple', 'cleave', 'world_slash', 'malevolent_shrine', 'infinite_void', 'space_cut')})
 write('minecraft/tags/damage_type/bypasses_shield.json',
       {'replace': False, 'values': ids('hollow_purple', 'world_slash', 'malevolent_shrine', 'infinite_void', 'space_cut')})
-write('minecraft/tags/damage_type/is_fire.json', {'replace': False, 'values': ids('fuga')})
-write('minecraft/tags/damage_type/no_knockback.json', {'replace': False, 'values': ids('malevolent_shrine', 'infinite_void')})
+# Not in minecraft:is_fire (Fire Resistance would cancel Fuga outright; Adaptation files it under fire itself), and no
+# minecraft:no_knockback tag (1.20.2+; DomainManager.sureHit keeps victims in place instead).
 write('minecraft/tags/damage_type/is_projectile.json', {'replace': False, 'values': ids('rough_energy')})
 write(f'{M}/tags/damage_type/bypasses_infinity.json',
       {'values': ids('malevolent_shrine', 'infinite_void', 'world_slash', 'space_cut')})
@@ -45,13 +45,18 @@ write(f'{M}/tags/blocks/technique_immune.json',
 
 
 # ── Loot tables ───────────────────────────────────────────────────────────
-def entry(item, mn=1, mx=1, chance=None):
+def entry(item, mn=1, mx=1, chance=None, by_player=False):
     e = {'type': 'minecraft:item', 'name': item}
     if mn != 1 or mx != 1:
         e['functions'] = [{'function': 'minecraft:set_count', 'count': {'type': 'minecraft:uniform', 'min': mn, 'max': mx}}]
     pool = {'rolls': 1, 'entries': [e]}
+    conditions = []
+    if by_player:
+        conditions.append({'condition': 'minecraft:killed_by_player'})
     if chance is not None:
-        pool['conditions'] = [{'condition': 'minecraft:random_chance', 'chance': chance}]
+        conditions.append({'condition': 'minecraft:random_chance', 'chance': chance})
+    if conditions:
+        pool['conditions'] = conditions
     return pool
 
 
@@ -60,9 +65,10 @@ def entity_loot(name, pools):
 
 
 entity_loot('satoru_gojo', [entry(f'{M}:limitless_imprint'), entry(f'{M}:gojo_blindfold')])
-entity_loot('ryomen_sukuna', [entry(f'{M}:sukuna_finger', 2, 4)])
+# Feeding a finger to a villager costs one: beating Sukuna yourself gains about half a finger, a trap gains nothing.
+entity_loot('ryomen_sukuna', [entry(f'{M}:sukuna_finger', 1, 2, by_player=True)])
 entity_loot('kinji_hakari', [entry(f'{M}:idle_death_gamble_imprint'), entry(f'{M}:pachinko_ball', 8, 16),
-                             entry(f'{M}:fight_club_invitation', 1, 1, 0.5)])
+                             entry(f'{M}:fight_club_invitation', 1, 1, 0.25, by_player=True)])
 entity_loot('mahoraga', [entry(f'{M}:sword_of_extermination'), entry(f'{M}:dharma_wheel')])
 
 # Sukuna's fingers are scattered and sealed away in ancient places.
@@ -109,7 +115,7 @@ shaped('ten_shadows_talisman', ['SSS', 'SES', 'SSS'], {'S': 'minecraft:iron_swor
 shaped('prison_realm', ['OEO', 'EDE', 'OEO'], {'O': 'minecraft:crying_obsidian', 'E': 'minecraft:ender_eye', 'D': 'minecraft:diamond_block'},
        f'{M}:prison_realm')
 shapeless('fight_club_invitation', ['minecraft:paper', 'minecraft:gold_ingot', 'minecraft:iron_ingot'], f'{M}:fight_club_invitation')
-shapeless('pachinko_ball', ['minecraft:iron_ingot'], f'{M}:pachinko_ball', 8)
+shapeless('pachinko_ball', ['minecraft:iron_ingot', 'minecraft:gold_nugget'], f'{M}:pachinko_ball', 8)
 shaped('gojo_blindfold', ['WWW', 'W W'], {'W': 'minecraft:black_wool'}, f'{M}:gojo_blindfold')
 
 

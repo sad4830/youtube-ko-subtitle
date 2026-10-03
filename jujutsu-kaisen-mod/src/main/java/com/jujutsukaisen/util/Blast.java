@@ -13,6 +13,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.common.util.BlockSnapshot;
+import net.minecraftforge.event.ForgeEventFactory;
 import org.jetbrains.annotations.Nullable;
 
 /** Controlled block destruction for techniques (no drops, no vanilla explosion side effects). */
@@ -76,7 +78,12 @@ public final class Blast {
                     (random.nextDouble() * 2 - 1) * radius * 0.5, (random.nextDouble() * 2 - 1) * radius));
             if (level.isEmptyBlock(pos) && level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), net.minecraft.core.Direction.UP)
                     && !(breaker instanceof net.minecraft.server.level.ServerPlayer player && !level.mayInteract(player, pos))) {
+                // Placed like a block: claim and protection mods can veto it through the place event.
+                BlockSnapshot snapshot = BlockSnapshot.create(level.dimension(), level, pos);
                 level.setBlock(pos, BaseFireBlock.getState(level, pos), Block.UPDATE_ALL);
+                if (breaker != null && ForgeEventFactory.onBlockPlace(breaker, snapshot, net.minecraft.core.Direction.UP)) {
+                    snapshot.restore(true, false);
+                }
             }
         }
     }

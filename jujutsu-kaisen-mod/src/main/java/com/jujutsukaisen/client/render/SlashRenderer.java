@@ -45,7 +45,7 @@ public class SlashRenderer<T extends Entity> extends EntityRenderer<T> {
                     -depth * 1.15f, -length / 2f * 1.05f, depth * 1.15f, length / 2f * 1.05f, 0, 0, 1, 1, 0xFF2030, 255, RenderUtil.FULL_BRIGHT);
         } else {
             RenderUtil.quad(buffers.getBuffer(RenderType.eyes(SLASH)), poseStack.last(),
-                    -depth, -length / 2f, depth, length / 2f, 0, 0, 1, 1, 0xFFF4F4, alpha, RenderUtil.FULL_BRIGHT);
+                    -depth, -length / 2f, depth, length / 2f, 0, 0, 1, 1, RenderUtil.premultiply(0xFFF4F4, alpha), 255, RenderUtil.FULL_BRIGHT);
         }
         poseStack.popPose();
         super.render(entity, yaw, partialTick, poseStack, buffers, light);

@@ -18,19 +18,48 @@ import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 
 import java.util.List;
 
-/** Cursed energy (주력) bar, technique list with cooldowns, status and the wind-up bar. */
+/**
+ * Cursed energy (주력) bar, technique list with cooldowns, status and the wind-up bar. The block sits at the top
+ * left: the bottom left belongs to chat, which would be drawn over it. It moves below the boss bars when they
+ * would overlap it.
+ */
 public final class CursedEnergyHud implements IGuiOverlay {
     public static final CursedEnergyHud INSTANCE = new CursedEnergyHud();
     private float shownEnergy = -1;
+    /** Bottom of the boss-bar stack in the last frame (0 if none), and the one being collected now. */
+    private static int bossBottom, bossBottomNow;
+    /** Right edge of this block in the current frame (0 if hidden): the slot machine keeps clear of it. */
+    private static int blockRight;
 
     private CursedEnergyHud() {
+    }
+
+    /** CustomizeGuiOverlayEvent.BossEventProgress: a boss bar at this y (bars are 5 px tall). */
+    public static void bossBarAt(int y) {
+        bossBottomNow = Math.max(bossBottomNow, y + 5);
+    }
+
+    /** RenderGuiEvent.Pre: boss bars are drawn after this overlay, so it uses the previous frame's stack. */
+    public static void frameStart() {
+        bossBottom = bossBottomNow;
+        bossBottomNow = 0;
+        blockRight = 0;
+    }
+
+    /** Top y for elements centred at the top of the screen (below any boss bars). */
+    public static int topBelowBossBars() {
+        return bossBottom > 0 ? bossBottom + 4 : 4;
+    }
+
+    public static int blockRight() {
+        return blockRight;
     }
 
     @Override
     public void render(ForgeGui gui, GuiGraphics g, float partialTick, int width, int height) {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
-        if (player == null || mc.options.hideGui || player.isSpectator()) return;
+        if (player == null || mc.options.hideGui || mc.options.renderDebug || player.isSpectator()) return; // F3 uses the top left
         SorcererData data = JJK.get(player);
         if (data == null) return;
         Technique technique = data.getTechnique();
@@ -38,15 +67,21 @@ public final class CursedEnergyHud implements IGuiOverlay {
         Font font = mc.font;
 
         int x = 6;
-        int y = height - 66 - technique.abilities().size() * 11;
         int barW = 112;
-
-        // Keys hint, then the technique name.
         Component keys = Component.translatable("hud.jujutsukaisen.keys", KeyBindings.USE.getTranslatedKeyMessage(),
                 KeyBindings.CYCLE.getTranslatedKeyMessage(), KeyBindings.DOMAIN.getTranslatedKeyMessage());
         if (technique.character() != null) {
             keys = keys.copy().append(Component.translatable("hud.jujutsukaisen.keys_appearance", KeyBindings.APPEARANCE.getTranslatedKeyMessage()));
         }
+        String ce = data.isJackpot() ? "∞" : (int) data.getCursedEnergy() + " / " + (int) data.getMaxCursedEnergy();
+        Component ceText = Component.translatable("hud.jujutsukaisen.cursed_energy", ce);
+        int right = x + Math.max(font.width(keys), barW + 5 + font.width(ceText));
+        blockRight = right + 4;
+        // Below the boss bars only if it would run into them (they are centred, 182 px wide).
+        int top = bossBottom > 0 && right > width / 2 - 91 ? bossBottom + 4 : 4;
+        int y = top + 11;
+
+        // Keys hint, then the technique name.
         g.drawString(font, keys.copy().withStyle(ChatFormatting.GRAY), x, y - 11, 0xFFFFFF, true);
         g.drawString(font, technique.displayName().copy().withStyle(ChatFormatting.BOLD), x, y, 0xFFFFFF, true);
         y += 11;
@@ -59,8 +94,7 @@ public final class CursedEnergyHud implements IGuiOverlay {
         g.fill(x - 1, y - 1, x + barW + 1, y + 7, 0xC0000000);
         g.fill(x, y, x + (int) (barW * ratio), y + 6, 0xFF000000 | color);
         g.fill(x, y, x + (int) (barW * ratio), y + 2, 0x40FFFFFF);
-        String ce = data.isJackpot() ? "∞" : (int) data.getCursedEnergy() + " / " + (int) data.getMaxCursedEnergy();
-        g.drawString(font, Component.translatable("hud.jujutsukaisen.cursed_energy", ce), x + barW + 5, y - 1, 0xE0E0E0, true);
+        g.drawString(font, ceText, x + barW + 5, y - 1, 0xE0E0E0, true);
         y += 11;
 
         // Abilities.
@@ -94,15 +128,12 @@ public final class CursedEnergyHud implements IGuiOverlay {
         if (data.isBurntOut()) {
             g.drawString(font, Component.translatable("hud.jujutsukaisen.burnout", String.format("%.1f", data.getBurnout() / 20f))
                     .withStyle(ChatFormatting.DARK_RED), x, y, 0xFFFFFF, true);
-        }
-
-
-        // Jackpot timer: 4:11 counting down.
-        if (data.isJackpot()) {
+        } else if (data.isJackpot()) {
+            // Jackpot timer: 4:11 counting down.
             int seconds = data.getJackpot() / 20;
             String time = String.format("%d:%02d", seconds / 60, seconds % 60);
             Component jackpot = Component.translatable("hud.jujutsukaisen.jackpot", time).withStyle(ChatFormatting.BOLD);
-            g.drawCenteredString(font, jackpot, width / 2, 4, rainbow(player.tickCount + partialTick));
+            g.drawString(font, jackpot, x, y, rainbow(player.tickCount + partialTick), true);
         }
 
         // Wind-up bar under the crosshair.

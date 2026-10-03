@@ -222,14 +222,24 @@ public abstract class SorcererEntity extends PathfinderMob implements SorcererHo
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         tag.put("Sorcerer", data.save());
+        tag.putInt("XpReward", xpReward);
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
-        if (tag.contains("Sorcerer")) data.load(tag.getCompound("Sorcerer"));
+        boolean saved = tag.contains("Sorcerer");
+        if (saved) data.load(tag.getCompound("Sorcerer"));
+        float energy = data.getCursedEnergy();
         data.setTechnique(technique());
         data.setFixedMax(maxEnergy());
+        if (saved) data.setCursedEnergy(Math.min(energy, data.getMaxCursedEnergy())); // a drained Gojo stays drained
+        if (tag.contains("XpReward")) xpReward = tag.getInt("XpReward");
         if (hasCustomName()) bossEvent.setName(getDisplayName());
+    }
+
+    /** XP dropped on death: a cheaply summoned sorcerer is worth less (saved, since xpReward itself is not). */
+    public void setXpReward(int xp) {
+        this.xpReward = xp;
     }
 }

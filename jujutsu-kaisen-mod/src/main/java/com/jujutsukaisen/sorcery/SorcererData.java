@@ -35,8 +35,12 @@ public class SorcererData {
     private int jackpot;
     private int jackpotCount;
     private boolean probabilityUp;
+    /** 시단: the expansion after an even-numbered jackpot spins faster. */
+    private boolean timeShort;
     private int zone;
     private boolean mahoragaTamed;
+    /** Game time when the tamed Mahoraga can be summoned again (saved, unlike item cooldowns). */
+    private long mahoragaSummonReady;
     /** Player only: look like the character whose technique you carry (Gojo, Hakari, Sukuna). */
     private boolean appearance;
 
@@ -62,6 +66,8 @@ public class SorcererData {
     private int healthHistoryFill;
 
     private boolean dirty = true;
+    /** {@link #lookSignature()} as last sent to other players' clients. */
+    private int sentLook = Integer.MIN_VALUE;
 
     // ───────────────────────────── technique ─────────────────────────────
 
@@ -249,6 +255,14 @@ public class SorcererData {
         markDirty();
     }
 
+    public boolean isTimeShort() {
+        return timeShort;
+    }
+
+    public void setTimeShort(boolean timeShort) {
+        this.timeShort = timeShort;
+    }
+
     public int getZone() {
         return zone;
     }
@@ -274,6 +288,14 @@ public class SorcererData {
     public void setMahoragaTamed(boolean tamed) {
         this.mahoragaTamed = tamed;
         markDirty();
+    }
+
+    public long getMahoragaSummonReady() {
+        return mahoragaSummonReady;
+    }
+
+    public void setMahoragaSummonReady(long gameTime) {
+        this.mahoragaSummonReady = gameTime;
     }
 
     // ───────────────────────────── casting ───────────────────────────────
@@ -433,6 +455,23 @@ public class SorcererData {
 
     // ───────────────────────────── sync / persistence ────────────────────
 
+    /** Everything other clients render from this state: the look, cast pose, aura colour and wheel. */
+    private int lookSignature() {
+        return java.util.Objects.hash(technique, appearance, casting, jackpot > 0, rct, infinity, burnout > 0, wheelTurns, fingers > 0);
+    }
+
+    /** True (once) if what other clients render changed since it was last sent to them. */
+    public boolean takeLookChange() {
+        int look = lookSignature();
+        if (look == sentLook) return false;
+        sentLook = look;
+        return true;
+    }
+
+    public void markLookSent() {
+        sentLook = lookSignature();
+    }
+
     public boolean isDirty() {
         return dirty;
     }
@@ -457,7 +496,9 @@ public class SorcererData {
         tag.putInt("Jackpot", jackpot);
         tag.putInt("JackpotCount", jackpotCount);
         tag.putBoolean("ProbabilityUp", probabilityUp);
+        tag.putBoolean("TimeShort", timeShort);
         tag.putBoolean("MahoragaTamed", mahoragaTamed);
+        tag.putLong("MahoragaSummonReady", mahoragaSummonReady);
         tag.putBoolean("Appearance", appearance);
         tag.putInt("WheelTurns", wheelTurns);
         tag.put("Cooldowns", new IntArrayTag(cooldowns.clone()));
@@ -483,7 +524,9 @@ public class SorcererData {
         jackpot = tag.getInt("Jackpot");
         jackpotCount = tag.getInt("JackpotCount");
         probabilityUp = tag.getBoolean("ProbabilityUp");
+        timeShort = tag.getBoolean("TimeShort");
         mahoragaTamed = tag.getBoolean("MahoragaTamed");
+        mahoragaSummonReady = tag.getLong("MahoragaSummonReady");
         appearance = tag.getBoolean("Appearance");
         wheelTurns = tag.getInt("WheelTurns");
         int[] saved = tag.getIntArray("Cooldowns");

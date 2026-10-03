@@ -23,6 +23,7 @@ public final class ClientPacketHandlers {
     }
 
     public static void slotSpin(S2CSlotSpin message) {
-        SlotMachineHud.start(message);
+        if (message.ticks == S2CSlotSpin.STOP) SlotMachineHud.stop();
+        else SlotMachineHud.start(message);
     }
 }

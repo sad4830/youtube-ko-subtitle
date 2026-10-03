@@ -14,6 +14,12 @@ public final class RenderUtil {
     }
 
     /** A camera-independent quad in the local XY plane, centred, both sides. */
+    /** Additive render types (eyes) ignore vertex alpha, so fade them by darkening the colour instead. */
+    public static int premultiply(int color, int alpha) {
+        int r = ((color >> 16) & 0xFF) * alpha / 255, g = ((color >> 8) & 0xFF) * alpha / 255, b = (color & 0xFF) * alpha / 255;
+        return r << 16 | g << 8 | b;
+    }
+
     public static void quad(VertexConsumer vc, PoseStack.Pose pose, float halfW, float halfH, int color, int alpha, int light) {
         quad(vc, pose, -halfW, -halfH, halfW, halfH, 0f, 0f, 1f, 1f, color, alpha, light);
     }

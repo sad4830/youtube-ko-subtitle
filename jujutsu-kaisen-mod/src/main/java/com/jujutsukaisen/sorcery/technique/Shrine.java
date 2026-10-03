@@ -50,11 +50,15 @@ public final class Shrine {
         Fx.sound(caster, SoundEvents.PLAYER_ATTACK_SWEEP, 1.0f, 1.4f + caster.getRandom().nextFloat() * 0.3f);
     }
 
-    /** Cleave needs contact outside the domain. */
+    /** Cleave needs contact outside the domain; inside the caster's own Malevolent Shrine it reaches anyone in it. */
     @Nullable
     public static LivingEntity cleaveTarget(LivingEntity caster) {
-        LivingEntity target = JJK.aimEntity(caster, 3.5 + caster.getBbWidth());
+        ActiveDomain domain = DomainManager.find(caster);
+        boolean shrine = domain != null && domain.type() == DomainType.MALEVOLENT_SHRINE;
+        LivingEntity target = JJK.aimEntity(caster, shrine ? domain.radius() : 3.5 + caster.getBbWidth());
         if (target == null || !JJK.canHit(caster, target)) return null;
+        if (shrine && caster.distanceTo(target) > 3.5 + caster.getBbWidth() + target.getBbWidth()
+                && !domain.contains(target.getBoundingBox().getCenter())) return null;
         return target;
     }
 
@@ -95,7 +99,7 @@ public final class Shrine {
 
     public static void chargeFuga(LivingEntity caster, int elapsed) {
         Vec3 hand = Fx.hand(caster, false);
-        Fx.burst(caster.level(), ParticleTypes.FLAME, hand, 6, 0.15, 0.02);
+        Fx.casterBurst(caster, ParticleTypes.FLAME, hand, 6, 0.15, 0.02);
         if (elapsed == 2) {
             if (caster instanceof ServerPlayer player) {
                 player.displayClientMessage(Component.translatable("chant.jujutsukaisen.fuga").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), true);
@@ -131,8 +135,8 @@ public final class Shrine {
             Fx.sound(caster, SoundEvents.BELL_BLOCK, 1.5f, 0.5f);
         }
         Vec3 palm = caster.getEyePosition().add(JJK.aim(caster).scale(0.9)).subtract(0, 0.25, 0);
-        Fx.burst(caster.level(), Fx.BLACK, palm, 4, 0.15, 0.0);
-        Fx.burst(caster.level(), Fx.CRIMSON, palm, 3, 0.25, 0.0);
+        Fx.casterBurst(caster, Fx.BLACK, palm, 4, 0.15, 0.0);
+        Fx.casterBurst(caster, Fx.CRIMSON, palm, 3, 0.25, 0.0);
     }
 
     /** 세계를 가르는 참격 — aimed with the palm at the world itself. */

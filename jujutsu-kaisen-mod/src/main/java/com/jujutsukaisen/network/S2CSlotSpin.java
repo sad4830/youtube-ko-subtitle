@@ -10,6 +10,9 @@ import java.util.function.Supplier;
 
 /** Idle Death Gamble: the reels spin for everyone in and around the domain. */
 public class S2CSlotSpin {
+    /** {@link #ticks} value that stops the machine on the client instead of starting a spin. */
+    public static final int STOP = -1;
+
     public final int[] reels;
     public final int indicator;
     public final int riichi;
