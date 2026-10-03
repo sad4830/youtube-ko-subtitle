@@ -150,6 +150,12 @@ public final class ClientShot {
             data.setCursedEnergy(1100);
         }
         origin = player.position();
+        // Remove fighters left over from the server smoke test so only the staged cast is on screen.
+        List<Entity> leftovers = new ArrayList<>();
+        for (Entity e : level.getAllEntities()) {
+            if (e instanceof com.jujutsukaisen.entity.SorcererEntity || e instanceof com.jujutsukaisen.entity.MahoragaEntity) leftovers.add(e);
+        }
+        leftovers.forEach(Entity::discard);
         double z = origin.z + 8;
         put(level, ModEntities.SATORU_GOJO.get(), origin.x - 5.5, origin.y, z, 180);
         put(level, ModEntities.RYOMEN_SUKUNA.get(), origin.x - 1.8, origin.y, z, 180);
@@ -169,7 +175,7 @@ public final class ClientShot {
                 }
                 look(player, new Vec3(origin.x - 3.6, origin.y + 2.0, z - 4.4), new Vec3(origin.x - 3.6, origin.y + 1.3, z));
             }
-            case 1 -> look(player, new Vec3(origin.x + 1.8, origin.y + 1.8, z - 3.0), new Vec3(origin.x + 1.8, origin.y + 1.2, z));
+            case 1 -> look(player, new Vec3(origin.x + 1.8, origin.y + 1.5, z - 4.2), new Vec3(origin.x + 1.8, origin.y + 1.25, z));
             default -> look(player, new Vec3(origin.x + 6.0, origin.y + 3.2, z - 6.5), new Vec3(origin.x + 6.0, origin.y + 2.6, z + 1));
         }
     }

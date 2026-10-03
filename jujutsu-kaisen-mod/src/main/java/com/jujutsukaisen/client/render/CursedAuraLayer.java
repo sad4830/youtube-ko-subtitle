@@ -35,8 +35,9 @@ public class CursedAuraLayer<T extends SorcererEntity, M extends EntityModel<T>>
         poseStack.pushPose();
         poseStack.scale(1.07f, 1.04f, 1.07f);
         poseStack.translate(0, -0.03f, 0);
+        float pulse = 0.42f + 0.12f * net.minecraft.util.Mth.sin(ageInTicks * 0.25f);
         getParentModel().renderToBuffer(poseStack, vc, light, OverlayTexture.NO_OVERLAY,
-                ((color >> 16) & 0xFF) / 255f, ((color >> 8) & 0xFF) / 255f, (color & 0xFF) / 255f, 1f);
+                ((color >> 16) & 0xFF) / 255f * pulse, ((color >> 8) & 0xFF) / 255f * pulse, (color & 0xFF) / 255f * pulse, 1f);
         poseStack.popPose();
     }
 }
