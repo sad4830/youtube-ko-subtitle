@@ -7,6 +7,11 @@ on:
       - 'jujutsu-kaisen-mod/**'
       - '.github/workflows/build-jjk-mod.yml'
 
+# A newer push supersedes a running build (both would push screenshots and the jar to the branch).
+concurrency:
+  group: build-jjk-mod-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -78,6 +83,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add jujutsu-kaisen-mod/docs/screenshots
           git commit -m "Update in-game screenshots [skip ci]" || exit 0
+          git pull --rebase -q origin ${GITHUB_REF_NAME}
           git push origin HEAD:${GITHUB_REF_NAME}
 
       - name: Check player technique test
