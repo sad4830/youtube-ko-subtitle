@@ -64,7 +64,7 @@ jobs:
         run: |
           ls run/screenshots/jjk_*.png >/dev/null 2>&1 || { echo "no screenshots"; exit 0; }
           python3 -m pip install -q pillow
-          mkdir -p docs/screenshots
+          mkdir -p docs/screenshots && rm -f docs/screenshots/*.jpg
           python3 - <<'PY'
           import glob, os
           from PIL import Image

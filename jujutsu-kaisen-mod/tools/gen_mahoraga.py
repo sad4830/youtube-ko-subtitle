@@ -2,8 +2,8 @@
 from texlib import Tex, rgb, shade, faces, soft, mix
 
 SKIN = rgb('E6E2DA')
-SKIN_S = rgb('C9C4BA')
-SKIN_D = rgb('A9A49B')
+SKIN_S = rgb('BDB7AB')
+SKIN_D = rgb('8E887E')
 SKIN_L = rgb('F6F3EC')
 HAKAMA = rgb('151515')
 SASH = rgb('F2F0EA')
@@ -51,10 +51,20 @@ def torso(t):
                 t.set(x + i, y + j, shade(SKIN_S, 0.95))
     line_v(t, x + 8, y + 1, 7, SKIN_S)
     line_v(t, x + 9, y + 1, 7, shade(SKIN_S, 1.05))
-    # Abdominal muscles: 3 rows x 2 columns plus the obliques.
+    # Shadow under the pectorals and the deltoid caps.
+    line_h(t, x + 1, y + 8, w - 2, SKIN_D)
+    for j in range(0, 6):
+        t.set(x, y + j, SKIN_S)
+        t.set(x + w - 1, y + j, SKIN_S)
+    # Abdominal muscles: highlighted cells separated by grooves, plus the obliques.
     for row in range(4):
         yy = y + 9 + row * 3
-        line_h(t, x + 5, yy, 8, SKIN_S)
+        line_h(t, x + 5, yy, 8, SKIN_D)
+        for i in (6, 7, 10, 11):
+            t.set(x + i, yy + 1, SKIN_L)
+    for k in range(4):  # serratus
+        line_h(t, x + 1, y + 10 + k * 2, 2, SKIN_S)
+        line_h(t, x + w - 3, y + 10 + k * 2, 2, SKIN_S)
     line_v(t, x + 8, y + 9, 12, SKIN_D)
     line_v(t, x + 9, y + 9, 12, SKIN_S)
     for j in range(9, 22):
@@ -90,7 +100,10 @@ def pecs(t):
 def hakama(t):
     f = faces(0, 32, 19, 9, 11)
     for name in SIDES:
-        soft(t, f[name], HAKAMA, top=1.25, bottom=0.9, edge=0.85, noise=0.04, fold={2, 6, 10, 14})
+        soft(t, f[name], HAKAMA, top=1.3, bottom=0.95, edge=0.85, noise=0.04, fold={2, 6, 10, 14})
+        x0, y0, w0, h0 = f[name]
+        for i in range(1, w0, 4):
+            line_v(t, x0 + i, y0, h0, rgb('2C2C2E'))
     t.noise_rect(*f['top'], HAKAMA, 0.03)
     t.noise_rect(*f['bottom'], shade(HAKAMA, 0.7), 0.02)
     # Sash (inflated box at 60,32).
@@ -108,7 +121,8 @@ def hakama(t):
 def head(t):
     f = skin_box(t, (120, 0, 10, 10, 10), top=1.05, bottom=0.92)
     x, y, w, h = f['front']  # 10 x 10 — no eyes; wing roots, lipless mouth with teeth.
-    line_h(t, x + 1, y + 2, 8, SKIN_S)  # brow ridge
+    line_h(t, x + 1, y + 2, 8, SKIN_D)  # heavy brow ridge
+    line_h(t, x + 1, y + 1, 8, SKIN_L)
     for i in (1, 2, 7, 8):
         t.set(x + i, y + 3, SKIN_D)
         t.set(x + i, y + 4, SKIN_S)
@@ -158,9 +172,15 @@ def arm(t, u, v):
         for j in range(20, 24):  # fist
             for i in range(w):
                 t.set(x + i, y + j, shade(SKIN, 0.95 - (j - 20) * 0.03))
+        line_h(t, x, y + 7, w, SKIN_S)  # under the shoulder cap
         if name == 'front':
             line_h(t, x + 1, y + 21, w - 2, SKIN_D)  # knuckles
             line_v(t, x + 3, y + 8, 7, SKIN_S)  # biceps split
+            for j in (11, 12):
+                t.set(x + 2, y + j, SKIN_L)
+                t.set(x + 4, y + j, SKIN_L)
+        if name == 'back':
+            line_v(t, x + 3, y + 8, 8, SKIN_D)  # triceps
 
 
 def bandage(t, u, v):
@@ -201,7 +221,9 @@ def legs(t, u, v):
     mult = {'front': 1.0, 'right': 0.9, 'left': 0.9, 'back': 0.84}
     for name in SIDES:
         x, y, w, h = f[name]
-        soft(t, (x, y, w, 14), shade(HAKAMA, mult[name]), top=1.2, bottom=0.95, edge=0.85, noise=0.04, fold={2, 5})
+        soft(t, (x, y, w, 14), shade(HAKAMA, mult[name]), top=1.3, bottom=0.95, edge=0.85, noise=0.04, fold={2, 5})
+        line_v(t, x + 2, y, 14, rgb('2C2C2E'))
+        line_v(t, x + 5, y, 14, rgb('2C2C2E'))
         soft(t, (x, y + 14, w, 3), shade(SKIN, mult[name]), top=1.0, bottom=0.85, edge=0.9)
     t.noise_rect(*f['top'], HAKAMA, 0.03)
     t.noise_rect(*f['bottom'], SKIN_S, 0.02)

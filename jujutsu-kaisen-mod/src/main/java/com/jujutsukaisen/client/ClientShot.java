@@ -6,6 +6,8 @@ import com.jujutsukaisen.domain.DomainManager;
 import com.jujutsukaisen.domain.DomainType;
 import com.jujutsukaisen.domain.Indicator;
 import com.jujutsukaisen.entity.GojoEntity;
+import com.jujutsukaisen.entity.SukunaEntity;
+import com.jujutsukaisen.sorcery.Ability;
 import com.jujutsukaisen.entity.projectile.BlueEntity;
 import com.jujutsukaisen.entity.projectile.DismantleEntity;
 import com.jujutsukaisen.entity.projectile.FugaEntity;
@@ -65,22 +67,24 @@ public final class ClientShot {
             case 60 -> server(mc, ClientShot::stageCharacters);
             case 140 -> shot(mc, "01_characters");
             case 150 -> server(mc, s -> stageCloseup(s, 0));
-            case 200 -> shot(mc, "02_gojo_sukuna");
+            case 200 -> shot(mc, "02_gojo_sukuna_casting");
             case 210 -> server(mc, s -> stageCloseup(s, 1));
-            case 260 -> shot(mc, "03_hakari_mahoraga");
-            case 270 -> server(mc, ClientShot::stageTechniques);
-            case 283 -> shot(mc, "04_techniques");
-            case 310 -> server(mc, ClientShot::stageShrine);
-            case 370 -> shot(mc, "05_malevolent_shrine");
-            case 380 -> {
+            case 250 -> shot(mc, "03_hakari");
+            case 260 -> server(mc, s -> stageCloseup(s, 2));
+            case 300 -> shot(mc, "04_mahoraga");
+            case 310 -> server(mc, ClientShot::stageTechniques);
+            case 323 -> shot(mc, "05_techniques");
+            case 330 -> server(mc, ClientShot::stageShrine);
+            case 390 -> shot(mc, "06_malevolent_shrine");
+            case 400 -> {
                 server(mc, ClientShot::clear);
                 int[] reels = {7, 7, 7};
                 SlotMachineHud.start(new S2CSlotSpin(reels, Indicator.GOLD.ordinal(), 3, true, 30, 12));
             }
-            case 420 -> shot(mc, "06_idle_death_gamble_hud");
-            case 430 -> server(mc, ClientShot::stageVoid);
-            case 500 -> shot(mc, "07_unlimited_void");
-            case 520 -> mc.stop();
+            case 440 -> shot(mc, "07_idle_death_gamble_hud");
+            case 450 -> server(mc, ClientShot::stageVoid);
+            case 520 -> shot(mc, "08_unlimited_void");
+            case 540 -> mc.stop();
             default -> {
             }
         }
@@ -156,8 +160,18 @@ public final class ClientShot {
 
     private static void stageCloseup(ServerPlayer player, int which) {
         double z = origin.z + 8;
-        if (which == 0) look(player, new Vec3(origin.x - 3.6, origin.y + 2.0, z - 4.2), new Vec3(origin.x - 3.6, origin.y + 1.3, z));
-        else look(player, new Vec3(origin.x + 4.0, origin.y + 2.6, z - 5.5), new Vec3(origin.x + 4.0, origin.y + 1.8, z));
+        switch (which) {
+            case 0 -> {
+                // Gojo draws Blue and Red together; Sukuna chants the World-Cutting Slash.
+                for (Entity e : staged) {
+                    if (e instanceof GojoEntity gojo) gojo.getSorcererData().startCast(Ability.HOLLOW_PURPLE, 400);
+                    if (e instanceof SukunaEntity sukuna) sukuna.getSorcererData().startCast(Ability.WORLD_SLASH, 400);
+                }
+                look(player, new Vec3(origin.x - 3.6, origin.y + 2.0, z - 4.4), new Vec3(origin.x - 3.6, origin.y + 1.3, z));
+            }
+            case 1 -> look(player, new Vec3(origin.x + 1.8, origin.y + 1.8, z - 3.0), new Vec3(origin.x + 1.8, origin.y + 1.2, z));
+            default -> look(player, new Vec3(origin.x + 6.0, origin.y + 3.2, z - 6.5), new Vec3(origin.x + 6.0, origin.y + 2.6, z + 1));
+        }
     }
 
     private static void stageTechniques(ServerPlayer player) {

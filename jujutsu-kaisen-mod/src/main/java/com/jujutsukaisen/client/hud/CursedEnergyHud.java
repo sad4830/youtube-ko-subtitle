@@ -41,7 +41,10 @@ public final class CursedEnergyHud implements IGuiOverlay {
         int y = height - 66 - technique.abilities().size() * 11;
         int barW = 112;
 
-        // Technique name.
+        // Keys hint, then the technique name.
+        g.drawString(font, Component.translatable("hud.jujutsukaisen.keys", KeyBindings.USE.getTranslatedKeyMessage(),
+                KeyBindings.CYCLE.getTranslatedKeyMessage(), KeyBindings.DOMAIN.getTranslatedKeyMessage()).withStyle(ChatFormatting.GRAY),
+                x, y - 11, 0xFFFFFF, true);
         g.drawString(font, technique.displayName().copy().withStyle(ChatFormatting.BOLD), x, y, 0xFFFFFF, true);
         y += 11;
 
@@ -90,10 +93,6 @@ public final class CursedEnergyHud implements IGuiOverlay {
                     .withStyle(ChatFormatting.DARK_RED), x, y, 0xFFFFFF, true);
         }
 
-        // Keys hint.
-        g.drawString(font, Component.translatable("hud.jujutsukaisen.keys", KeyBindings.USE.getTranslatedKeyMessage(),
-                KeyBindings.CYCLE.getTranslatedKeyMessage(), KeyBindings.DOMAIN.getTranslatedKeyMessage()).withStyle(ChatFormatting.DARK_GRAY),
-                x, height - 12, 0xFFFFFF, false);
 
         // Jackpot timer: 4:11 counting down.
         if (data.isJackpot()) {
