@@ -110,6 +110,12 @@ python download_models.py --comfy ~/ComfyUI --set anima --no-turbo
 
 > 파일명이 위와 다르면 워크플로우에서 빨간 테두리가 뜹니다. 그럴 땐 해당 노드에서 파일을 다시 선택하면 됩니다.
 
+> **Comfy Desktop(인스턴스 관리 화면이 있는 새 데스크톱 앱) 사용자**
+> - models 폴더 찾기: 인스턴스 카드 ⋮ → **Manage** → **Storage** 탭에서 경로 클릭.
+>   공유 폴더 기본 위치는 `%LOCALAPPDATA%\Comfy-Desktop\ComfyUI-Shared\models` 입니다.
+> - `face_yolov8m.pt`는 공유 폴더에 넣으면 얼굴 감지 노드 목록에 **안 뜹니다**(Impact Subpack은 인스턴스 자체 models 폴더만 봄).
+>   대신 Impact Subpack을 설치하면 이 파일을 인스턴스 폴더에 **자동으로 받아주므로** 따로 넣을 필요가 없습니다.
+
 ### ④ 워크플로우 불러오기
 ComfyUI 재시작 → `workflows/` 폴더의 JSON 파일을 ComfyUI 화면에 **드래그 앤 드롭**.
 각 워크플로우 왼쪽에 한국어 **사용법 메모**가 들어 있습니다.
