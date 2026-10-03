@@ -7,6 +7,16 @@
 > 설치: `jujutsukaisen-1.20.1-1.0.0.jar` 를 `.minecraft/mods` 폴더에 넣고 Forge 1.20.1(47.x) 프로필로 실행하세요.
 > 빌드된 jar 는 GitHub Actions 의 **Build Jujutsu Kaisen Mod** 워크플로 → 실행 결과 → *Artifacts* 에서 받을 수 있습니다.
 
+## 인게임 스크린샷
+CI 가 실제 클라이언트를 띄워 자동으로 찍은 화면입니다 (`docs/screenshots/`).
+
+| | |
+|---|---|
+| ![캐릭터](docs/screenshots/01_characters.jpg) | ![허식 자 · 세계를 가르는 참격 영창](docs/screenshots/02_gojo_sukuna_casting.jpg) |
+| ![마허라](docs/screenshots/04_mahoraga.jpg) | ![술식 이펙트](docs/screenshots/05_techniques.jpg) |
+| ![복마어주자](docs/screenshots/06_malevolent_shrine.jpg) | ![좌살박도 슬롯](docs/screenshots/07_idle_death_gamble_hud.jpg) |
+| ![무량공처](docs/screenshots/08_unlimited_void.jpg) | ![하카리 킨지](docs/screenshots/03_hakari.jpg) |
+
 ---
 
 ## 조작 (키는 설정 → 조작에서 변경 가능)
@@ -112,6 +122,8 @@
 * 소스: `src/main/java/com/jujutsukaisen`
 * 텍스처·언어 파일·데이터팩은 `tools/` 의 파이썬 스크립트로 생성됩니다 (`python3 tools/gen_textures.py`, `gen_lang.py`, `gen_data.py`, Pillow 필요).
 * 빌드: `./gradlew build` (JDK 17) → `build/libs/`
-* CI 는 빌드 후 **헤드리스 서버 스모크 테스트**(네 캐릭터 소환·전투, 모든 술식과 영역전개를 1회씩 강제 발동, 데이터팩 검증)를 실행합니다.
+* CI 는 빌드 후 **헤드리스 서버 스모크 테스트**(네 캐릭터 소환·전투, 모든 술식과 영역전개를 1회씩 강제 발동, 데이터팩 검증)와
+  **클라이언트 스크린샷 테스트**(xvfb + Mesa 로 실제 게임을 실행해 장면을 촬영)를 실행합니다.
+  `ci/smoketest.enabled`, `ci/screenshots.enabled` 파일을 지우면 각각 꺼집니다.
 
 *주술회전(呪術廻戦)은 아쿠타미 게게의 작품입니다. 이 모드는 비공식 팬메이드입니다.*
