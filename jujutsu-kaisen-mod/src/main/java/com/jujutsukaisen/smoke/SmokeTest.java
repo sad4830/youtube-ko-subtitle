@@ -54,7 +54,8 @@ public final class SmokeTest {
         ServerLevel level = server.overworld();
         try {
             checkData(level);
-            BlockPos spawn = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, level.getSharedSpawnPos());
+            // Fight away from spawn so the client screenshot stage stays intact.
+            BlockPos spawn = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, level.getSharedSpawnPos().offset(80, 0, 0));
             gojo = spawn(level, ModEntities.SATORU_GOJO.get(), spawn.offset(-6, 0, 0));
             sukuna = spawn(level, ModEntities.RYOMEN_SUKUNA.get(), spawn.offset(6, 0, 0));
             hakari = spawn(level, ModEntities.KINJI_HAKARI.get(), spawn.offset(0, 0, 8));

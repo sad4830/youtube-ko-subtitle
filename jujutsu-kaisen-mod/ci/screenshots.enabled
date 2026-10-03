@@ -1,0 +1,1 @@
+Presence of this file enables the xvfb client screenshot run in CI (screenshots are committed to docs/screenshots).

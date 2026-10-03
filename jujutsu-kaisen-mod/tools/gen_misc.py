@@ -66,7 +66,7 @@ def shrine(path):
                 t.set(x + i, y + j, c)
 
     # Hall: dark red lacquered wood, gold trim, and the huge gaping mouth on the front.
-    hf = faces(0, 102, 28, 18, 18)
+    hf = faces(0, 102, 28, 20, 18)
     for name, rect in hf.items():
         planks(rect, lacquer if name == 'front' else wood, vertical=True)
     x, y, w, h = hf['front']
@@ -104,7 +104,7 @@ def shrine(path):
                     c = shade(roof, 0.65)
                 t.set(x + i, y + j, c)
 
-    for box in ((0, 138, 46, 3, 32), (0, 173, 34, 3, 24), (140, 42, 24, 3, 4), (140, 50, 6, 2, 32)):
+    for box in ((0, 140, 46, 3, 32), (0, 175, 34, 3, 24), (140, 42, 24, 3, 4), (140, 50, 6, 2, 32)):
         for name, rect in faces(*box).items():
             tiles(rect)
     # Bull skulls and horns.

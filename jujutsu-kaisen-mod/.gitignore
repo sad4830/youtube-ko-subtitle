@@ -17,3 +17,7 @@ logs/
 .project
 .settings/
 bin/
+
+# Python
+__pycache__/
+*.pyc

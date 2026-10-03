@@ -48,7 +48,7 @@ public class MalevolentShrineModel extends HierarchicalModel<MalevolentShrineEnt
 
         // The hall with its gaping mouth.
         PartDefinition hall = root.addOrReplaceChild("hall", CubeListBuilder.create()
-                .texOffs(0, 102).addBox(-14.0f, -18.0f, -9.0f, 28, 18, 18), PartPose.offset(0, 12, 0));
+                .texOffs(0, 102).addBox(-14.0f, -20.0f, -9.0f, 28, 20, 18), PartPose.offset(0, 12, 0));
         hall.addOrReplaceChild("upper_teeth", CubeListBuilder.create()
                 .texOffs(208, 0).addBox(-10.0f, 0.0f, -0.5f, 20, 3, 1), PartPose.offset(0, -13, -9.4f));
         PartDefinition jaw = hall.addOrReplaceChild("jaw", CubeListBuilder.create()
@@ -57,8 +57,8 @@ public class MalevolentShrineModel extends HierarchicalModel<MalevolentShrineEnt
 
         // Tiered roof with upturned eaves.
         PartDefinition roof = root.addOrReplaceChild("roof", CubeListBuilder.create()
-                .texOffs(0, 138).addBox(-23.0f, -3.0f, -16.0f, 46, 3, 32)
-                .texOffs(0, 173).addBox(-17.0f, -6.0f, -12.0f, 34, 3, 24)
+                .texOffs(0, 140).addBox(-23.0f, -3.0f, -16.0f, 46, 3, 32)
+                .texOffs(0, 175).addBox(-17.0f, -6.0f, -12.0f, 34, 3, 24)
                 .texOffs(140, 42).addBox(-12.0f, -9.0f, -2.0f, 24, 3, 4), PartPose.offset(0, -8, 0));
         roof.addOrReplaceChild("eave_left", CubeListBuilder.create().texOffs(140, 50).addBox(0.0f, -1.0f, -16.0f, 6, 2, 32),
                 PartPose.offsetAndRotation(22.0f, -1.0f, 0.0f, 0, 0, -0.35f));

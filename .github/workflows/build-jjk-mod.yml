@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: jujutsu-kaisen-mod
@@ -42,6 +44,41 @@ jobs:
           echo "----- smoke test summary -----"
           grep -E "JJK-SMOKETEST|Exception|ERROR|Caused by" smoketest.log | head -150 || true
           grep -q "JJK-SMOKETEST: PASS" smoketest.log
+
+      - name: Client screenshots (xvfb + Mesa)
+        if: hashFiles('jujutsu-kaisen-mod/ci/screenshots.enabled') != ''
+        env:
+          JJK_CLIENTSHOT: '1'
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1-mesa-dri > /dev/null
+          mkdir -p run/saves && rm -rf run/saves/world && cp -r run/world run/saves/world
+          printf "guiScale:2\nrenderDistance:8\nmaxFps:30\nonboardAccessibility:false\ntutorialStep:none\nskipMultiplayerWarning:true\njoinedFirstServer:true\nsoundCategory_master:0.0\nlang:ko_kr\n" > run/options.txt
+          timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClient --no-daemon 2>&1 | tee client.log || true
+          echo "----- client summary -----"
+          grep -E "JJK-CLIENTSHOT|Exception|ERROR|OpenGL|GL version" client.log | head -120 || true
+          ls -la run/screenshots || true
+
+      - name: Publish screenshots to the branch
+        if: hashFiles('jujutsu-kaisen-mod/ci/screenshots.enabled') != ''
+        run: |
+          ls run/screenshots/jjk_*.png >/dev/null 2>&1 || { echo "no screenshots"; exit 0; }
+          python3 -m pip install -q pillow
+          mkdir -p docs/screenshots
+          python3 - <<'PY'
+          import glob, os
+          from PIL import Image
+          for p in sorted(glob.glob('run/screenshots/jjk_*.png')):
+              im = Image.open(p).convert('RGB')
+              im.thumbnail((960, 540))
+              im.save(os.path.join('docs/screenshots', os.path.basename(p)[4:].replace('.png', '.jpg')), quality=82)
+          PY
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add jujutsu-kaisen-mod/docs/screenshots
+          git commit -m "Update in-game screenshots [skip ci]" || exit 0
+          git push origin HEAD:${GITHUB_REF_NAME}
 
       - name: API signature probe (javap)
         if: always() && hashFiles('jujutsu-kaisen-mod/ci/javap-classes.txt') != ''

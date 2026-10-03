@@ -70,7 +70,7 @@ public class MahoragaModel extends HierarchicalModel<MahoragaEntity> {
                 PartPose.offsetAndRotation(3.0f, -5.0f, -5.2f, 0.0f, 0.45f, 0.12f));
         head.addOrReplaceChild("tail", CubeListBuilder.create().texOffs(200, 0).addBox(-1.5f, 0.0f, 0.0f, 3, 10, 3),
                 PartPose.offsetAndRotation(0.0f, -6.0f, 4.0f, 0.45f, 0.0f, 0.0f));
-        addWheel(head, 0.0f, -18.0f, 0.0f);
+        addWheel(head, 0.0f, -27.0f, 1.0f);
 
         PartDefinition rightArm = root.addOrReplaceChild("right_arm", CubeListBuilder.create()
                         .texOffs(0, 52).addBox(-6.0f, -2.0f, -3.5f, 7, 24, 7)

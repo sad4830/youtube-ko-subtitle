@@ -33,6 +33,10 @@ minecraft {
 
         client {
             property 'forge.enabledGameTestNamespaces', mod_id
+            // CI screenshot run: jump straight into the prepared world.
+            if (System.getenv('JJK_CLIENTSHOT') != null) {
+                args '--quickPlaySingleplayer', 'world'
+            }
         }
 
         server {
