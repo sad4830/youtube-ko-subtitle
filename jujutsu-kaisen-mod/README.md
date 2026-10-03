@@ -5,7 +5,7 @@
 원작(아쿠타미 게게) 설정을 최대한 따라 구현했습니다.
 
 > 설치: `jujutsukaisen-1.20.1-1.0.0.jar` 를 `.minecraft/mods` 폴더에 넣고 Forge 1.20.1(47.x) 프로필로 실행하세요.
-> 빌드된 jar 는 GitHub Actions 의 **Build Jujutsu Kaisen Mod** 워크플로 → 실행 결과 → *Artifacts* 에서 받을 수 있습니다.
+> 바로 쓸 수 있는 jar 는 [`dist/`](dist/) 에 있습니다 — CI 가 서버 스모크 테스트와 플레이어 술식 테스트를 통과한 빌드만 여기에 올립니다.
 
 ## 인게임 스크린샷
 CI 가 실제 클라이언트를 띄워 자동으로 찍은 화면입니다 (`docs/screenshots/`).
@@ -16,6 +16,8 @@ CI 가 실제 클라이언트를 띄워 자동으로 찍은 화면입니다 (`do
 | ![마허라](docs/screenshots/04_mahoraga.jpg) | ![술식 이펙트](docs/screenshots/05_techniques.jpg) |
 | ![복마어주자](docs/screenshots/06_malevolent_shrine.jpg) | ![좌살박도 슬롯](docs/screenshots/07_idle_death_gamble_hud.jpg) |
 | ![무량공처](docs/screenshots/08_unlimited_void.jpg) | ![하카리 킨지](docs/screenshots/03_hakari.jpg) |
+| ![플레이어 고죠 — 허식 자](docs/screenshots/09_player_gojo_purple.jpg) | ![플레이어 하카리 — 좌살박도](docs/screenshots/10_player_hakari_domain.jpg) |
+| ![플레이어 스쿠나 — 세계를 가르는 참격](docs/screenshots/11_player_sukuna_world_slash.jpg) | ![1인칭 — 고죠의 손](docs/screenshots/12_first_person_gojo_hand.jpg) |
 
 ---
 
@@ -28,6 +30,7 @@ CI 가 실제 클라이언트를 띄워 자동으로 찍은 화면입니다 (`do
 | **V** | 영역전개 (전개 중 다시 누르면 해제) |
 | **G** (누르고 있기) | 반전술식 — 주력을 소모해 회복, 타버린 술식을 3배 빨리 복구 |
 | **H** | 무한 켜기/끄기 (무하한 주술 전용) |
+| **J** | 캐릭터 모습 켜기/끄기 (고죠·하카리·스쿠나) |
 
 화면 왼쪽 아래에 **주력 게이지**, 술식 목록·재사용 대기시간, 상태(∞ 무한, ✚ 반전술식, ◆ 존, ✋ 손가락 수, ☸ 마허라 조복)가 표시됩니다.
 
@@ -84,6 +87,13 @@ CI 가 실제 클라이언트를 띄워 자동으로 찍은 화면입니다 (`do
 * **세계를 가르는 참격**은 마허라를 조복하거나(원작에서 스쿠나는 마허라의 무한 적응을 보고 이 참격을 익혔습니다) 손가락 20개를 모으면 해금됩니다.
 * **마허라의 법진**을 보조 손에 들면 원작의 스쿠나처럼 **법진을 짊어지고** 받은 피해에 적응합니다 (머리 위에 법진이 떠오름).
 
+### 고죠 · 하카리 · 스쿠나가 되기
+술식을 얻으면 해당 캐릭터의 **모습**(스킨, 스쿠나는 팔 4개·얼굴 문양)과 **술식 포즈**까지 그대로 쓰게 됩니다.
+* **술식 각인**을 쓰면 술식과 함께 그 캐릭터의 모습이 됩니다. **J** 키로 원래 모습과 오갈 수 있습니다.
+* 스쿠나의 손가락으로 어주자를 얻었다면 **J** 를 눌러 스쿠나의 모습이 될 수 있습니다.
+* 크리에이티브/테스트용: `/jjk become @s satoru_gojo` (`kinji_hakari`, `ryomen_sukuna`, `none`) — 술식·모습·주력을 한 번에 설정합니다.
+* 1인칭에서도 손이 캐릭터의 손으로 보이고, 고죠는 무한이 화살·투사체를 멈춰 세웁니다.
+
 ## 공통 시스템
 * **주력(呪力)** — 술식·영역·반전술식의 자원. 시간이 지나면 회복 (육안 보유자는 더 빠름).
 * **흑섬(黒閃)** — 주력을 실은 풀 차지 근접 공격이 낮은 확률로 흑섬이 됩니다 (의도적으로는 불가능). 피해 2.5배, 이후 **존(ゾーン)** 상태로 다음 흑섬 확률 상승.
@@ -103,6 +113,7 @@ CI 가 실제 클라이언트를 띄워 자동으로 찍은 화면입니다 (`do
 
 ## 명령어 (OP)
 ```
+/jjk become <플레이어> <satoru_gojo|kinji_hakari|ryomen_sukuna|none>
 /jjk technique <플레이어> <none|limitless|shrine|idle_death_gamble>
 /jjk energy <플레이어> <양>
 /jjk fingers <플레이어> <0~20>
@@ -123,7 +134,9 @@ CI 가 실제 클라이언트를 띄워 자동으로 찍은 화면입니다 (`do
 * 텍스처·언어 파일·데이터팩은 `tools/` 의 파이썬 스크립트로 생성됩니다 (`python3 tools/gen_textures.py`, `gen_lang.py`, `gen_data.py`, Pillow 필요).
 * 빌드: `./gradlew build` (JDK 17) → `build/libs/`
 * CI 는 빌드 후 **헤드리스 서버 스모크 테스트**(네 캐릭터 소환·전투, 모든 술식과 영역전개를 1회씩 강제 발동, 데이터팩 검증)와
-  **클라이언트 스크린샷 테스트**(xvfb + Mesa 로 실제 게임을 실행해 장면을 촬영)를 실행합니다.
+  **클라이언트 스크린샷 테스트**(xvfb + Mesa 로 실제 게임을 실행해 장면을 촬영),
+  **플레이어 술식 테스트**(플레이어가 고죠·하카리·스쿠나가 되어 키 입력 경로로 술식을 실제로 쓰는지 확인)를 실행하고,
+  모두 통과하면 jar 를 `dist/` 에 커밋합니다.
   `ci/smoketest.enabled`, `ci/screenshots.enabled` 파일을 지우면 각각 꺼집니다.
 
 *주술회전(呪術廻戦)은 아쿠타미 게게의 작품입니다. 이 모드는 비공식 팬메이드입니다.*
